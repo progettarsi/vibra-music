@@ -6,16 +6,13 @@
 package app.vibra.ui.lyrics
 
 import android.os.Build
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -27,131 +24,165 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.Stable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.BlendMode
-import androidx.compose.ui.graphics.BlurEffect
-import androidx.compose.ui.graphics.TileMode
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.CompositingStrategy
-import androidx.compose.ui.graphics.TransformOrigin
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.graphics.BlurEffect
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RenderEffect
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.TileMode
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.withStyle
-import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.util.lerp
+import app.vibra.ui.motion.Liquid
+import app.vibra.ui.motion.LiquidSpeed
 import com.mocharealm.accompanist.lyrics.core.model.ISyncedLine
 import com.mocharealm.accompanist.lyrics.core.model.SyncedLyrics
 import com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeAlignment
 import com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeLine
+import com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeSyllable
 import com.mocharealm.accompanist.lyrics.core.model.synced.SyncedLine
-import kotlin.math.abs
-import kotlinx.coroutines.coroutineScope
+import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.collectLatest
+import moe.rukamori.archivetune.LocalAnimationsDisabled
 
 /*
  * ─────────────────────────────────────────────────────────────────────────────────────
- *  VIBRA LYRICS LIST — synced lyrics without per-frame effects
+ *  VIBRA LYRICS LIST — synced lyrics, word by word, without per-frame work on the list
  * ─────────────────────────────────────────────────────────────────────────────────────
  *
- *  The third-party karaoke view this replaces re-rendered every visible line into fresh
- *  bitmaps on each frame (about seventy texture uploads per frame in a system trace), which
- *  is what made the lyrics crawl. This list draws plain text and moves it with transforms:
+ *  Plain text moved and shaded by graphics layers (a third-party karaoke view that rendered
+ *  every line into fresh bitmaps per frame was what made the lyrics crawl):
  *
- *   • the active line is the last one that has started; it is bright, the others fade out
- *     with their distance from it (alpha and a slight scale — graphics-layer properties,
- *     animated per line only when the active line changes);
- *   • lines far from the active one are blurred a little (RenderEffect on the line's layer,
- *     animated only when the active line changes);
- *   • word-synced lines fill in word by word, smoothly: only the active line's text is
- *     rebuilt per frame;
- *   • the active line rests at [anchorFraction] of the height; to get there every line rises
- *     on its own spring, the ones below one after another, with a clear bounce (LineMotion).
+ *   • the sung line sits in the middle of the list and the text glides to the next one,
+ *     the lines below following one after another (LyricsFollow);
+ *   • lines fade and soften with their distance from the sung one; the sung line's words
+ *     light up one by one, drawn with a per-word gradient in the draw phase, so the text is
+ *     never re-laid out or recomposed while it is sung;
+ *   • a line that becomes active keeps its brightness: only its words light up, and when
+ *     it is over they fade back down (no flash in between);
+ *   • dragging the text lets the reader browse it sharp; three seconds after the last touch
+ *     it glides back to the line being sung. Tapping a line plays from there.
  * ─────────────────────────────────────────────────────────────────────────────────────
  */
 
 /**
  * @param currentPosition playback position in ms on the lyrics' clock (read off-composition).
- * @param anchorFraction where the active line rests, as a share of the list's height.
+ * @param onLineClicked a line was tapped; returns true when playback seeks to it, which also
+ *   brings the text back to following.
  */
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun VibraLyricsList(
     lyrics: SyncedLyrics,
     currentPosition: () -> Int,
-    listState: LazyListState,
     textColor: Color,
     textStyle: TextStyle,
     accompanimentStyle: TextStyle,
     showTranslation: Boolean,
-    onLineClicked: (ISyncedLine) -> Unit,
+    onLineClicked: (ISyncedLine) -> Boolean,
     onLinePressed: (ISyncedLine) -> Unit,
     modifier: Modifier = Modifier,
-    anchorFraction: Float = 0.38f,
 ) {
     val lines = lyrics.lines
+    val position = rememberUpdatedState(currentPosition)
+    val scope = rememberCoroutineScope()
     // The active line is known before the first frame, so a list opened mid-song never shows
-    // its beginning for an instant (and the lines never animate from wrong values).
-    var active by remember(lines) { mutableIntStateOf(activeLineIndex(lines, currentPosition())) }
-    var placed by remember(lines) { mutableStateOf(false) }
-    val shown by animateFloatAsState(if (placed) 1f else 0f, tween(PlaceFadeMillis), label = "lyricsPlaced")
-    val motion = remember(lines) { LineMotion() }
-    LaunchedEffect(lines) {
-        snapshotFlow { activeLineIndex(lines, currentPosition()) }.collect { active = it }
+    // its beginning for an instant.
+    val follow =
+        remember(lines) {
+            val starts = IntArray(lines.size) { lines[it].start }
+            LyricsFollow(starts = starts, initialActive = lineAt(starts, position.value()), scope = scope)
+        }
+    val listState = remember(lines) { LazyListState() }
+    val specs =
+        FollowSpecs(
+            rise = Liquid.spatial(),
+            settle = Liquid.container(),
+            fade = Liquid.effects(),
+            focus = Liquid.container(),
+            cascade = !LocalAnimationsDisabled.current,
+        )
+    SideEffect { follow.specs = specs }
+
+    LaunchedEffect(follow) {
+        snapshotFlow { position.value() }.collect { follow.onPosition(it) }
+    }
+    LaunchedEffect(follow, listState) {
+        listState.interactionSource.interactions.collect { interaction ->
+            if (interaction is DragInteraction.Start) follow.startBrowsing()
+        }
+    }
+    // Back to the sung line once the text has rested, untouched, for a while.
+    LaunchedEffect(follow, listState) {
+        snapshotFlow { follow.browsing && !follow.touching && !listState.isScrollInProgress }
+            .collectLatest { resting ->
+                if (resting) {
+                    delay(ResyncAfterMillis)
+                    follow.stopBrowsing()
+                }
+            }
     }
 
-    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
-        val density = LocalDensity.current
-        val anchorPx = with(density) { maxHeight.toPx() * anchorFraction }
-        // Placement without animation: on opening, on a new track, and whenever the layout
-        // changes (a resize must not make the lines bounce).
-        LaunchedEffect(lines, anchorPx) {
-            listState.scrollToItem(maxOf(active, 0), -anchorPx.toInt())
-            placed = true
-        }
-        LaunchedEffect(active) {
-            if (placed) motion.advance(listState, maxOf(active, 0), anchorPx)
-        }
-
+    BoxWithConstraints(
+        modifier =
+            modifier
+                .fillMaxSize()
+                .pointerInput(follow) {
+                    // Observes fingers without consuming them: scrolling and taps stay the list's.
+                    awaitEachGesture {
+                        awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                        follow.touching = true
+                        try {
+                            do {
+                                val event = awaitPointerEvent(PointerEventPass.Initial)
+                            } while (event.changes.any { it.pressed })
+                        } finally {
+                            follow.touching = false
+                        }
+                    }
+                },
+    ) {
+        // Placement without animation on opening and whenever the height changes.
+        LaunchedEffect(follow, constraints.maxHeight) { follow.drive(listState) }
+        val half = maxHeight / 2
         LazyColumn(
             state = listState,
-            // The first line starts where the active line rests, so the intro needs no travel.
-            contentPadding = PaddingValues(top = maxHeight * anchorFraction, bottom = maxHeight * (1f - anchorFraction)),
-            verticalArrangement = Arrangement.spacedBy(18.dp),
-            modifier = Modifier.fillMaxSize().graphicsLayer { alpha = shown }.edgeFade(),
+            // Half the height at both ends: the first and the last line can rest in the middle.
+            contentPadding = PaddingValues(top = half, bottom = half),
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .graphicsLayer { alpha = follow.visibility.value },
         ) {
             itemsIndexed(lines, key = { index, line -> "${line.start}:$index" }) { index, line ->
-                // Each line has its own vertical offset, so lines can rise one by one.
-                val rise = remember { Animatable(0f) }
-                DisposableEffect(rise) {
-                    motion.offsets[index] = rise
-                    onDispose { if (motion.offsets[index] === rise) motion.offsets.remove(index) }
-                }
                 LyricLine(
                     line = line,
-                    riseY = { rise.value },
-                    distance = if (active < 0) index + 1 else abs(index - active),
-                    isActive = index == active,
-                    currentPosition = currentPosition,
+                    index = index,
+                    distance = lineDistance(index, follow.active),
+                    follow = follow,
+                    position = position.value,
                     textColor = textColor,
                     textStyle = textStyle,
                     accompanimentStyle = accompanimentStyle,
                     showTranslation = showTranslation,
-                    onClick = { onLineClicked(line) },
+                    onClick = { if (onLineClicked(line)) follow.seekedTo(index) },
                     onLongClick = { onLinePressed(line) },
                 )
             }
@@ -163,10 +194,10 @@ fun VibraLyricsList(
 @Composable
 private fun LyricLine(
     line: ISyncedLine,
-    riseY: () -> Float,
+    index: Int,
     distance: Int,
-    isActive: Boolean,
-    currentPosition: () -> Int,
+    follow: LyricsFollow,
+    position: () -> Int,
     textColor: Color,
     textStyle: TextStyle,
     accompanimentStyle: TextStyle,
@@ -174,126 +205,244 @@ private fun LyricLine(
     onClick: () -> Unit,
     onLongClick: () -> Unit,
 ) {
+    val active = distance == 0
+    val lit =
+        animateFloatAsState(
+            targetValue = if (active) 1f else 0f,
+            // Sung words fade back down more slowly than a line lights up.
+            animationSpec = if (active) Liquid.effects() else Liquid.effects(LiquidSpeed.Slow),
+            label = "lyricLit",
+        )
+    val dim = animateFloatAsState(lineDim(distance), Liquid.effects(), label = "lyricDim")
+    val blur = animateFloatAsState(lineBlurDp(distance), Liquid.effects(), label = "lyricBlur")
+    val scale = animateFloatAsState(if (active) 1f else InactiveScale, Liquid.spatial(), label = "lyricScale")
+    // What is not lit: the depth dimming, evened out while the reader browses.
+    val base = { lerp(dim.value, BrowseDim, follow.focus.value) }
+    val glow = { lerp(base(), 1f, lit.value) }
+    val softness = remember { LineSoftness() }
+
     val endAligned = (line as? KaraokeLine)?.alignment == KaraokeAlignment.End
-    val alpha by animateFloatAsState(
-        targetValue = lineAlpha(distance),
-        animationSpec = tween(LineFadeMillis),
-        label = "lyricLineAlpha",
-    )
-    val blur by animateFloatAsState(
-        targetValue = lineBlurDp(distance),
-        animationSpec = tween(LineBlurMillis),
-        label = "lyricLineBlur",
-    )
-    val scale by animateFloatAsState(
-        targetValue = if (isActive) 1f else InactiveScale,
-        animationSpec = spring(dampingRatio = 0.7f, stiffness = 500f),
-        label = "lyricLineScale",
-    )
     val align = if (endAligned) TextAlign.End else TextAlign.Start
     Column(
         modifier =
             Modifier
                 .fillMaxWidth()
+                // Two layers: the offset changes every frame of a glide, the look only when
+                // the line's distance or the browsing focus changes.
+                .graphicsLayer { translationY = follow.offset(index) }
                 .graphicsLayer {
-                    translationY = riseY()
-                    this.alpha = alpha
-                    scaleX = scale
-                    scaleY = scale
+                    scaleX = scale.value
+                    scaleY = scale.value
                     transformOrigin = TransformOrigin(if (endAligned) 1f else 0f, 0.5f)
-                    if (blur > 0.05f && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                        val radius = blur.dp.toPx()
-                        renderEffect = BlurEffect(radius, radius, TileMode.Decal)
-                    }
+                    renderEffect = softness.effect((blur.value * (1f - follow.focus.value)).dp.toPx())
                 }.combinedClickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
                     onClick = onClick,
                     onLongClick = onLongClick,
-                ).padding(horizontal = 4.dp),
+                    // The gap between lines is part of each line, so there is nowhere to tap in vain.
+                ).padding(horizontal = 4.dp, vertical = LineGap / 2),
     ) {
         val syllables = (line as? KaraokeLine)?.syllables
-        if (isActive && syllables != null && syllables.size > 1) {
-            // Each word fills in smoothly over its own duration. Only this one line is rebuilt
-            // per frame (a single text layout), never the whole list.
-            val position = currentPosition()
-            Text(
-                text =
-                    buildAnnotatedString {
-                        syllables.forEach { syllable ->
-                            val span = (syllable.end - syllable.start).coerceAtLeast(1)
-                            val fill = ((position - syllable.start).toFloat() / span).coerceIn(0f, 1f)
-                            val eased = fill * fill * (3f - 2f * fill)
-                            withStyle(SpanStyle(color = textColor.copy(alpha = UnsungAlpha + (1f - UnsungAlpha) * eased))) {
-                                append(syllable.content)
-                            }
-                        }
-                    },
+        if (!syllables.isNullOrEmpty()) {
+            SungText(
+                syllables = syllables,
                 style = textStyle,
-                textAlign = align,
-                modifier = Modifier.fillMaxWidth(),
+                color = textColor,
+                align = align,
+                base = base,
+                lit = { lit.value },
+                position = position,
             )
         } else {
-            Text(text = line.plainText(), style = textStyle, color = textColor, textAlign = align, modifier = Modifier.fillMaxWidth())
-        }
-        (line as? KaraokeLine.MainKaraokeLine)?.accompanimentLines?.forEach { backing ->
             Text(
-                text = backing.syllables.joinToString("") { it.content },
-                style = accompanimentStyle,
-                color = textColor.copy(alpha = 0.7f),
+                text = line.plainText(),
+                style = textStyle,
+                color = textColor,
                 textAlign = align,
-                modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                modifier = Modifier.fillMaxWidth().graphicsLayer { alpha = glow() },
             )
         }
-        val translation = line.translationText()
-        if (showTranslation && !translation.isNullOrBlank()) {
-            Text(
-                text = translation,
-                style = accompanimentStyle,
-                color = textColor.copy(alpha = 0.7f),
-                textAlign = align,
-                modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-            )
+        val backing = (line as? KaraokeLine.MainKaraokeLine)?.accompanimentLines.orEmpty()
+        val translation = line.translationText()?.takeIf { showTranslation && it.isNotBlank() }
+        if (backing.isNotEmpty() || translation != null) {
+            Column(modifier = Modifier.fillMaxWidth().graphicsLayer { alpha = SecondaryAlpha * glow() }) {
+                backing.forEach { accompaniment ->
+                    Text(
+                        text = accompaniment.syllables.joinToString("") { it.content },
+                        style = accompanimentStyle,
+                        color = textColor,
+                        textAlign = align,
+                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                    )
+                }
+                if (translation != null) {
+                    Text(
+                        text = translation,
+                        style = accompanimentStyle,
+                        color = textColor,
+                        textAlign = align,
+                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                    )
+                }
+            }
         }
     }
 }
 
-/** Index of the last line that has started at [position], or -1 before the first. */
-private fun activeLineIndex(
-    lines: List<ISyncedLine>,
-    position: Int,
-): Int {
-    var low = 0
-    var high = lines.lastIndex
-    var found = -1
-    while (low <= high) {
-        val mid = (low + high) ushr 1
-        if (lines[mid].start <= position) {
-            found = mid
-            low = mid + 1
-        } else {
-            high = mid - 1
-        }
-    }
-    return found
+/**
+ * A word-synced line. Laid out once; in the draw phase each visual row is painted with a
+ * horizontal gradient that holds every word at its own brightness — from [base] up to full
+ * as the word is sung (times [lit], which fades the line back down when it is over). The
+ * position is only read while the line is lit, so the other lines never redraw for it.
+ */
+@Composable
+private fun SungText(
+    syllables: List<KaraokeSyllable>,
+    style: TextStyle,
+    color: Color,
+    align: TextAlign,
+    base: () -> Float,
+    lit: () -> Float,
+    position: () -> Int,
+) {
+    val words = remember(syllables) { SungWords(syllables) }
+    Text(
+        text = words.text,
+        style = style,
+        color = color,
+        textAlign = align,
+        onTextLayout = words::onLayout,
+        modifier =
+            Modifier.fillMaxWidth().drawWithContent {
+                val layout = words.layout
+                if (layout == null) drawContent() else words.draw(this, layout, color, base(), lit(), position)
+            },
+    )
 }
 
-/** Blur of a line by its distance from the active one (the lines far away go soft). */
-private fun lineBlurDp(distance: Int): Float =
-    when (distance) {
-        0 -> 0f
-        1 -> 1.2f
-        2 -> 2.4f
-        else -> 3.6f
+/** Where each word of a sung line is, row by row, once the line is laid out. */
+private class SungWords(
+    private val syllables: List<KaraokeSyllable>,
+) {
+    val text = syllables.joinToString("") { it.content }
+    var layout: TextLayoutResult? = null
+        private set
+    private var rows: List<List<WordSpan>> = emptyList()
+
+    fun onLayout(result: TextLayoutResult) {
+        layout = result
+        rows = wordRows(result)
     }
 
-private fun lineAlpha(distance: Int): Float =
-    when (distance) {
-        0 -> 1f
-        1 -> 0.58f
-        2 -> 0.46f
-        else -> 0.36f
+    fun draw(
+        scope: DrawScope,
+        layout: TextLayoutResult,
+        color: Color,
+        base: Float,
+        lit: Float,
+        position: () -> Int,
+    ) = with(scope) {
+        if (lit <= 0.001f) {
+            drawText(layout, color = color.copy(alpha = color.alpha * base))
+            return@with
+        }
+        val now = position()
+        val width = size.width.coerceAtLeast(1f)
+        val lastRow = layout.lineCount - 1
+        for (row in 0..lastRow) {
+            val spans = rows.getOrNull(row).orEmpty()
+            // Generous bands: glyphs that reach past their row (accents, italics) stay whole.
+            val top = if (row == 0) -size.height else layout.getLineTop(row)
+            val bottom = if (row == lastRow) size.height * 2f else layout.getLineBottom(row)
+            clipRect(left = -width, top = top, right = width * 2f, bottom = bottom) {
+                drawText(layout, brush = rowBrush(spans, color, base, lit, now, width))
+            }
+        }
     }
+
+    /** Each word's brightness between its left and right edge (one colour when the row is even). */
+    private fun rowBrush(
+        spans: List<WordSpan>,
+        color: Color,
+        base: Float,
+        lit: Float,
+        position: Int,
+        width: Float,
+    ): Brush {
+        if (spans.isEmpty()) return SolidColor(color.copy(alpha = color.alpha * base))
+        val alphas =
+            FloatArray(spans.size) { i ->
+                val word = syllables[spans[i].syllable]
+                lerp(base, 1f, wordFill(word.start, word.end, position) * lit)
+            }
+        if (alphas.all { it == alphas[0] }) return SolidColor(color.copy(alpha = color.alpha * alphas[0]))
+        val stops = ArrayList<Pair<Float, Color>>(spans.size * 2 + 2)
+        var last = 0f
+        fun stop(
+            x: Float,
+            alpha: Float,
+        ) {
+            last = (x / width).coerceIn(last, 1f)
+            stops += last to color.copy(alpha = color.alpha * alpha)
+        }
+        stop(0f, alphas.first())
+        spans.forEachIndexed { i, span ->
+            stop(span.left, alphas[i])
+            stop(span.right, alphas[i])
+        }
+        stop(width, alphas.last())
+        return Brush.horizontalGradient(*stops.toTypedArray(), startX = 0f, endX = width)
+    }
+
+    private fun wordRows(result: TextLayoutResult): List<List<WordSpan>> {
+        val rows = List(result.lineCount) { ArrayList<WordSpan>() }
+        val length = result.layoutInput.text.length
+        var offset = 0
+        syllables.forEachIndexed { index, syllable ->
+            val start = offset
+            val end = (offset + syllable.content.length).coerceAtMost(length)
+            offset = end
+            if (end <= start) return@forEachIndexed
+            val firstRow = result.getLineForOffset(start)
+            val lastRow = result.getLineForOffset(end - 1)
+            for (row in firstRow..lastRow) {
+                val from = if (row == firstRow) start else result.getLineStart(row)
+                val to = if (row == lastRow) end else result.getLineEnd(row)
+                if (to <= from) continue
+                val head = result.getBoundingBox(from)
+                val tail = result.getBoundingBox(to - 1)
+                rows[row] += WordSpan(index, minOf(head.left, tail.left), maxOf(head.right, tail.right))
+            }
+        }
+        rows.forEach { row -> row.sortBy { it.left } }
+        return rows
+    }
+}
+
+/** The part of word [syllable] that lies on one visual row, in px. */
+private class WordSpan(
+    val syllable: Int,
+    val left: Float,
+    val right: Float,
+)
+
+/** Keeps one blur effect per radius, so a resting line does not rebuild it on every layer update. */
+private class LineSoftness {
+    private var radius = 0f
+    private var effect: RenderEffect? = null
+
+    fun effect(px: Float): RenderEffect? {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return null
+        val rounded = (px * 4f).roundToInt() / 4f
+        if (rounded < MinBlurPx) return null
+        if (rounded != radius || effect == null) {
+            radius = rounded
+            effect = BlurEffect(rounded, rounded, TileMode.Decal)
+        }
+        return effect
+    }
+}
 
 private fun ISyncedLine.plainText(): String =
     when (this) {
@@ -309,75 +458,13 @@ private fun ISyncedLine.translationText(): String? =
         else -> null
     }
 
-/** The per-line vertical offsets of the lines currently on screen, by line index. */
-@Stable
-private class LineMotion {
-    val offsets = mutableMapOf<Int, Animatable<Float, AnimationVector1D>>()
-
-    /**
-     * Brings line [index] to [anchorPx] from the top the way the old karaoke view did: the list
-     * jumps to its new position at once while every line keeps its on-screen place (an offset
-     * of the same size, the other way), and then each line rises into its place on its own
-     * spring — the lines below the active one one after another, so the text is pulled up
-     * line by line, overshoots and settles. A far jump (a seek) just repositions.
-     */
-    suspend fun advance(
-        state: LazyListState,
-        index: Int,
-        anchorPx: Float,
-    ) = coroutineScope {
-        val item = state.layoutInfo.visibleItemsInfo.firstOrNull { it.index == index }
-        if (item == null) {
-            state.scrollToItem(index, -anchorPx.toInt())
-            return@coroutineScope
-        }
-        val delta = item.offset - anchorPx
-        if (abs(delta) < 1f) return@coroutineScope
-        if (abs(delta) > state.layoutInfo.viewportSize.height * FarJumpShare) {
-            state.scrollToItem(index, -anchorPx.toInt())
-            return@coroutineScope
-        }
-        val lines = offsets.toMap()
-        // Adding to the current offset keeps a line that is still rising from jumping.
-        lines.values.forEach { it.snapTo(it.value + delta) }
-        state.scrollBy(delta)
-        lines.forEach { (line, offset) ->
-            launch {
-                delay(if (line >= index) minOf(line - index, MaxStagger) * StaggerMillis else 0L)
-                offset.animateTo(0f, spring(dampingRatio = RiseDamping, stiffness = RiseStiffness))
-            }
-        }
-    }
-}
-
-/** Dissolves the top and bottom of the list into the backdrop. */
-private fun Modifier.edgeFade(): Modifier =
-    graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-        .drawWithContent {
-            drawContent()
-            drawRect(
-                brush =
-                    Brush.verticalGradient(
-                        0f to Color.Transparent,
-                        0.07f to Color.Black,
-                        0.9f to Color.Black,
-                        1f to Color.Transparent,
-                    ),
-                blendMode = BlendMode.DstIn,
-            )
-        }
-
-/** Each line's rise: a clearly visible overshoot (damping 0.5), the lines below start 45 ms apart. */
-private const val RiseDamping = 0.5f
-private const val RiseStiffness = 420f
-private const val StaggerMillis = 45L
-private const val MaxStagger = 6
-
-/** A jump longer than this share of the viewport is not animated. */
-private const val FarJumpShare = 0.8f
-
-private const val LineFadeMillis = 220
-private const val PlaceFadeMillis = 140
-private const val LineBlurMillis = 260
+private val LineGap = 18.dp
 private const val InactiveScale = 0.94f
-private const val UnsungAlpha = 0.45f
+
+/** Brightness of every line that is not lit while the reader browses: even, and easy to read. */
+private const val BrowseDim = 0.62f
+
+/** Backing vocals and translations, relative to their line. */
+private const val SecondaryAlpha = 0.7f
+private const val MinBlurPx = 0.5f
+private const val ResyncAfterMillis = 3_000L

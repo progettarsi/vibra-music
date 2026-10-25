@@ -530,8 +530,8 @@ private fun VibraLyricsControls(
     }
 }
 
-/** Share of the lyrics pane's height over which lines fade in/out at the edges. */
-private const val EdgeFade = 0.08f
+/** Share of the lyrics pane's height over which lines fade in/out at the edges (the only edge fade). */
+private const val EdgeFade = 0.1f
 
 @Composable
 private fun LyricsContent(

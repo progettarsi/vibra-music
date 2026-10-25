@@ -18,6 +18,10 @@ import android.os.SystemClock
 import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -88,6 +92,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.media3.common.Player
 import app.vibra.ui.lyrics.VibraLyricsList
+import app.vibra.ui.lyrics.VibraLyricsLoader
+import app.vibra.ui.motion.Liquid
+import app.vibra.ui.motion.LiquidSpeed
 import com.mocharealm.accompanist.lyrics.core.model.ISyncedLine
 import com.mocharealm.accompanist.lyrics.core.model.SyncedLyrics
 import com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeAlignment
@@ -106,8 +113,6 @@ import moe.rukamori.archivetune.lyrics.LyricsTextDirection
 import moe.rukamori.archivetune.lyrics.LyricsUtils.providedTranslationTextForEntry
 import moe.rukamori.archivetune.lyrics.WordTimestamp
 import moe.rukamori.archivetune.lyrics.toLyricsEntries
-import moe.rukamori.archivetune.ui.component.shimmer.ShimmerHost
-import moe.rukamori.archivetune.ui.component.shimmer.TextPlaceholder
 import moe.rukamori.archivetune.ui.theme.rememberArchiveTuneLyricsFontFamily
 import moe.rukamori.archivetune.utils.rememberEnumPreference
 import moe.rukamori.archivetune.viewmodels.LyricsRenderScreenState
@@ -211,7 +216,6 @@ fun LyricsEnhanced(
     val latestLeadMs = rememberUpdatedState(leadMs)
     val playbackPositionMs = lyricsRenderViewModel.playbackPositionMs.collectAsStateWithLifecycle()
     val plainLyricsListState = key(lyricsSessionKey) { rememberLazyListState() }
-    val karaokeLyricsListState = key(lyricsSessionKey) { rememberLazyListState() }
 
     LaunchedEffect(lyricsSessionKey) {
         isSelectionModeActive = false
@@ -395,6 +399,20 @@ fun LyricsEnhanced(
         dismissSelection()
     }
 
+    // Vibra: loading, lyrics and "not found" cross-fade; a view on its way out keeps its own
+    // lines, so the old song's lyrics fade instead of vanishing when the track changes.
+    val lyricsView: LyricsView =
+        when {
+            lyricsState is LyricsRenderScreenState.Loading -> LyricsView.Loading
+            lyricsState !is LyricsRenderScreenState.Success -> LyricsView.Missing
+            isSynced && syncedLyrics.lines.isEmpty() -> LyricsView.Missing
+            !isSynced && plainLyrics.items.isEmpty() -> LyricsView.Missing
+            !isSynced -> LyricsView.Plain(plainLyrics, lyricsSessionKey)
+            else -> LyricsView.Synced(syncedLyrics, lyricsSessionKey, lyricsLayoutDirection)
+        }
+    val viewEnter = Liquid.effects<Float>(LiquidSpeed.Slow)
+    val viewExit = Liquid.effects<Float>(LiquidSpeed.Fast)
+
     Box(
         contentAlignment = Alignment.TopCenter,
         modifier =
@@ -402,84 +420,60 @@ fun LyricsEnhanced(
                 .fillMaxSize()
                 .padding(bottom = 12.dp),
     ) {
-        when {
-            lyricsState is LyricsRenderScreenState.Loading -> {
-                ShimmerHost {
-                    repeat(6) { TextPlaceholder() }
-                }
-            }
+        AnimatedContent(
+            targetState = lyricsView,
+            transitionSpec = { fadeIn(viewEnter) togetherWith fadeOut(viewExit) using null },
+            contentKey = { view -> view.key },
+            contentAlignment = Alignment.Center,
+            label = "lyricsView",
+            modifier = Modifier.fillMaxSize(),
+        ) { view ->
+            when (view) {
+                LyricsView.Loading -> VibraLyricsLoader(color = textColor, modifier = Modifier.fillMaxSize())
 
-            lyricsState !is LyricsRenderScreenState.Success -> {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(
-                        text = stringResource(R.string.lyrics_not_found),
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = textColor.copy(alpha = 0.6f),
-                        textAlign = TextAlign.Center,
-                    )
-                }
-            }
+                LyricsView.Missing -> LyricsMissing(textColor = textColor)
 
-            isSynced && syncedLyrics.lines.isEmpty() -> {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(
-                        text = stringResource(R.string.lyrics_not_found),
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = textColor.copy(alpha = 0.6f),
-                        textAlign = TextAlign.Center,
-                    )
-                }
-            }
-
-            !isSynced && plainLyrics.items.isEmpty() -> {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(
-                        text = stringResource(R.string.lyrics_not_found),
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = textColor.copy(alpha = 0.6f),
-                        textAlign = TextAlign.Center,
-                    )
-                }
-            }
-
-            !isSynced -> {
-                PlainLyricsView(
-                    lines = plainLyrics,
-                    listState = plainLyricsListState,
-                    selectedLineKeys = selectedLineKeySet,
-                    textColor = textColor,
-                    textStyle = normalTextStyle,
-                    onLineClicked = { lineKey ->
-                        if (isSelectionModeActive) toggleSelectedLine(lineKey)
-                    },
-                    onLinePressed = { lineKey ->
-                        if (!isSelectionModeActive) {
-                            isSelectionModeActive = true
-                            if (!selectedLineKeys.contains(lineKey)) {
-                                selectedLineKeys.add(lineKey)
+                is LyricsView.Plain -> {
+                    PlainLyricsView(
+                        lines = view.lyrics,
+                        listState = plainLyricsListState,
+                        selectedLineKeys = selectedLineKeySet,
+                        textColor = textColor,
+                        textStyle = normalTextStyle,
+                        onLineClicked = { lineKey ->
+                            if (isSelectionModeActive) toggleSelectedLine(lineKey)
+                        },
+                        onLinePressed = { lineKey ->
+                            if (!isSelectionModeActive) {
+                                isSelectionModeActive = true
+                                if (!selectedLineKeys.contains(lineKey)) {
+                                    selectedLineKeys.add(lineKey)
+                                }
+                            } else if (!selectedLineKeys.contains(lineKey)) {
+                                toggleSelectedLine(lineKey)
                             }
-                        } else if (!selectedLineKeys.contains(lineKey)) {
-                            toggleSelectedLine(lineKey)
-                        }
-                    },
-                    modifier = Modifier.fillMaxSize(),
-                )
-            }
+                        },
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
 
-            else -> {
-                CompositionLocalProvider(LocalLayoutDirection provides lyricsLayoutDirection) {
-                    key(lyricsSessionKey, syncedLyrics) {
-                        // Vibra's own list: the library's karaoke view re-rendered every line
-                        // into new bitmaps on each frame (see VibraLyricsList).
-                        VibraLyricsList(
-                            listState = karaokeLyricsListState,
-                                lyrics = syncedLyrics,
+                is LyricsView.Synced -> {
+                    CompositionLocalProvider(LocalLayoutDirection provides view.direction) {
+                        key(view.session, view.lyrics) {
+                            // Vibra's own list: the library's karaoke view re-rendered every line
+                            // into new bitmaps on each frame (see VibraLyricsList).
+                            VibraLyricsList(
+                                lyrics = view.lyrics,
                                 currentPosition = playbackSyncPosition,
                                 onLineClicked = { line ->
                                     if (isSelectionModeActive) {
                                         toggleSelectedLine(line.selectionKey())
-                                    } else if (lyricsClick && isSynced && line.start > 0) {
+                                        false
+                                    } else if (lyricsClick && line.start > 0) {
                                         player.seekTo(line.start.toLong())
+                                        true
+                                    } else {
+                                        false
                                     }
                                 },
                                 onLinePressed = { line ->
@@ -493,12 +487,13 @@ fun LyricsEnhanced(
                                         toggleSelectedLine(lineKey)
                                     }
                                 },
-                            textColor = textColor,
-                            textStyle = normalTextStyle,
-                            accompanimentStyle = accompanimentTextStyle,
-                            showTranslation = showTranslations,
-                            modifier = Modifier.fillMaxSize(),
-                        )
+                                textColor = textColor,
+                                textStyle = normalTextStyle,
+                                accompanimentStyle = accompanimentTextStyle,
+                                showTranslation = showTranslations,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        }
                     }
                 }
             }
@@ -621,6 +616,48 @@ fun LyricsEnhanced(
 private data class PlainLyrics(
     val items: List<PlainLyricLine>,
 )
+
+/** What the lyrics pane shows; the lines travel with it (see the cross-fade in LyricsEnhanced). */
+@Immutable
+private sealed interface LyricsView {
+    /** Identity for the cross-fade: a new song's lyrics are a new view, a re-prepared one is not. */
+    val key: Any
+
+    data object Loading : LyricsView {
+        override val key: Any get() = this
+    }
+
+    data object Missing : LyricsView {
+        override val key: Any get() = this
+    }
+
+    data class Plain(
+        val lyrics: PlainLyrics,
+        val session: Any,
+    ) : LyricsView {
+        override val key: Any get() = "plain" to session
+    }
+
+    data class Synced(
+        val lyrics: SyncedLyrics,
+        val session: Any,
+        val direction: LayoutDirection,
+    ) : LyricsView {
+        override val key: Any get() = "synced" to session
+    }
+}
+
+@Composable
+private fun LyricsMissing(textColor: Color) {
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Text(
+            text = stringResource(R.string.lyrics_not_found),
+            style = MaterialTheme.typography.bodyLarge,
+            color = textColor.copy(alpha = 0.6f),
+            textAlign = TextAlign.Center,
+        )
+    }
+}
 
 @Immutable
 private data class PlainLyricLine(
