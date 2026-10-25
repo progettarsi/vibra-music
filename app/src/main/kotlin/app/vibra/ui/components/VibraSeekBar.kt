@@ -11,7 +11,6 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -49,6 +48,7 @@ import androidx.compose.ui.unit.dp
 import app.vibra.ui.haptics.rememberVibraHaptics
 import app.vibra.ui.motion.Liquid
 import app.vibra.ui.motion.LiquidSpeed
+import app.vibra.ui.motion.detectOwnedHorizontalDragGestures
 import app.vibra.ui.theme.VibraDimens
 import kotlin.math.PI
 import kotlin.math.roundToInt
@@ -149,7 +149,7 @@ fun VibraSeekBar(
                     }
                 }.pointerInput(durationMs) {
                     var lastDecile = -1
-                    detectHorizontalDragGestures(
+                    detectOwnedHorizontalDragGestures(
                         onDragStart = { offset ->
                             dragging = true
                             dragFraction = (offset.x / size.width).coerceIn(0f, 1f)

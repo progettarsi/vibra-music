@@ -18,7 +18,6 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -138,6 +137,7 @@ import app.vibra.ui.motion.Liquid
 import app.vibra.ui.motion.LiquidMorphShape
 import app.vibra.ui.motion.LiquidSheetState
 import app.vibra.ui.motion.LiquidSpeed
+import app.vibra.ui.motion.detectOwnedHorizontalDragGestures
 import app.vibra.ui.motion.LocalPlaybackSpin
 import app.vibra.ui.motion.liquidPress
 import app.vibra.ui.motion.nudge
@@ -1032,7 +1032,7 @@ private fun rememberCoverSwipeGesture(
     return Modifier.pointerInput(connection) {
         val tracker = VelocityTracker()
         var crossed = false
-        detectHorizontalDragGestures(
+        detectOwnedHorizontalDragGestures(
             onDragStart = {
                 tracker.resetTracking()
                 crossed = false

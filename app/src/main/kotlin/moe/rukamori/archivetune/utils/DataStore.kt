@@ -171,7 +171,11 @@ fun <T> rememberPreference(
             context.dataStore.data
                 .map { it[key] ?: defaultValue }
                 .distinctUntilChanged()
-        }.collectAsState(defaultValue)
+        }.collectAsState(
+            // Seed from the in-memory cache so a re-entered screen (e.g. back from Settings)
+            // starts on the saved value instead of flashing the default for a frame.
+            remember { PreferenceStore.get(key) ?: defaultValue },
+        )
 
     return remember {
         object : MutableState<T> {
@@ -202,7 +206,7 @@ inline fun <reified T : Enum<T>> rememberEnumPreference(
             context.dataStore.data
                 .map { it[key].toEnum(defaultValue = defaultValue) }
                 .distinctUntilChanged()
-        }.collectAsState(defaultValue)
+        }.collectAsState(remember { PreferenceStore.get(key).toEnum(defaultValue = defaultValue) })
 
     return remember {
         object : MutableState<T> {
