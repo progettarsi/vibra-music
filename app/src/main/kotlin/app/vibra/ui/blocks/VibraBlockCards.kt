@@ -32,6 +32,7 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.res.painterResource
@@ -393,6 +394,87 @@ private fun CoverGrid(
     }
 }
 
+// ── spotlight ──────────────────────────────────────────────────────────────────────
+
+/**
+ * The feed's largest block: the first item's cover across the whole card with its title
+ * written on it, the next few as a strip of covers below. Used now and then, so the feed
+ * keeps a rhythm of sizes instead of running into a series of equal tiles.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun SpotlightBlock(
+    entries: List<ShelfEntry>,
+    modifier: Modifier = Modifier,
+    title: String? = null,
+    onTitleClick: (() -> Unit)? = null,
+) {
+    val lead = entries.firstOrNull() ?: return
+    VibraCard(modifier = modifier) {
+        title?.let { BlockTitle(text = it, onClick = onTitleClick) }
+        Box(
+            modifier =
+                Modifier
+                    .padding(10.dp)
+                    .fillMaxWidth()
+                    .aspectRatio(SpotlightAspect)
+                    .clip(VibraShapes.InnerArtwork)
+                    .combinedClickable(onClick = lead.onClick, onLongClick = lead.onLongClick),
+        ) {
+            VibraArtwork(url = lead.thumbnailUrl, shape = VibraShapes.InnerArtwork, contentDescription = lead.title, modifier = Modifier.fillMaxSize())
+            // The title sits on the cover: a dark fade at the bottom keeps it readable.
+            Box(
+                Modifier
+                    .matchParentSize()
+                    .background(Brush.verticalGradient(0.45f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.72f))),
+            )
+            Column(modifier = Modifier.align(Alignment.BottomStart).padding(16.dp)) {
+                Text(
+                    text = lead.title,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                lead.subtitle?.takeIf { it.isNotBlank() }?.let {
+                    Text(
+                        text = it,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = Color.White.copy(alpha = 0.85f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
+        val rest = entries.drop(1).take(SpotlightStrip)
+        if (rest.isNotEmpty()) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(start = 10.dp, end = 10.dp, bottom = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                rest.forEach { entry ->
+                    val shape = if (entry.circular) CircleShape else VibraShapes.RowThumbnail
+                    VibraArtwork(
+                        url = entry.thumbnailUrl,
+                        shape = shape,
+                        contentDescription = entry.title,
+                        modifier =
+                            Modifier
+                                .weight(1f)
+                                .aspectRatio(1f)
+                                .clip(shape)
+                                .combinedClickable(onClick = entry.onClick, onLongClick = entry.onLongClick),
+                    )
+                }
+                // Short strips keep the covers' size instead of stretching them.
+                repeat(SpotlightStrip - rest.size) { Spacer(Modifier.weight(1f)) }
+            }
+        }
+    }
+}
+
 // ── coverCard ──────────────────────────────────────────────────────────────────────
 
 /** Figma "coverCard" with play overlay: one item, artwork-first (small block). */
@@ -695,3 +777,9 @@ private fun EmptyBlockBody(
 
 private val ForYouHeight = 244.dp
 private val PlaylistRowHeight = 137.dp
+
+/** Spotlight cover: a little wider than tall, so the block is big without filling the screen. */
+private const val SpotlightAspect = 1.25f
+
+/** Covers in the spotlight's strip. */
+private const val SpotlightStrip = 4

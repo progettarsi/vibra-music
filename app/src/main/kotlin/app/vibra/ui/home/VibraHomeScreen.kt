@@ -52,6 +52,7 @@ import app.vibra.ui.blocks.MosaicBlock
 import app.vibra.ui.blocks.PlaylistBlock
 import app.vibra.ui.blocks.SongEntry
 import app.vibra.ui.blocks.SongsBlock
+import app.vibra.ui.blocks.SpotlightBlock
 import app.vibra.ui.blocks.VibraBlock
 import app.vibra.ui.blocks.blockColumnsFor
 import app.vibra.ui.blocks.blockGrid
@@ -76,6 +77,7 @@ import moe.rukamori.archivetune.home.HomeScreenState
 import moe.rukamori.archivetune.home.HomeUiState
 import moe.rukamori.archivetune.innertube.models.PlaylistItem
 import moe.rukamori.archivetune.innertube.models.SongItem
+import moe.rukamori.archivetune.innertube.models.YTItem
 import moe.rukamori.archivetune.innertube.pages.HomePage
 import moe.rukamori.archivetune.ui.screens.Screens
 import moe.rukamori.archivetune.utils.makeTimeString
@@ -90,10 +92,14 @@ import moe.rukamori.archivetune.viewmodels.HomeViewModel
  *     Quick picks (songsCard) ........ large when personalised, medium otherwise
  *     Keep listening (coverCard) ..... small, pairs with your playlist
  *     Your playlist (playlistCard) .... small/medium
- *     Feed sections (mosaics) ........ relevance decays down the feed, so the first
- *                                      sections are rich and later ones compact
+ *     Shelves (feed + "similar to") .. a fixed rhythm of sizes all the way down
+ *                                      (FeedRhythm): a spotlight, a pair of small
+ *                                      tiles, a medium and a large mosaic…; shelves
+ *                                      that are mostly songs become song lists
  *   No long horizontal shelves: each section shows a few covers and its title opens the
- *   full section (engine browse screen) when YouTube provides one.
+ *   full section (engine browse screen) when YouTube provides one. A shelf named after
+ *   its seed (an artist or song it is "similar to") shows no title: the name would
+ *   describe someone else's music (see contentTitle).
  *
  *  Data: HomeViewModel (the engine's home pipeline). Nothing is mocked; blocks without
  *  data are simply not emitted, and the grid re-packs the rest.
@@ -365,37 +371,63 @@ private fun homeBlocks(
             }
     }
 
-    // ── Recommendations from your library ──────────────────────────────────────────
-    ui.similarRecommendations.forEachIndexed { index, recommendation ->
-        val entries = recommendation.items.map { it.toShelfEntry(actions) }
-        blocks +=
-            VibraBlock(key = "similar_${recommendation.title.id}", relevance = 0.6f - index * 0.1f) { size, modifier ->
-                MosaicBlock(title = recommendation.title.title, entries = entries, size = size, modifier = modifier)
-            }
-    }
-
-    // ── The feed: relevance decays with position, so it gets more compact as it goes ──
-    ui.homePage
-        ?.sections
-        .orEmpty()
-        .filter { it.items.isNotEmpty() && !VibraEmotionalShapes.isExcludedCategory(it.title) }
-        .forEachIndexed { index, section ->
-            val entries = section.items.map { it.toShelfEntry(actions) }
-            val browseId = section.endpoint?.browseId
-            blocks +=
-                VibraBlock(
-                    key = section.blockKey(),
-                    relevance = (0.82f - index * 0.09f).coerceAtLeast(0.3f),
-                ) { size, modifier ->
-                    MosaicBlock(
-                        title = section.title,
-                        entries = entries,
-                        size = size,
-                        onTitleClick = browseId?.let { id -> { navController.navigate("browse/$id") } },
-                        modifier = modifier,
+    // ── Shelves: recommendations from your library, then the feed ──────────────────
+    // "Similar to" shelves are named after the artist or song they start from, not after
+    // what they hold, so they go untitled.
+    val shelves =
+        ui.similarRecommendations.map { recommendation ->
+            FeedShelf(key = "similar_${recommendation.title.id}", title = null, items = recommendation.items, browseId = null)
+        } +
+            ui.homePage
+                ?.sections
+                .orEmpty()
+                .filter { it.items.isNotEmpty() && !VibraEmotionalShapes.isExcludedCategory(it.title) }
+                .map { section ->
+                    FeedShelf(
+                        key = section.blockKey(),
+                        title = section.contentTitle(),
+                        items = section.items,
+                        browseId = section.endpoint?.browseId,
                     )
                 }
+    var step = 0
+    shelves.forEach { shelf ->
+        val onTitleClick = shelf.browseId?.let { id -> { navController.navigate("browse/$id") } }
+        val songs = shelf.items.filterIsInstance<SongItem>()
+        if (songs.size >= SongListMin && songs.size * 10 >= shelf.items.size * 6) {
+            // Mostly songs: a list reads better than a wall of covers.
+            val rows =
+                songs.map { item ->
+                    SongEntry(
+                        key = item.id,
+                        title = item.title,
+                        subtitle = item.artists.joinToString { it.name },
+                        thumbnailUrl = item.thumbnail,
+                        duration = item.duration?.let { makeTimeString(it * 1000L) },
+                        onClick = { actions.open(item) },
+                        onLongClick = { actions.showMenu(item) },
+                    )
+                }
+            blocks +=
+                VibraBlock(key = shelf.key, relevance = 0.7f, minSize = BlockSize.Medium, maxSize = BlockSize.Medium) { size, modifier ->
+                    SongsBlock(songs = rows, size = size, title = shelf.title, onTitleClick = onTitleClick, modifier = modifier)
+                }
+            return@forEach
         }
+        val entries = shelf.items.map { it.toShelfEntry(actions) }
+        val shape = FeedRhythm[step++ % FeedRhythm.size]
+        blocks +=
+            if (shape == FeedShape.Spotlight) {
+                VibraBlock(key = shelf.key, relevance = 1f, minSize = BlockSize.Large) { _, modifier ->
+                    SpotlightBlock(entries = entries, title = shelf.title, onTitleClick = onTitleClick, modifier = modifier)
+                }
+            } else {
+                // A small tile left without a partner is promoted to the medium mosaic by the grid.
+                VibraBlock(key = shelf.key, relevance = shape.relevance, minSize = shape.size, maxSize = maxOf(shape.size, BlockSize.Medium)) { size, modifier ->
+                    MosaicBlock(title = shelf.title, entries = entries, size = size, onTitleClick = onTitleClick, modifier = modifier)
+                }
+            }
+    }
 
     // ── Where the feed runs out: favourites from long ago ──────────────────────────
     // The endless feed never repeats recent recommendations; past its end, songs the
@@ -432,6 +464,51 @@ private fun LazyListScope.homeSkeleton() {
 
 /** Stable block key of a feed section (also used to tell which sections were seen). */
 private fun HomePage.Section.blockKey(): String = "section_${title}_${items.firstOrNull()?.id.orEmpty()}"
+
+/**
+ * The section's title when it describes its content, else null. YouTube heads its "similar
+ * to" shelves with a strapline ("Similar to") over the seed's name and picture: the title
+ * alone is then an artist or song whose music the shelf does not hold.
+ */
+private fun HomePage.Section.contentTitle(): String? = title.takeIf { label.isNullOrBlank() && thumbnail == null }
+
+/** A shelf of the feed, whichever source it comes from. */
+private class FeedShelf(
+    val key: String,
+    val title: String?,
+    val items: List<YTItem>,
+    val browseId: String?,
+)
+
+/** How a shelf is drawn: one step of [FeedRhythm]. */
+private enum class FeedShape(
+    val size: BlockSize,
+    val relevance: Float,
+) {
+    Spotlight(BlockSize.Large, 1f),
+    Large(BlockSize.Large, 0.9f),
+    Medium(BlockSize.Medium, 0.7f),
+    Small(BlockSize.Small, 0.4f),
+}
+
+/**
+ * The sizes shelves take, in turn, all the way down the endless feed: big moments
+ * between pairs of small tiles, so the page never settles into a run of equal blocks.
+ */
+private val FeedRhythm =
+    listOf(
+        FeedShape.Spotlight,
+        FeedShape.Small,
+        FeedShape.Small,
+        FeedShape.Medium,
+        FeedShape.Large,
+        FeedShape.Small,
+        FeedShape.Small,
+        FeedShape.Medium,
+    )
+
+/** Songs a shelf needs (and share of its items, 60 %) to be drawn as a song list. */
+private const val SongListMin = 4
 
 /** A feed row counts as seen once it has stayed on screen this long. */
 private const val SeenAfterMillis = 800L
