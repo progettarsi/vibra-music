@@ -26,6 +26,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
@@ -50,7 +51,9 @@ import app.vibra.ui.motion.Liquid
 import app.vibra.ui.motion.LiquidSpeed
 import app.vibra.ui.theme.VibraDimens
 import kotlin.math.PI
+import kotlin.math.roundToInt
 import kotlin.math.sin
+import kotlinx.coroutines.flow.collectLatest
 import moe.rukamori.archivetune.LocalAnimationsDisabled
 import moe.rukamori.archivetune.R
 import moe.rukamori.archivetune.utils.makeTimeString
@@ -83,6 +86,7 @@ fun VibraSeekBar(
     fillColor: Color = MaterialTheme.colorScheme.primary,
     thickness: Dp = VibraDimens.ProgressTrack,
     wavy: Boolean = false,
+    waveMoving: () -> Boolean = { true },
 ) {
     val haptics = rememberVibraHaptics()
     var dragging by remember { mutableStateOf(false) }
@@ -110,11 +114,16 @@ fun VibraSeekBar(
         label = "seekWave",
     )
     val phase = remember { Animatable(0f) }
+    val moving by rememberUpdatedState(waveMoving)
     LaunchedEffect(waveOn) {
         if (!waveOn) return@LaunchedEffect
-        while (true) {
-            phase.snapTo(0f)
-            phase.animateTo(1f, tween(WavePeriodMillis, easing = LinearEasing))
+        // Held still while nobody sees it (the closed player), and resumed where it stopped.
+        snapshotFlow { moving() }.collectLatest { movingNow ->
+            while (movingNow) {
+                if (phase.value >= 1f) phase.snapTo(0f)
+                val remaining = ((1f - phase.value) * WavePeriodMillis).roundToInt().coerceAtLeast(1)
+                phase.animateTo(1f, tween(remaining, easing = LinearEasing))
+            }
         }
     }
     val seekLabel = stringResource(R.string.vibra_seek)

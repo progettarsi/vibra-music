@@ -12,11 +12,14 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.C
 import androidx.media3.common.Player
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import moe.rukamori.archivetune.models.MediaMetadata
 import moe.rukamori.archivetune.playback.PlayerConnection
 
@@ -100,18 +103,24 @@ class PlaybackPositionState internal constructor(
         )
 }
 
+/** @param active false while nobody can see the position (e.g. the closed player): no sampling. */
 @Composable
 fun rememberPlaybackPosition(
     player: Player,
     isPlaying: Boolean,
     mediaId: String?,
+    active: () -> Boolean = { true },
 ): PlaybackPositionState {
     val state = remember(player) { PlaybackPositionState(player) }
+    val shown by rememberUpdatedState(active)
     LaunchedEffect(state, isPlaying, mediaId) {
-        state.resample()
-        while (isPlaying) {
-            delay(250)
+        snapshotFlow { shown() }.collectLatest { activeNow ->
+            if (!activeNow) return@collectLatest
             state.resample()
+            while (isPlaying) {
+                delay(250)
+                state.resample()
+            }
         }
     }
     return state

@@ -64,11 +64,13 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
+import app.vibra.ui.components.MarqueeScroll
 import app.vibra.ui.dock.DockLeading
 import app.vibra.ui.dock.DockMode
 import app.vibra.ui.dock.VibraDock
 import app.vibra.ui.dock.VibraDockState
 import app.vibra.ui.motion.Liquid
+import app.vibra.ui.motion.LiquidSheetState
 import app.vibra.ui.motion.LiquidSpeed
 import app.vibra.ui.motion.LocalPlaybackSpin
 import app.vibra.ui.motion.rememberLiquidSheetState
@@ -142,6 +144,7 @@ fun VibraAppShell(
     val dock = controller.dock
     val playerSheet = rememberLiquidSheetState()
     var miniPlayerBounds by remember { mutableStateOf<Rect?>(null) }
+    val miniTitleScroll = remember { MarqueeScroll() }
     // The profile opens out of (and folds back into) the dock's leading button.
     var leadingBounds by remember { mutableStateOf<Rect?>(null) }
     val windowSize = LocalWindowInfo.current.containerSize
@@ -175,7 +178,7 @@ fun VibraAppShell(
                 ),
             )
 
-    SystemBarsForPlayer(expanded = playerSheet.isExpanded)
+    SystemBarsForPlayer(playerSheet)
 
     // Closing search with back, and folding the search away on navigation.
     BackHandler(enabled = dock.mode == DockMode.Search) { dock.closeSearch() }
@@ -275,6 +278,7 @@ fun VibraAppShell(
                 onSkipPrevious = { connection?.seekToPrevious() },
                 onSearch = submitSearch,
                 onMiniPlayerBounds = { miniPlayerBounds = it },
+                miniTitleScroll = miniTitleScroll,
                 onLeadingBounds = { leadingBounds = it },
                 modifier =
                     Modifier.graphicsLayer {
@@ -289,6 +293,7 @@ fun VibraAppShell(
             VibraPlayerSheet(
                 sheet = playerSheet,
                 collapsedBounds = miniPlayerBounds,
+                miniTitleScroll = miniTitleScroll,
                 connection = connection,
                 nowPlaying = nowPlaying,
                 navController = navController,
@@ -416,7 +421,9 @@ private fun VibraNavHost(
  * must be light regardless of theme; restore the theme default when it closes.
  */
 @Composable
-private fun SystemBarsForPlayer(expanded: Boolean) {
+private fun SystemBarsForPlayer(sheet: LiquidSheetState) {
+    // Read here, not in the shell: the switch then recomposes only this.
+    val expanded = sheet.isExpanded
     val view = LocalView.current
     val darkTheme = isSystemInDarkTheme() || MaterialTheme.colorScheme.background.luminanceIsDark()
     if (view.isInEditMode) return

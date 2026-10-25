@@ -82,6 +82,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import app.vibra.ui.components.MarqueeScroll
 import app.vibra.ui.components.PlayerArtworkPx
 import app.vibra.ui.components.VibraArtwork
 import app.vibra.ui.components.VibraMarquee
@@ -179,6 +180,13 @@ object MiniPlayerGeometry {
         insetPx: Float,
         sizePx: Float,
     ): Rect = Rect(pill.left + insetPx, pill.top + insetPx, pill.left + insetPx + sizePx, pill.top + insetPx + sizePx)
+
+    /** Player progress at which the title, flying to the player, starts cross-fading into the player's. */
+    const val TitleCrossfadeStart = 0.12f
+
+    /** How far (0‥1) the scrolling title is drawn back to its start at player [progress]: all
+     *  the way by the time it starts cross-fading into the player's title (which rests there). */
+    fun titleHome(progress: Float): Float = (progress / TitleCrossfadeStart).coerceIn(0f, 1f)
 }
 
 /**
@@ -190,12 +198,20 @@ object MiniPlayerGeometry {
 fun MiniPlayerTrackText(
     track: MediaMetadata,
     modifier: Modifier = Modifier,
+    scroll: MarqueeScroll? = null,
+    followScroll: Boolean = false,
+    scrollPaused: () -> Boolean = { false },
+    scrollHome: () -> Float = { 0f },
 ) {
     Column(modifier = modifier) {
         VibraMarquee(
             text = track.title,
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurface,
+            scroll = scroll,
+            follow = followScroll,
+            paused = scrollPaused,
+            home = scrollHome,
         )
         Text(
             text = track.artists.joinToString { it.name },
@@ -215,6 +231,8 @@ fun MiniPlayerTrackText(
  * @param onMiniPlayerBounds reports where the mini-player pill sits (root coordinates);
  *        the player uses it as the origin of its morph.
  * @param onLeadingBounds reports the leading button's bounds (profile opens out of it).
+ * @param miniTitleScroll the mini-player title's scroll, shared with the copy of it that the
+ *        full player flies to its own title.
  */
 @Composable
 fun VibraDock(
@@ -229,6 +247,7 @@ fun VibraDock(
     onSkipPrevious: () -> Unit,
     onSearch: (String) -> Unit,
     onMiniPlayerBounds: (Rect) -> Unit,
+    miniTitleScroll: MarqueeScroll,
     modifier: Modifier = Modifier,
     onLeadingBounds: (Rect) -> Unit = {},
 ) {
@@ -293,6 +312,7 @@ fun VibraDock(
                                 swipe = swipe,
                                 playerSheet = playerSheet,
                                 playerProgress = playerProgress,
+                                titleScroll = miniTitleScroll,
                                 haptics = haptics,
                                 onPlayPause = onPlayPause,
                                 onSkipNext = onSkipNext,
@@ -425,6 +445,7 @@ private fun MiniPlayer(
     swipe: MiniPlayerSwipe,
     playerSheet: LiquidSheetState,
     playerProgress: () -> Float,
+    titleScroll: MarqueeScroll,
     haptics: VibraHaptics,
     onPlayPause: () -> Unit,
     onSkipNext: () -> Unit,
@@ -542,7 +563,15 @@ private fun MiniPlayer(
                             alpha = if (playerProgress() > 0.001f) 0f else detailsAlpha
                         },
             ) { track ->
-                MiniPlayerTrackText(track)
+                // Only the current track drives the shared scroll (the outgoing one keeps its
+                // own). It holds while the player is open or opening, and is drawn back to its
+                // start as the player grows, home where the player's title begins to show.
+                MiniPlayerTrackText(
+                    track = track,
+                    scroll = titleScroll.takeIf { track.id == metadata.id },
+                    scrollPaused = { playerSheet.isOpenOrOpening },
+                    scrollHome = { MiniPlayerGeometry.titleHome(playerProgress()) },
+                )
             }
         }
     }

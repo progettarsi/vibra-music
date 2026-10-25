@@ -296,6 +296,14 @@ class BackdropBaker internal constructor(
         wanted.forEach { url -> bakeOne(url, slot, size, keep = wanted) }
     }
 
+    /** Drops every bake but [url]'s (the neighbours are not needed while the player is closed). */
+    fun retainOnly(url: String?) {
+        order.filter { it != url }.forEach { other ->
+            order.remove(other)
+            baked.remove(other)
+        }
+    }
+
     private suspend fun bakeOne(
         url: String,
         slot: Rect,
@@ -307,6 +315,8 @@ class BackdropBaker internal constructor(
         val image = loadCoverImage(platformContext, url) ?: return
         val bitmap = mutex.withLock { render(image, slot, size) }
         if (started != generation) return
+        // Uploaded to the GPU now, not in the first frame that shows it.
+        bitmap.prepareToDraw()
         baked[url] = bitmap
         order.addLast(url)
         while (order.size > MaxBakes) {

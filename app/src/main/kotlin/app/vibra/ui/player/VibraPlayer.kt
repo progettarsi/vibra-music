@@ -121,6 +121,7 @@ import androidx.media3.common.Player.REPEAT_MODE_ONE
 import androidx.navigation.NavController
 import app.vibra.ui.components.ArtworkAccent
 import app.vibra.ui.components.ArtworkAtmosphere
+import app.vibra.ui.components.MarqueeScroll
 import app.vibra.ui.components.PlayerArtworkPx
 import app.vibra.ui.components.SmallArtworkPx
 import app.vibra.ui.components.VibraArtwork
@@ -148,6 +149,7 @@ import app.vibra.ui.theme.VibraTextStyles
 import kotlin.math.abs
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
@@ -194,6 +196,11 @@ import android.graphics.Shader as FrameworkShader
  *                 it on the way: the text travels instead of blinking out and back in.
  *   4. CONTENT    top bar and controls fade in during the second half of the growth.
  *
+ *  Closed, the player is not torn down: it stays composed, parked off screen and undrawn,
+ *  with its cover decoded and its backdrop baked, so opening is the closing played
+ *  backwards. (Building it in the first frame of the opening stalled the drag for a few
+ *  hundred ms.) While parked nothing in it ticks: position, wave, marquee and spin wait.
+ *
  *  Opening the queue lays a sheet *over* the player while the player recedes (scales down,
  *  dims and, on Android 12+, blurs slightly) — the iOS "card behind a card" depth cue.
  *
@@ -204,10 +211,12 @@ import android.graphics.Shader as FrameworkShader
  */
 
 /**
- * Hosts the full player above the app content. Composes nothing while fully collapsed so
- * browsing costs no player work.
+ * Hosts the full player above the app content. While collapsed it stays composed but
+ * parked: off screen, undrawn, out of reach of touches and with nothing ticking, so the
+ * opening starts from a ready player (see the overview above).
  *
  * @param collapsedBounds the mini-player pill in root coordinates (morph origin).
+ * @param miniTitleScroll the mini-player title's scroll, followed by its flying copy.
  */
 @Composable
 fun VibraPlayerSheet(
@@ -216,13 +225,22 @@ fun VibraPlayerSheet(
     connection: PlayerConnection,
     nowPlaying: NowPlaying,
     navController: NavController,
+    miniTitleScroll: MarqueeScroll,
     modifier: Modifier = Modifier,
 ) {
-    if (!sheet.isOpenOrOpening) return
     val metadata = nowPlaying.metadata
+    // Built a moment after there is something to play, out of the way of the first screen
+    // (or right away if the player is opened before that).
+    var warm by remember { mutableStateOf(false) }
+    LaunchedEffect(metadata != null) {
+        if (metadata == null) return@LaunchedEffect
+        delay(WarmUpDelayMillis)
+        warm = true
+    }
+    if (!warm && !sheet.isOpenOrOpening) return
     if (metadata == null) {
         // The queue was cleared while the player was open: fold back into the dock.
-        LaunchedEffect(Unit) { sheet.collapse() }
+        if (sheet.isOpenOrOpening) LaunchedEffect(Unit) { sheet.collapse() }
         return
     }
 
@@ -238,33 +256,35 @@ fun VibraPlayerSheet(
             label = "lyricsTransition",
         )
     val lyrics = { lyricsState.value }
+    // Closed, the player forgets its queue and lyrics: it always reopens on the player.
+    LaunchedEffect(sheet, queueSheet) {
+        snapshotFlow { sheet.isOpenOrOpening }.collect { open ->
+            if (!open) {
+                queueSheet.snapTo(0f)
+                lyricsVisible = false
+            }
+        }
+    }
 
-    // Back: close lyrics → close queue → collapse player, each with predictive preview.
-    PredictiveBackHandler(enabled = sheet.isExpanded && !queueSheet.isOpenOrOpening && !lyricsVisible) { events ->
-        try {
-            events.collect { sheet.previewBack(it.progress) }
-            sheet.collapse()
-        } catch (cancelled: CancellationException) {
-            sheet.expand()
-            throw cancelled
-        }
-    }
-    PredictiveBackHandler(enabled = queueSheet.isExpanded) { events ->
-        try {
-            events.collect { queueSheet.previewBack(it.progress) }
-            queueSheet.collapse()
-        } catch (cancelled: CancellationException) {
-            queueSheet.expand()
-            throw cancelled
-        }
-    }
+    PlayerBackHandlers(sheet = sheet, queueSheet = queueSheet, lyricsVisible = { lyricsVisible })
 
     val screenCorner = rememberScreenCornerRadius()
     val spin = LocalPlaybackSpin.current
     val accent = artworkAccent(rememberArtworkColors(metadata.thumbnailUrl))
 
     CompositionLocalProvider(LocalPlayerAccent provides accent) {
-        BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+        BoxWithConstraints(
+            modifier =
+                modifier
+                    .fillMaxSize()
+                    // Parked two widths to the right while closed: no touches reach it there.
+                    .layout { measurable, constraints ->
+                        val placeable = measurable.measure(constraints)
+                        layout(placeable.width, placeable.height) {
+                            placeable.place(if (sheet.isOpenOrOpening) 0 else placeable.width * 2, 0)
+                        }
+                    }.graphicsLayer { alpha = if (sheet.isOpenOrOpening) 1f else 0f },
+        ) {
             val density = LocalDensity.current
             val fullHeightPx = constraints.maxHeight.toFloat()
             val fullWidthPx = constraints.maxWidth.toFloat()
@@ -359,11 +379,22 @@ fun VibraPlayerSheet(
                 }
             LaunchedEffect(coverSlot, fullWidthPx, fullHeightPx, metadata.thumbnailUrl, previousCover, nextCover) {
                 val slot = coverSlot ?: return@LaunchedEffect
-                backdropBaker.bake(
-                    slot = slot,
-                    size = IntSize(fullWidthPx.toInt(), fullHeightPx.toInt()),
-                    urls = listOf(metadata.thumbnailUrl, nextCover, previousCover),
-                )
+                val size = IntSize(fullWidthPx.toInt(), fullHeightPx.toInt())
+                // The current backdrop is baked while the player is still closed, so the opening
+                // never waits for it (or competes with it for frames); the neighbours, needed
+                // only for a swipe, a moment after the player has settled open (each bake is a burst
+                // of GPU work: it must not land on a frame that moves).
+                backdropBaker.bake(slot = slot, size = size, urls = listOf(metadata.thumbnailUrl))
+                snapshotFlow { sheet.progress >= 1f }.collectLatest { settled ->
+                    if (!settled) return@collectLatest
+                    delay(NeighbourBakeDelayMillis)
+                    backdropBaker.bake(slot = slot, size = size, urls = listOf(metadata.thumbnailUrl, nextCover, previousCover))
+                }
+            }
+            // Closed, only the current backdrop is kept.
+            val currentUrl by rememberUpdatedState(metadata.thumbnailUrl)
+            LaunchedEffect(backdropBaker) {
+                snapshotFlow { sheet.isOpenOrOpening }.collect { open -> if (!open) backdropBaker.retainOnly(currentUrl) }
             }
             val titleFlight =
                 TitleFlight(
@@ -433,7 +464,8 @@ fun VibraPlayerSheet(
                     from = cookieOrigin,
                     to = coverSlot ?: cookieOrigin,
                     progress = { sheet.progress.coerceIn(0f, 1f) },
-                    startRotation = { spin?.degrees ?: 0f },
+                    // Parked, the spin is not read, so it does not redraw the hidden cover.
+                    startRotation = { if (sheet.isOpenOrOpening) spin?.degrees ?: 0f else 0f },
                     fullBleed = !landscape,
                     swipeOffset = { coverSwipe.value },
                     lyrics = lyrics,
@@ -476,8 +508,7 @@ fun VibraPlayerSheet(
                     lyrics = lyrics,
                 )
 
-                val miniTextVisible by remember { derivedStateOf { sheet.progress < TitleCrossfadeEnd } }
-                if (miniTextVisible) FlyingMiniText(metadata = metadata, flight = titleFlight)
+                FlyingMiniText(metadata = metadata, flight = titleFlight, sheet = sheet, scroll = miniTitleScroll)
             }
 
             // ── Queue: a sheet over the receding player ─────────────────────────────────────
@@ -540,6 +571,33 @@ fun VibraPlayerSheet(
     PlaybackErrorHost(connection = connection, navController = navController, sheet = sheet)
 }
 
+/** Back: close lyrics → close queue → collapse player, each with predictive preview. */
+@Composable
+private fun PlayerBackHandlers(
+    sheet: LiquidSheetState,
+    queueSheet: LiquidSheetState,
+    lyricsVisible: () -> Boolean,
+) {
+    PredictiveBackHandler(enabled = sheet.isExpanded && !queueSheet.isOpenOrOpening && !lyricsVisible()) { events ->
+        try {
+            events.collect { sheet.previewBack(it.progress) }
+            sheet.collapse()
+        } catch (cancelled: CancellationException) {
+            sheet.expand()
+            throw cancelled
+        }
+    }
+    PredictiveBackHandler(enabled = queueSheet.isExpanded) { events ->
+        try {
+            events.collect { queueSheet.previewBack(it.progress) }
+            queueSheet.collapse()
+        } catch (cancelled: CancellationException) {
+            queueSheet.expand()
+            throw cancelled
+        }
+    }
+}
+
 /** Clips the player foreground to the container's current (growing) rounded rect. */
 private class GrowingContainerShape(
     private val bounds: Rect,
@@ -582,14 +640,25 @@ private class TitleFlight(
     fun crossfade(): Float = ((progress() - TitleCrossfadeStart) / (TitleCrossfadeEnd - TitleCrossfadeStart)).coerceIn(0f, 1f)
 }
 
-/** The mini-player's text, redrawn in the player and flown towards the title. */
+/**
+ * The mini-player's text, redrawn in the player and flown towards the title. It shows the
+ * mini-player's own scroll position ([scroll]), so the hand-over never jumps, and exists
+ * only while it can be seen (open or opening, before the cross-fade is over).
+ */
 @Composable
 private fun FlyingMiniText(
     metadata: MediaMetadata,
     flight: TitleFlight,
+    sheet: LiquidSheetState,
+    scroll: MarqueeScroll,
 ) {
+    val visible by remember(sheet) { derivedStateOf { sheet.isOpenOrOpening && sheet.progress < TitleCrossfadeEnd } }
+    if (!visible) return
     MiniPlayerTrackText(
         track = metadata,
+        scroll = scroll,
+        followScroll = true,
+        scrollHome = { MiniPlayerGeometry.titleHome(flight.progress()) },
         modifier =
             Modifier
                 .layout { measurable, _ ->
@@ -842,6 +911,7 @@ private fun PlayerContent(
             onShowSleepDialog = { showSleepDialog = true },
             compact = landscape,
             lyrics = lyrics,
+            shown = { sheet.isOpenOrOpening },
         )
     }
 
@@ -1028,6 +1098,10 @@ private fun PlayerTitleBlock(
             style = VibraTextStyles.PlayerTitle,
             color = OnBackdrop,
             modifier = Modifier.fillMaxWidth(),
+            // Closing, it is drawn back to its start before it cross-fades into the mini-player
+            // text, which rests there.
+            paused = { !sheet.isExpanded },
+            home = { ((1f - sheet.progress) / (1f - TitleCrossfadeEnd)).coerceIn(0f, 1f) },
         )
         PlayerArtists(
             artists = metadata.artists,
@@ -1089,11 +1163,12 @@ private fun PlayerControls(
     onShowSleepDialog: () -> Unit,
     compact: Boolean,
     lyrics: () -> Float,
+    shown: () -> Boolean,
 ) {
     val haptics = rememberVibraHaptics()
     val accent = LocalPlayerAccent.current
     val player = connection.player
-    val position = rememberPlaybackPosition(player, nowPlaying.isPlaying, metadata.id)
+    val position = rememberPlaybackPosition(player, nowPlaying.isPlaying, metadata.id, active = shown)
     var scrubFraction by remember { mutableStateOf<Float?>(null) }
     val librarySong by connection.currentSong.collectAsStateWithLifecycle(initialValue = null)
     val liked = librarySong?.song?.liked ?: metadata.liked
@@ -1114,6 +1189,7 @@ private fun PlayerControls(
         trackColor = OnBackdrop.copy(alpha = 0.24f),
         fillColor = accent.color,
         wavy = nowPlaying.isPlaying,
+        waveMoving = shown,
     )
     Row(modifier = Modifier.fillMaxWidth()) {
         val shownMs = scrubFraction?.let { (it * progress.durationMs).toLong() } ?: progress.positionMs
@@ -1478,6 +1554,7 @@ private fun PlaybackErrorHost(
     navController: NavController,
     sheet: LiquidSheetState,
 ) {
+    if (!sheet.isOpenOrOpening) return
     val error by connection.error.collectAsStateWithLifecycle()
     val haptics = rememberVibraHaptics()
     val activeError = error ?: return
@@ -1554,5 +1631,11 @@ private val CoverCorner = 28.dp
 private const val CookieDim = 0.32f
 
 /** Opening progress over which the mini-player text hands over to the player title. */
-private const val TitleCrossfadeStart = 0.12f
+private const val TitleCrossfadeStart = MiniPlayerGeometry.TitleCrossfadeStart
+
+/** How long after there is something to play the closed player is built (see VibraPlayerSheet). */
+private const val WarmUpDelayMillis = 1_200L
+
+/** How long the player rests open before the neighbouring tracks' backdrops are baked. */
+private const val NeighbourBakeDelayMillis = 600L
 private const val TitleCrossfadeEnd = 0.55f
