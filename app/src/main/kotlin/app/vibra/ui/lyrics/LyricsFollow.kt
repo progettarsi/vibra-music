@@ -12,6 +12,7 @@ import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.VectorizedFiniteAnimationSpec
 import androidx.compose.foundation.MutatePriority
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.lazy.LazyListItemInfo
 import androidx.compose.foundation.lazy.LazyListLayoutInfo
@@ -46,7 +47,8 @@ import kotlinx.coroutines.launch
  *    pulled along line by line and settles with a light bounce. Every glide is a pure function
  *    of time, so a line that comes into view mid-glide takes exactly its place in the
  *    cascade, and glides that overlap simply add up.
- *  • A jump too long to glide (a seek, a return from far away) fades through instead.
+ *  • A seek too long to glide fades through instead; a return from far away runs back
+ *    with one quick scroll.
  *  • When the reader drags the text, following stops and every line turns sharp; after a
  *    few seconds without touching it the text glides back to the line being sung.
  * ─────────────────────────────────────────────────────────────────────────────────────
@@ -166,7 +168,7 @@ internal class LyricsFollow(
         val info = state.layoutInfo
         val item = info.visibleItemsInfo.firstOrNull { it.index == index }
         if (item == null) {
-            fadeTo(state, index)
+            if (calm) rushTo(state, index) else fadeTo(state, index)
             return
         }
         val pending = glides.sumOf { if (it.scrolling) (it.delta - it.applied).toDouble() else 0.0 }.toFloat()
@@ -187,6 +189,37 @@ internal class LyricsFollow(
             )
         if (ticker?.isActive != true) ticker = scope.launch { tick() }
         if (scroller?.isActive != true) scroller = scope.launch { scroll(state) }
+    }
+
+    /**
+     * Return to a line out of view: one quick scroll by the estimated distance (from the size
+     * of the lines on screen), so the text visibly runs back to the sung line, then a short
+     * glide that lands it exactly in the middle.
+     */
+    private suspend fun rushTo(
+        state: LazyListState,
+        index: Int,
+    ) {
+        val info = state.layoutInfo
+        val seen = info.visibleItemsInfo
+        if (seen.isEmpty()) {
+            fadeTo(state, index)
+            return
+        }
+        val reference = seen.minBy { abs(it.index - index) }
+        val lineSize = seen.sumOf { it.size } / seen.size.toFloat()
+        val estimate = centreOf(reference, info) - info.viewportSize.height / 2f + (index - reference.index) * lineSize
+        scroller?.cancel()
+        glides.clear()
+        clockNanos = 0L
+        guarded { state.animateScrollBy(estimate, specs.settle) }
+        // The reader may have grabbed the text again on the way.
+        if (browsing) return
+        if (state.layoutInfo.visibleItemsInfo.none { it.index == index }) {
+            guarded { centre(state, index) }
+        } else {
+            moveTo(state, index, calm = true)
+        }
     }
 
     /** Out, re-centre on [index] at once, in: a long jump that would only blur past. */
