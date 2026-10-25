@@ -9,6 +9,7 @@
 
 package moe.rukamori.archivetune.ui.menu
 
+import app.vibra.ui.components.VibraBottomSheet
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -64,7 +65,6 @@ import moe.rukamori.archivetune.utils.rememberPreference
 import java.time.LocalDateTime
 import java.util.Locale
 
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.foundation.layout.height
@@ -246,7 +246,7 @@ fun AddToPlaylistDialog(
         added
     }
 
-    ModalBottomSheet(onDismissRequest = { if (!busy) onDismiss() }) {
+    VibraBottomSheet(onDismissRequest = { if (!busy) onDismiss() }) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp)) {
             Text(stringResource(R.string.add_to_playlist), style = MaterialTheme.typography.headlineSmall)
             Spacer(Modifier.height(16.dp))

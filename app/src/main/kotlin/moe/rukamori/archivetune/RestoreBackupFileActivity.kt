@@ -29,7 +29,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -48,6 +47,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.vibra.ui.components.VibraDialogButton
 import dagger.hilt.android.AndroidEntryPoint
 import moe.rukamori.archivetune.ui.component.DefaultDialog
 import moe.rukamori.archivetune.ui.menu.LoadingScreen
@@ -120,7 +120,7 @@ private fun RestoreBackupFileScreen(
                 onDismiss = onNavigateBack,
                 title = { Text(stringResource(R.string.restore_in_progress)) },
                 buttons = {
-                    TextButton(onClick = onNavigateBack, shapes = ButtonDefaults.shapes()) {
+                    VibraDialogButton(onClick = onNavigateBack, shapes = ButtonDefaults.shapes()) {
                         Text(stringResource(android.R.string.cancel))
                     }
                 },
@@ -135,7 +135,7 @@ private fun RestoreBackupFileScreen(
                 icon = { Icon(painterResource(R.drawable.error), null) },
                 title = { Text(stringResource(R.string.restore_failed)) },
                 buttons = {
-                    TextButton(onClick = onNavigateBack, shapes = ButtonDefaults.shapes()) {
+                    VibraDialogButton(primary = true, onClick = onNavigateBack, shapes = ButtonDefaults.shapes()) {
                         Text(stringResource(android.R.string.ok))
                     }
                 },
@@ -192,10 +192,11 @@ private fun RestoreOptionsDialog(
         onDismiss = onDismiss,
         title = { Text(title) },
         buttons = {
-            TextButton(onClick = onDismiss, shapes = ButtonDefaults.shapes()) {
+            VibraDialogButton(onClick = onDismiss, shapes = ButtonDefaults.shapes()) {
                 Text(stringResource(android.R.string.cancel))
             }
-            TextButton(
+            VibraDialogButton(
+                primary = true,
                 onClick = onConfirm,
                 shapes = ButtonDefaults.shapes(),
                 enabled = selected.isNotEmpty(),

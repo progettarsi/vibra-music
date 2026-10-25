@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalButton
@@ -33,6 +32,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import app.vibra.ui.components.VibraDropdownMenu
 import moe.rukamori.archivetune.R
 import moe.rukamori.archivetune.constants.PlaylistSongSortType
 import moe.rukamori.archivetune.constants.PlaylistSortType
@@ -116,7 +116,7 @@ inline fun <reified T : Enum<T>> SortHeader(
             }
         }
 
-        DropdownMenu(
+        VibraDropdownMenu(
             expanded = menuExpanded,
             onDismissRequest = { menuExpanded = false },
             modifier = Modifier.widthIn(min = 172.dp),

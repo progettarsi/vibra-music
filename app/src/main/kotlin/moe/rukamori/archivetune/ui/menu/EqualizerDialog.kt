@@ -57,7 +57,6 @@ import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -70,6 +69,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -89,6 +89,10 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.vibra.ui.components.VibraDialogButton
+import app.vibra.ui.components.VibraFieldShape
+import app.vibra.ui.components.vibraTextFieldColors
+import kotlin.math.roundToInt
 import moe.rukamori.archivetune.R
 import moe.rukamori.archivetune.equalizer.EqualizerControlMode
 import moe.rukamori.archivetune.equalizer.EqualizerTone
@@ -99,7 +103,6 @@ import moe.rukamori.archivetune.viewmodels.EqualizerScreenState
 import moe.rukamori.archivetune.viewmodels.EqualizerToneUiModel
 import moe.rukamori.archivetune.viewmodels.EqualizerUiModel
 import moe.rukamori.archivetune.viewmodels.EqualizerViewModel
-import kotlin.math.roundToInt
 
 @Composable
 fun EqualizerDialog(
@@ -845,7 +848,9 @@ private fun SaveProfileDialog(
         onDismissRequest = onDismiss,
         title = { Text(text = stringResource(R.string.eq_save_profile)) },
         text = {
-            OutlinedTextField(
+            TextField(
+                shape = VibraFieldShape,
+                colors = vibraTextFieldColors(),
                 value = name,
                 onValueChange = onNameChange,
                 label = { Text(text = stringResource(R.string.eq_profile_name)) },
@@ -854,9 +859,9 @@ private fun SaveProfileDialog(
             )
         },
         confirmButton = {
-            TextButton(onClick = onSave, enabled = name.isNotBlank()) { Text(text = stringResource(R.string.save)) }
+            VibraDialogButton(primary = true, onClick = onSave, enabled = name.isNotBlank()) { Text(text = stringResource(R.string.save)) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(text = stringResource(R.string.eq_close)) } },
+        dismissButton = { VibraDialogButton(onClick = onDismiss) { Text(text = stringResource(R.string.eq_close)) } },
     )
 }
 
@@ -878,7 +883,7 @@ private fun ManageProfilesDialog(
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(text = stringResource(R.string.eq_close)) } },
+        confirmButton = { VibraDialogButton(primary = true, onClick = onDismiss) { Text(text = stringResource(R.string.eq_close)) } },
     )
 }
 

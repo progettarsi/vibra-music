@@ -9,8 +9,6 @@
 
 package moe.rukamori.archivetune.ui.screens.settings
 
-import moe.rukamori.archivetune.ui.component.IconButton
-import moe.rukamori.archivetune.ui.utils.backToMain
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -38,7 +36,6 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SheetState
 import androidx.compose.material3.SnackbarDuration
@@ -64,6 +61,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
+import app.vibra.ui.components.VibraBottomSheet
 import coil3.annotation.ExperimentalCoilApi
 import coil3.imageLoader
 import kotlinx.coroutines.Dispatchers
@@ -82,10 +80,12 @@ import moe.rukamori.archivetune.storage.StorageFolderKind
 import moe.rukamori.archivetune.storage.StorageLocationKind
 import moe.rukamori.archivetune.storage.StorageLocationRepository
 import moe.rukamori.archivetune.ui.component.ActionPromptDialog
+import moe.rukamori.archivetune.ui.component.IconButton
 import moe.rukamori.archivetune.ui.component.ListPreference
 import moe.rukamori.archivetune.ui.component.PreferenceEntry
 import moe.rukamori.archivetune.ui.component.PreferenceGroup
 import moe.rukamori.archivetune.ui.component.SwitchPreference
+import moe.rukamori.archivetune.ui.utils.backToMain
 import moe.rukamori.archivetune.ui.utils.formatFileSize
 import moe.rukamori.archivetune.utils.rememberPreference
 import moe.rukamori.archivetune.viewmodels.StorageCacheClearUiKind
@@ -664,12 +664,9 @@ private fun StorageLocationPickerSheet(
     val currentOptionId = options.firstOrNull { option -> option.isSelected }?.id
     val canApplySelection = currentOptionId != selectedOptionId
 
-    ModalBottomSheet(
+    VibraBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-        shape = MaterialTheme.shapes.extraLarge,
-        tonalElevation = 2.dp,
     ) {
         Column(
             verticalArrangement = Arrangement.spacedBy(16.dp),

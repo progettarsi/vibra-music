@@ -247,8 +247,7 @@ fun SelectionSongMenu(
                                     Icon(
                                         painter = painterResource(R.drawable.play),
                                         contentDescription = null,
-                                        modifier = Modifier.size(28.dp),
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(24.dp),
                                     )
                                 },
                                 text = stringResource(R.string.play),
@@ -268,8 +267,7 @@ fun SelectionSongMenu(
                                     Icon(
                                         painter = painterResource(R.drawable.shuffle),
                                         contentDescription = null,
-                                        modifier = Modifier.size(28.dp),
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(24.dp),
                                     )
                                 },
                                 text = stringResource(R.string.shuffle),
@@ -289,8 +287,7 @@ fun SelectionSongMenu(
                                     Icon(
                                         painter = painterResource(R.drawable.playlist_add),
                                         contentDescription = null,
-                                        modifier = Modifier.size(28.dp),
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(24.dp),
                                     )
                                 },
                                 text = stringResource(R.string.add_to_playlist),
@@ -304,9 +301,6 @@ fun SelectionSongMenu(
             }
         }
 
-        item {
-            Spacer(modifier = Modifier.height(12.dp))
-        }
 
         item {
             MenuSurfaceSection(modifier = Modifier.padding(vertical = 6.dp)) {
@@ -439,9 +433,6 @@ fun SelectionSongMenu(
             }
         }
 
-        item {
-            Spacer(modifier = Modifier.height(12.dp))
-        }
 
         item {
             MenuSurfaceSection(modifier = Modifier.padding(vertical = 6.dp)) {
@@ -516,9 +507,6 @@ fun SelectionSongMenu(
         }
 
         if (songPosition?.size != 0) {
-            item {
-                Spacer(modifier = Modifier.height(12.dp))
-            }
 
             item {
                 MenuSurfaceSection(modifier = Modifier.padding(vertical = 6.dp)) {
@@ -602,9 +590,6 @@ fun SelectionSongMenu(
         }
 
         if (isFromCache && onRemoveFromCache != null) {
-            item {
-                Spacer(modifier = Modifier.height(12.dp))
-            }
 
             item {
                 MenuSurfaceSection(modifier = Modifier.padding(vertical = 6.dp)) {
@@ -796,8 +781,7 @@ fun SelectionMediaMetadataMenu(
                                     Icon(
                                         painter = painterResource(R.drawable.play),
                                         contentDescription = null,
-                                        modifier = Modifier.size(28.dp),
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(24.dp),
                                     )
                                 },
                                 text = stringResource(R.string.play),
@@ -817,8 +801,7 @@ fun SelectionMediaMetadataMenu(
                                     Icon(
                                         painter = painterResource(R.drawable.shuffle),
                                         contentDescription = null,
-                                        modifier = Modifier.size(28.dp),
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(24.dp),
                                     )
                                 },
                                 text = stringResource(R.string.shuffle),
@@ -838,8 +821,7 @@ fun SelectionMediaMetadataMenu(
                                     Icon(
                                         painter = painterResource(R.drawable.playlist_add),
                                         contentDescription = null,
-                                        modifier = Modifier.size(28.dp),
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(24.dp),
                                     )
                                 },
                                 text = stringResource(R.string.add_to_playlist),
@@ -853,9 +835,6 @@ fun SelectionMediaMetadataMenu(
             }
         }
 
-        item {
-            Spacer(modifier = Modifier.height(12.dp))
-        }
 
         item {
             MenuSurfaceSection(modifier = Modifier.padding(vertical = 6.dp)) {
@@ -999,9 +978,6 @@ fun SelectionMediaMetadataMenu(
             }
         }
 
-        item {
-            Spacer(modifier = Modifier.height(12.dp))
-        }
 
         item {
             MenuSurfaceSection(modifier = Modifier.padding(vertical = 6.dp)) {

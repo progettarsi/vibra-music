@@ -84,6 +84,15 @@ object VibraShapes {
     /** Dock pills are full stadiums. */
     val Pill: Shape = CircleShape
 
+    /** Centred dialogs (same radius as Material's AlertDialog, so both families match). */
+    val Dialog: Shape = RoundedCornerShape(28.dp)
+
+    /** Anchored dropdown menus. */
+    val Menu: Shape = RoundedCornerShape(24.dp)
+
+    /** Groups of rows inside a sheet (action menus, pickers). */
+    val SheetGroup: Shape = RoundedCornerShape(24.dp)
+
     // ── M3 Expressive shape set (Figma "Shape Set" instances) ──────────────────────
     // MaterialShapes.toShape() is composable (it caches the outline per composition).
 

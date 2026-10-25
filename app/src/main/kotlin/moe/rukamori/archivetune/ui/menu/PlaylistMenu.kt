@@ -502,8 +502,7 @@ public fun PlaylistMenu(
                         Icon(
                             painter = painterResource(R.drawable.play),
                             contentDescription = null,
-                            modifier = Modifier.size(28.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(24.dp),
                         )
                     },
                     text = playText,
@@ -524,8 +523,7 @@ public fun PlaylistMenu(
                         Icon(
                             painter = painterResource(R.drawable.shuffle),
                             contentDescription = null,
-                            modifier = Modifier.size(28.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(24.dp),
                         )
                     },
                     text = shuffleText,
@@ -546,8 +544,7 @@ public fun PlaylistMenu(
                         Icon(
                             painter = painterResource(R.drawable.share),
                             contentDescription = null,
-                            modifier = Modifier.size(28.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(24.dp),
                         )
                     },
                     text = shareText,
@@ -588,9 +585,6 @@ public fun PlaylistMenu(
             }
         }
 
-        item {
-            Spacer(modifier = Modifier.height(12.dp))
-        }
 
         item {
             MenuSurfaceSection(modifier = Modifier.padding(vertical = 6.dp)) {
@@ -788,9 +782,6 @@ public fun PlaylistMenu(
         }
 
         if (downloadPlaylist != true) {
-            item {
-                Spacer(modifier = Modifier.height(12.dp))
-            }
 
             item {
                 MenuSurfaceSection(modifier = Modifier.padding(vertical = 6.dp)) {
@@ -866,9 +857,6 @@ public fun PlaylistMenu(
         }
 
         if (autoPlaylist != true) {
-            item {
-                Spacer(modifier = Modifier.height(12.dp))
-            }
 
             item {
                 MenuSurfaceSection(modifier = Modifier.padding(vertical = 6.dp)) {
@@ -924,9 +912,6 @@ public fun PlaylistMenu(
         }
 
         playlist.playlist.shareLink?.let { shareLink ->
-            item {
-                Spacer(modifier = Modifier.height(12.dp))
-            }
 
             item {
                 MenuSurfaceSection(modifier = Modifier.padding(vertical = 6.dp)) {

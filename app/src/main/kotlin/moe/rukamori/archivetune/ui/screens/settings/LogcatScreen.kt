@@ -37,7 +37,6 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Button
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -76,10 +75,12 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
+import app.vibra.ui.components.VibraDropdownMenu
 import kotlinx.coroutines.flow.collectLatest
 import moe.rukamori.archivetune.LocalPlayerAwareWindowInsets
 import moe.rukamori.archivetune.R
 import moe.rukamori.archivetune.logcat.LogcatLevel
+import moe.rukamori.archivetune.ui.component.IconButton as ArchiveTuneIconButton
 import moe.rukamori.archivetune.ui.utils.backToMain
 import moe.rukamori.archivetune.viewmodels.LogcatEffect
 import moe.rukamori.archivetune.viewmodels.LogcatScreenState
@@ -87,7 +88,6 @@ import moe.rukamori.archivetune.viewmodels.LogcatUiEntries
 import moe.rukamori.archivetune.viewmodels.LogcatUiEntry
 import moe.rukamori.archivetune.viewmodels.LogcatUiModel
 import moe.rukamori.archivetune.viewmodels.LogcatViewModel
-import moe.rukamori.archivetune.ui.component.IconButton as ArchiveTuneIconButton
 
 @Composable
 fun LogcatScreen(
@@ -365,7 +365,7 @@ private fun LogcatTopBar(
                         contentDescription = stringResource(R.string.options_label),
                     )
                 }
-                DropdownMenu(
+                VibraDropdownMenu(
                     expanded = model?.isMenuExpanded == true,
                     onDismissRequest = { onSetMenuExpanded(false) },
                 ) {

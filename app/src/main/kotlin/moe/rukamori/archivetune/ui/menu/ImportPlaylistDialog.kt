@@ -19,7 +19,6 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -33,6 +32,8 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
+import app.vibra.ui.components.VibraDialogButton
+import java.time.LocalDateTime
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
@@ -43,7 +44,6 @@ import moe.rukamori.archivetune.db.entities.PlaylistEntity
 import moe.rukamori.archivetune.db.entities.PlaylistSongMap
 import moe.rukamori.archivetune.ui.component.DefaultDialog
 import moe.rukamori.archivetune.ui.component.TextFieldDialog
-import java.time.LocalDateTime
 
 @Composable
 fun ImportPlaylistDialog(
@@ -190,7 +190,7 @@ fun ImportPlaylistDialog(
                 }
             },
             buttons = {
-                TextButton(
+                VibraDialogButton(
                     enabled = !isProcessingDuplicate,
                     onClick = {
                         resetState()
@@ -199,7 +199,7 @@ fun ImportPlaylistDialog(
                     shapes = ButtonDefaults.shapes(),
                 ) { Text(text = stringResource(android.R.string.cancel)) }
 
-                TextButton(
+                VibraDialogButton(
                     enabled = !isProcessingDuplicate,
                     onClick = {
                         isProcessingDuplicate = true
@@ -273,7 +273,8 @@ fun ImportPlaylistDialog(
                     shapes = ButtonDefaults.shapes(),
                 ) { Text(text = stringResource(R.string.update_button)) }
 
-                TextButton(
+                VibraDialogButton(
+                    primary = true,
                     enabled = !isProcessingDuplicate,
                     onClick = {
                         isProcessingDuplicate = true

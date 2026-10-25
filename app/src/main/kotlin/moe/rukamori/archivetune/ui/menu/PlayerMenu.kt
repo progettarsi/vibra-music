@@ -467,13 +467,7 @@ fun PlayerMenu(
                                             Icon(
                                                 painter = painterResource(R.drawable.bedtime),
                                                 contentDescription = null,
-                                                modifier = Modifier.size(28.dp),
-                                                tint =
-                                                    if (sleepTimerEnabled) {
-                                                        MaterialTheme.colorScheme.primary
-                                                    } else {
-                                                        MaterialTheme.colorScheme.onSurfaceVariant
-                                                    },
+                                                modifier = Modifier.size(24.dp),
                                             )
                                         },
                                         text = stringResource(R.string.sleep_timer),
@@ -481,18 +475,11 @@ fun PlayerMenu(
                                             onDismiss()
                                             onClick()
                                         },
+                                        // Vibra: a running timer fills its circle with the primary colour.
                                         backgroundColor =
-                                            if (sleepTimerEnabled) {
-                                                MaterialTheme.colorScheme.primaryContainer
-                                            } else {
-                                                Color.Unspecified
-                                            },
+                                            if (sleepTimerEnabled) MaterialTheme.colorScheme.primary else Color.Unspecified,
                                         contentColor =
-                                            if (sleepTimerEnabled) {
-                                                MaterialTheme.colorScheme.onPrimaryContainer
-                                            } else {
-                                                MaterialTheme.colorScheme.onSurfaceVariant
-                                            },
+                                            if (sleepTimerEnabled) MaterialTheme.colorScheme.onPrimary else Color.Unspecified,
                                     ),
                                 )
                             }
@@ -503,8 +490,7 @@ fun PlayerMenu(
                                             Icon(
                                                 painter = painterResource(R.drawable.radio),
                                                 contentDescription = null,
-                                                modifier = Modifier.size(28.dp),
-                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.size(24.dp),
                                             )
                                         },
                                         text = stringResource(R.string.start_radio),
@@ -521,8 +507,7 @@ fun PlayerMenu(
                                         Icon(
                                             painter = painterResource(R.drawable.playlist_add),
                                             contentDescription = null,
-                                            modifier = Modifier.size(28.dp),
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(24.dp),
                                         )
                                     },
                                     text = stringResource(R.string.add_to_playlist),
@@ -538,8 +523,7 @@ fun PlayerMenu(
                                                     if (isInSpeedDial) R.drawable.bookmark_filled else R.drawable.bookmark,
                                                 ),
                                             contentDescription = null,
-                                            modifier = Modifier.size(28.dp),
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(24.dp),
                                         )
                                     },
                                     text =
@@ -564,8 +548,7 @@ fun PlayerMenu(
                                             Icon(
                                                 painter = painterResource(R.drawable.share),
                                                 contentDescription = null,
-                                                modifier = Modifier.size(28.dp),
-                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.size(24.dp),
                                             )
                                         },
                                         text = stringResource(R.string.share),
@@ -580,8 +563,7 @@ fun PlayerMenu(
                                             Icon(
                                                 painter = painterResource(R.drawable.link),
                                                 contentDescription = null,
-                                                modifier = Modifier.size(28.dp),
-                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.size(24.dp),
                                             )
                                         },
                                         text = stringResource(R.string.copy_link),
@@ -611,9 +593,6 @@ fun PlayerMenu(
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
                 )
             }
-        }
-        item {
-            Spacer(modifier = Modifier.height(12.dp))
         }
         if (splitArtists.isNotEmpty() || mediaMetadata.album != null) {
             item {
@@ -669,9 +648,6 @@ fun PlayerMenu(
                         }
                     }
                 }
-            }
-            item {
-                Spacer(modifier = Modifier.height(12.dp))
             }
         }
         if (!isLocalMedia) {

@@ -9,8 +9,6 @@
 
 package moe.rukamori.archivetune.ui.screens.settings
 
-import moe.rukamori.archivetune.ui.component.IconButton
-import moe.rukamori.archivetune.ui.utils.backToMain
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.only
@@ -25,7 +23,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -38,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
+import app.vibra.ui.components.VibraDialogButton
 import moe.rukamori.archivetune.LocalDatabase
 import moe.rukamori.archivetune.LocalPlayerAwareWindowInsets
 import moe.rukamori.archivetune.R
@@ -45,9 +43,11 @@ import moe.rukamori.archivetune.constants.DisableScreenshotKey
 import moe.rukamori.archivetune.constants.PauseListenHistoryKey
 import moe.rukamori.archivetune.constants.PauseSearchHistoryKey
 import moe.rukamori.archivetune.ui.component.DefaultDialog
+import moe.rukamori.archivetune.ui.component.IconButton
 import moe.rukamori.archivetune.ui.component.PreferenceEntry
 import moe.rukamori.archivetune.ui.component.PreferenceGroup
 import moe.rukamori.archivetune.ui.component.SwitchPreference
+import moe.rukamori.archivetune.ui.utils.backToMain
 import moe.rukamori.archivetune.utils.rememberPreference
 import moe.rukamori.archivetune.viewmodels.ResetListeningStatsState
 import moe.rukamori.archivetune.viewmodels.ResetListeningStatsViewModel
@@ -95,14 +95,15 @@ fun PrivacySettings(
                 )
             },
             buttons = {
-                TextButton(
+                VibraDialogButton(
                     onClick = { showClearListenHistoryDialog = false },
                     shapes = ButtonDefaults.shapes(),
                 ) {
                     Text(text = stringResource(android.R.string.cancel))
                 }
 
-                TextButton(
+                VibraDialogButton(
+                    primary = true,
                     onClick = {
                         showClearListenHistoryDialog = false
                         database.query {
@@ -132,14 +133,15 @@ fun PrivacySettings(
                 )
             },
             buttons = {
-                TextButton(
+                VibraDialogButton(
                     onClick = { showClearSearchHistoryDialog = false },
                     shapes = ButtonDefaults.shapes(),
                 ) {
                     Text(text = stringResource(android.R.string.cancel))
                 }
 
-                TextButton(
+                VibraDialogButton(
+                    primary = true,
                     onClick = {
                         showClearSearchHistoryDialog = false
                         database.query {
@@ -282,21 +284,23 @@ private fun ResetListeningStatsPreference(
             },
             buttons = {
                 if (state is ResetListeningStatsState.Error) {
-                    TextButton(
+                    VibraDialogButton(
+                        primary = true,
                         onClick = onDismiss,
                         shapes = ButtonDefaults.shapes(),
                     ) {
                         Text(stringResource(android.R.string.ok))
                     }
                 } else {
-                    TextButton(
+                    VibraDialogButton(
                         onClick = onDismiss,
                         enabled = !isResetting,
                         shapes = ButtonDefaults.shapes(),
                     ) {
                         Text(stringResource(android.R.string.cancel))
                     }
-                    TextButton(
+                    VibraDialogButton(
+                        primary = true,
                         onClick = onConfirm,
                         enabled = !isResetting,
                         shapes = ButtonDefaults.shapes(),

@@ -45,10 +45,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -61,6 +58,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import app.vibra.ui.components.RowBackground
@@ -70,18 +68,16 @@ import app.vibra.ui.components.VibraCard
 import app.vibra.ui.components.VibraGlyphButton
 import app.vibra.ui.components.VibraRow
 import app.vibra.ui.haptics.rememberVibraHaptics
+import app.vibra.ui.library.VibraStatsViewModel
 import app.vibra.ui.motion.Liquid
 import app.vibra.ui.motion.LiquidSpeed
 import app.vibra.ui.navigation.rememberVibraItemActions
 import app.vibra.ui.theme.Star
 import app.vibra.ui.theme.VibraDimens
 import app.vibra.ui.theme.VibraShapes
-import moe.rukamori.archivetune.LocalDatabase
 import moe.rukamori.archivetune.LocalPlayerAwareWindowInsets
 import moe.rukamori.archivetune.R
 import moe.rukamori.archivetune.ui.utils.navigateToArtist
-import java.time.LocalDateTime
-import java.time.ZoneOffset
 
 /*
  * ─────────────────────────────────────────────────────────────────────────────────────
@@ -110,18 +106,15 @@ enum class StatsPeriod(
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun VibraStatsScreen(navController: NavController) {
-    val database = LocalDatabase.current
     val actions = rememberVibraItemActions(navController)
     val style = rememberProfileStyle()
-    var period by rememberSaveable { mutableStateOf(StatsPeriod.Week) }
-    val from =
-        remember(period) {
-            period.days?.let { LocalDateTime.now().minusDays(it).toInstant(ZoneOffset.UTC).toEpochMilli() } ?: 0L
-        }
-    val artists by remember(from) { database.mostPlayedArtists(from, limit = 8) }.collectAsStateWithLifecycle(emptyList())
-    val songs by remember(from) { database.mostPlayedSongs(from, limit = 10) }.collectAsStateWithLifecycle(emptyList())
-    val songStats by remember(from) { database.mostPlayedSongsStats(from, limit = 1000) }.collectAsStateWithLifecycle(emptyList())
-    val albums by remember(from) { database.mostPlayedAlbums(from, limit = 6) }.collectAsStateWithLifecycle(emptyList())
+    // Rows and the chosen period live in the page's ViewModel (see VibraLibraryData.kt).
+    val stats: VibraStatsViewModel = hiltViewModel()
+    val period by stats.period.collectAsStateWithLifecycle()
+    val artists by stats.artists.collectAsStateWithLifecycle()
+    val songs by stats.songs.collectAsStateWithLifecycle()
+    val songStats by stats.songStats.collectAsStateWithLifecycle()
+    val albums by stats.albums.collectAsStateWithLifecycle()
     val playCounts = remember(songStats) { songStats.associate { it.id to it.songCountListened } }
     val totalMinutes = (songStats.sumOf { it.timeListened ?: 0L } / 60_000L).toInt()
     val shownMinutes by animateIntAsState(totalMinutes, animationSpec = Liquid.effects(LiquidSpeed.Slow), label = "statsMinutes")
@@ -134,7 +127,7 @@ fun VibraStatsScreen(navController: NavController) {
             verticalArrangement = Arrangement.spacedBy(VibraDimens.CardGap),
             modifier = Modifier.fillMaxSize(),
         ) {
-            item(key = "period") { PeriodSelector(selected = period, onSelect = { period = it }) }
+            item(key = "period") { PeriodSelector(selected = period, onSelect = stats::select) }
 
             item(key = "hero") {
                 VibraCard(modifier = Modifier.fillMaxWidth()) {

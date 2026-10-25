@@ -33,7 +33,6 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
@@ -68,6 +67,7 @@ import androidx.compose.ui.util.fastSumBy
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.media3.exoplayer.offline.Download
 import androidx.navigation.NavController
+import app.vibra.ui.components.VibraDialogButton
 import moe.rukamori.archivetune.LocalDownloadUtil
 import moe.rukamori.archivetune.LocalPlayerAwareWindowInsets
 import moe.rukamori.archivetune.LocalPlayerConnection
@@ -179,14 +179,15 @@ fun TopPlaylistScreen(
                 )
             },
             buttons = {
-                TextButton(
+                VibraDialogButton(
                     onClick = { showRemoveDownloadDialog = false },
                     shapes = ButtonDefaults.shapes(),
                 ) {
                     Text(text = stringResource(android.R.string.cancel))
                 }
 
-                TextButton(
+                VibraDialogButton(
+                    primary = true,
                     onClick = {
                         showRemoveDownloadDialog = false
                         sendRemoveDownloads(

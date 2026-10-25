@@ -33,10 +33,10 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -51,6 +51,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import app.vibra.ui.components.VibraDialogButton
+import app.vibra.ui.components.VibraFieldShape
+import app.vibra.ui.components.vibraTextFieldColors
 import moe.rukamori.archivetune.R
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -73,7 +76,9 @@ fun ArtistSeparatorsDialog(
             onDismissRequest = { showAddSymbolDialog = false },
             title = { Text(stringResource(R.string.add_symbol)) },
             text = {
-                OutlinedTextField(
+                TextField(
+                    shape = VibraFieldShape,
+                    colors = vibraTextFieldColors(),
                     value = newSymbolInput,
                     onValueChange = {
                         if (it.length <= 1) {
@@ -101,7 +106,7 @@ fun ArtistSeparatorsDialog(
                 }
             },
             dismissButton = {
-                TextButton(onClick = {
+                VibraDialogButton(onClick = {
                     newSymbolInput = ""
                     showAddSymbolDialog = false
                 }, shapes = ButtonDefaults.shapes()) {

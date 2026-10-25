@@ -12,8 +12,8 @@ package moe.rukamori.archivetune.ui.menu
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -38,6 +38,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import app.vibra.ui.components.VibraBottomSheet
+import app.vibra.ui.components.VibraDialogButton
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
@@ -266,7 +268,7 @@ fun AddToPlaylistDialogOnline(
     }
 
     if (isVisible) {
-        androidx.compose.material3.ModalBottomSheet(onDismissRequest = onDismiss) {
+        VibraBottomSheet(onDismissRequest = onDismiss) {
             Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp)) {
                 Text(stringResource(R.string.add_to_playlist), style = MaterialTheme.typography.headlineSmall)
                 androidx.compose.material3.Button(
@@ -340,7 +342,7 @@ fun AddToPlaylistDialogOnline(
             title = { Text("Import Complete") },
             onDismiss = { showResultDialog = false },
             buttons = {
-                TextButton(onClick = { showResultDialog = false }, shapes = ButtonDefaults.shapes()) {
+                VibraDialogButton(primary = true, onClick = { showResultDialog = false }, shapes = ButtonDefaults.shapes()) {
                     Text("OK")
                 }
             },

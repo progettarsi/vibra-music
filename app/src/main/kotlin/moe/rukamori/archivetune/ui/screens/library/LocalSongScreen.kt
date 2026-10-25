@@ -60,7 +60,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeFlexibleTopAppBar
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SearchBar
 import androidx.compose.material3.SearchBarDefaults
@@ -97,6 +96,11 @@ import androidx.core.content.ContextCompat
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
+import app.vibra.ui.components.VibraBottomSheet
+import java.text.Collator
+import java.time.LocalDateTime
+import java.util.Locale
+import kotlin.math.roundToInt
 import moe.rukamori.archivetune.LocalPlayerAwareWindowInsets
 import moe.rukamori.archivetune.LocalPlayerConnection
 import moe.rukamori.archivetune.R
@@ -118,10 +122,6 @@ import moe.rukamori.archivetune.ui.menu.SongMenu
 import moe.rukamori.archivetune.utils.rememberPreference
 import moe.rukamori.archivetune.viewmodels.LocalSongsScanState
 import moe.rukamori.archivetune.viewmodels.LocalSongsViewModel
-import java.text.Collator
-import java.time.LocalDateTime
-import java.util.Locale
-import kotlin.math.roundToInt
 
 @OptIn(
     ExperimentalFoundationApi::class,
@@ -789,12 +789,9 @@ private fun LocalSongScanSheet(
         label = "contentAlpha",
     )
 
-    ModalBottomSheet(
+    VibraBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-        shape = RoundedCornerShape(topStart = 36.dp, topEnd = 36.dp),
-        tonalElevation = 2.dp,
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,

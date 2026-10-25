@@ -7,18 +7,13 @@
 
 package moe.rukamori.archivetune.ui.component
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.compositionLocalOf
@@ -26,10 +21,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.unit.dp
+import app.vibra.ui.components.VibraBottomSheet
+import app.vibra.ui.theme.VibraDimens
 
 val LocalMenuState = compositionLocalOf { MenuState() }
 
@@ -65,42 +59,34 @@ class MenuState(
     }
 }
 
+// Vibra: the item menus open in Vibra's sheet (one look for every popup, see
+// app/vibra/ui/components/VibraPopups.kt). Menus are lazy lists whose height is only known
+// after their rows are composed, so the sheet keeps its two stops — half open, then full
+// height on a drag — instead of sizing itself to a height that is still growing.
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BottomSheetMenu(
     modifier: Modifier = Modifier,
     state: MenuState,
-    background: Color = MaterialTheme.colorScheme.surface,
 ) {
     val focusManager = LocalFocusManager.current
 
     state.dialogContent?.invoke()
 
     if (state.isVisible) {
-        ModalBottomSheet(
+        VibraBottomSheet(
             onDismissRequest = {
                 focusManager.clearFocus()
                 state.isVisible = false
             },
-            containerColor = background,
-            contentColor = MaterialTheme.colorScheme.onSurface,
-            dragHandle = {
-                Box(
-                    modifier =
-                        Modifier
-                            .padding(vertical = 12.dp)
-                            .size(width = 40.dp, height = 4.dp)
-                            .clip(RoundedCornerShape(2.dp))
-                            .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)),
-                )
-            },
             modifier = modifier.fillMaxHeight(),
+            sheetState = rememberModalBottomSheetState(),
         ) {
             Column(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 20.dp),
+                        .padding(horizontal = VibraDimens.Gutter),
             ) {
                 state.content(this)
             }

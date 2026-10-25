@@ -9,7 +9,6 @@
 
 package moe.rukamori.archivetune.ui.screens.settings
 
-import moe.rukamori.archivetune.ui.utils.backToMain
 import android.widget.Toast
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Spring
@@ -31,8 +30,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.only
@@ -44,7 +43,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
@@ -55,13 +53,11 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SearchBar
 import androidx.compose.material3.SearchBarDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -86,6 +82,10 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
+import app.vibra.ui.components.VibraBottomSheet
+import app.vibra.ui.components.VibraDialogButton
+import app.vibra.ui.components.VibraFieldShape
+import app.vibra.ui.components.vibraTextFieldColors
 import com.google.common.collect.ImmutableList
 import moe.rukamori.archivetune.LocalPlayerAwareWindowInsets
 import moe.rukamori.archivetune.R
@@ -97,6 +97,7 @@ import moe.rukamori.archivetune.ui.component.IconButton
 import moe.rukamori.archivetune.ui.component.ListPreference
 import moe.rukamori.archivetune.ui.component.PreferenceEntry
 import moe.rukamori.archivetune.ui.component.PreferenceGroup
+import moe.rukamori.archivetune.ui.utils.backToMain
 import moe.rukamori.archivetune.viewmodels.AiIntegrationSettingsScreenState
 import moe.rukamori.archivetune.viewmodels.AiIntegrationSettingsUiModel
 import moe.rukamori.archivetune.viewmodels.AiIntegrationSettingsViewModel
@@ -396,7 +397,7 @@ private fun AiApiTestErrorDialog(
         },
         title = { Text(stringResource(R.string.ai_api_test_failed)) },
         buttons = {
-            TextButton(onClick = onClose, shapes = ButtonDefaults.shapes()) {
+            VibraDialogButton(primary = true, onClick = onClose, shapes = ButtonDefaults.shapes()) {
                 Text(stringResource(android.R.string.ok))
             }
         },
@@ -459,10 +460,11 @@ private fun AiSettingsEditorDialog(
         icon = { Icon(painterResource(iconResId), contentDescription = null) },
         title = { Text(stringResource(titleResId)) },
         buttons = {
-            TextButton(onClick = onDismiss, shapes = ButtonDefaults.shapes()) {
+            VibraDialogButton(onClick = onDismiss, shapes = ButtonDefaults.shapes()) {
                 Text(stringResource(android.R.string.cancel))
             }
-            TextButton(
+            VibraDialogButton(
+                primary = true,
                 enabled = editor.canSave,
                 onClick = onSave,
                 shapes = ButtonDefaults.shapes(),
@@ -471,7 +473,9 @@ private fun AiSettingsEditorDialog(
             }
         },
     ) {
-        OutlinedTextField(
+        TextField(
+            shape = VibraFieldShape,
+            colors = vibraTextFieldColors(),
             value = editor.value,
             onValueChange = onValueChange,
             modifier = Modifier.fillMaxWidth(),
@@ -599,11 +603,9 @@ private fun ModelPickerPreference(
         }
 
     if (showSheet) {
-        ModalBottomSheet(
+        VibraBottomSheet(
             onDismissRequest = onDismissSheet,
             sheetState = sheetState,
-            shape = RoundedCornerShape(topStart = 36.dp, topEnd = 36.dp),
-            containerColor = MaterialTheme.colorScheme.background,
         ) {
             Text(
                 text = stringResource(R.string.ai_model),

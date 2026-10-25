@@ -9,38 +9,53 @@
 
 package moe.rukamori.archivetune.ui.component
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.indication
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.isSpecified
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import app.vibra.ui.haptics.rememberVibraHaptics
+import app.vibra.ui.motion.liquidPress
+import app.vibra.ui.theme.VibraShapes
 
+// Vibra: a quick action is a tonal circle with its label underneath (like the round icon
+// buttons on album and player pages), not a grey tile. The circle squishes on its spring
+// when pressed and ticks a haptic, so the grid reads as part of Vibra.
 @Composable
 fun NewActionButton(
     icon: @Composable () -> Unit,
@@ -51,51 +66,56 @@ fun NewActionButton(
     backgroundColor: Color = Color.Unspecified,
     contentColor: Color = Color.Unspecified,
 ) {
-    val containerColor = if (backgroundColor.isSpecified) backgroundColor else MaterialTheme.colorScheme.surfaceContainerHigh
-    val actionContentColor = if (contentColor.isSpecified) contentColor else MaterialTheme.colorScheme.onSurfaceVariant
+    val containerColor = if (backgroundColor.isSpecified) backgroundColor else MaterialTheme.colorScheme.secondaryContainer
+    val iconColor = if (contentColor.isSpecified) contentColor else MaterialTheme.colorScheme.onSecondaryContainer
+    val haptics = rememberVibraHaptics()
+    val interactionSource = remember { MutableInteractionSource() }
 
-    FilledTonalButton(
-        onClick = onClick,
+    Column(
         modifier =
             modifier
-                .fillMaxWidth()
-                .heightIn(min = 96.dp),
-        enabled = enabled,
-        shape = ButtonDefaults.squareShape,
-        colors =
-            ButtonDefaults.filledTonalButtonColors(
-                containerColor = containerColor,
-                contentColor = actionContentColor,
-            ),
-        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 12.dp),
+                .clip(VibraShapes.SheetGroup)
+                .clickable(
+                    interactionSource = interactionSource,
+                    indication = null,
+                    enabled = enabled,
+                    role = Role.Button,
+                ) {
+                    haptics.press()
+                    onClick()
+                }.alpha(if (enabled) 1f else 0.38f)
+                .padding(vertical = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+        Box(
+            modifier =
+                Modifier
+                    .size(ActionCircle)
+                    .liquidPress(interactionSource, pressedScale = 0.86f)
+                    .clip(CircleShape)
+                    .background(containerColor)
+                    .indication(interactionSource, ripple()),
+            contentAlignment = Alignment.Center,
         ) {
-            Box(
-                modifier = Modifier.size(28.dp),
-                contentAlignment = Alignment.Center,
-            ) {
+            CompositionLocalProvider(LocalContentColor provides iconColor) {
                 icon()
             }
-
-            // Vibra: labels wrap onto two lines instead of marquee-scrolling inside a
-            // single cut-off line, so every action is readable at a glance.
-            Text(
-                text = text,
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.SemiBold,
-                textAlign = TextAlign.Center,
-                maxLines = 2,
-                minLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
         }
+
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelLarge,
+            textAlign = TextAlign.Center,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.padding(horizontal = 4.dp),
+        )
     }
 }
+
+private val ActionCircle = 56.dp
 
 @Composable
 fun NewMenuItem(
@@ -128,7 +148,7 @@ fun NewMenuItem(
             onClick = onClick,
             enabled = enabled,
             modifier = modifier.fillMaxWidth(),
-            shape = MaterialTheme.shapes.large,
+            shape = VibraShapes.SheetGroup,
             color = Color.Transparent,
         ) {
             content()
@@ -150,6 +170,8 @@ fun NewMenuSectionHeader(
     )
 }
 
+// Vibra: every cell has the same width, and a last row with fewer actions is centred
+// instead of leaving an empty slot at its end.
 @Composable
 fun NewActionGrid(
     actions: List<NewAction>,
@@ -161,29 +183,26 @@ fun NewActionGrid(
     val columnCount = columns.coerceAtLeast(1)
     val rows = actions.chunked(columnCount)
 
-    Column(
-        modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        rows.forEach { row ->
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                row.forEach { action ->
-                    NewActionButton(
-                        icon = action.icon,
-                        text = action.text,
-                        onClick = action.onClick,
-                        modifier = Modifier.weight(1f),
-                        enabled = action.enabled,
-                        backgroundColor = action.backgroundColor,
-                        contentColor = action.contentColor,
-                    )
-                }
-
-                repeat(columnCount - row.size) {
-                    Spacer(modifier = Modifier.weight(1f))
+    BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
+        val gap = 4.dp
+        val cellWidth = (maxWidth - gap * (columnCount - 1)) / columnCount
+        Column(verticalArrangement = Arrangement.spacedBy(gap)) {
+            rows.forEach { row ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(gap, Alignment.CenterHorizontally),
+                ) {
+                    row.forEach { action ->
+                        NewActionButton(
+                            icon = action.icon,
+                            text = action.text,
+                            onClick = action.onClick,
+                            modifier = Modifier.width(cellWidth),
+                            enabled = action.enabled,
+                            backgroundColor = action.backgroundColor,
+                            contentColor = action.contentColor,
+                        )
+                    }
                 }
             }
         }
@@ -272,9 +291,10 @@ fun MenuSurfaceSection(
     modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    // Vibra: one step above the sheet (surfaceContainerLow), with the sheet-group radius.
     Surface(
-        shape = MaterialTheme.shapes.extraLarge,
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        shape = VibraShapes.SheetGroup,
+        color = MaterialTheme.colorScheme.surfaceContainer,
         modifier = modifier.fillMaxWidth(),
     ) {
         Column(content = content)

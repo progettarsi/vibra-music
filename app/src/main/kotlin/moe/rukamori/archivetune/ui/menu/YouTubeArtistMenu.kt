@@ -84,8 +84,6 @@ fun YouTubeArtistMenu(
         trailingContent = {},
     )
 
-    HorizontalDivider()
-
     Spacer(modifier = Modifier.height(12.dp))
 
     val configuration = LocalConfiguration.current
@@ -113,8 +111,7 @@ fun YouTubeArtistMenu(
                                             Icon(
                                                 painter = painterResource(R.drawable.radio),
                                                 contentDescription = null,
-                                                modifier = Modifier.size(28.dp),
-                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.size(24.dp),
                                             )
                                         },
                                         text = stringResource(R.string.start_radio),
@@ -133,8 +130,7 @@ fun YouTubeArtistMenu(
                                             Icon(
                                                 painter = painterResource(R.drawable.shuffle),
                                                 contentDescription = null,
-                                                modifier = Modifier.size(28.dp),
-                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.size(24.dp),
                                             )
                                         },
                                         text = stringResource(R.string.shuffle),
@@ -152,8 +148,7 @@ fun YouTubeArtistMenu(
                                         Icon(
                                             painter = painterResource(R.drawable.share),
                                             contentDescription = null,
-                                            modifier = Modifier.size(28.dp),
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(24.dp),
                                         )
                                     },
                                     text = stringResource(R.string.share),
@@ -175,9 +170,6 @@ fun YouTubeArtistMenu(
             }
         }
 
-        item {
-            Spacer(modifier = Modifier.height(12.dp))
-        }
 
         item {
             MenuSurfaceSection(modifier = Modifier.padding(vertical = 6.dp)) {

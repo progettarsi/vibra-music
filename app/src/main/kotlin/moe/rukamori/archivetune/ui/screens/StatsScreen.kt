@@ -7,6 +7,7 @@
 
 package moe.rukamori.archivetune.ui.screens
 
+import android.graphics.Color as AndroidColor
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -85,7 +86,11 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
+import app.vibra.ui.components.VibraDialogButton
 import coil3.compose.AsyncImage
+import java.time.LocalDateTime
+import java.time.LocalTime
+import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import moe.rukamori.archivetune.LocalPlayerAwareWindowInsets
@@ -120,10 +125,6 @@ import moe.rukamori.archivetune.utils.joinByBullet
 import moe.rukamori.archivetune.utils.makeTimeString
 import moe.rukamori.archivetune.viewmodels.StatsScreenState
 import moe.rukamori.archivetune.viewmodels.StatsViewModel
-import java.time.LocalDateTime
-import java.time.LocalTime
-import java.time.format.DateTimeFormatter
-import android.graphics.Color as AndroidColor
 
 @OptIn(
     ExperimentalMaterial3Api::class,
@@ -947,7 +948,7 @@ private fun StatsYearPickerDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) {
+            VibraDialogButton(primary = true, onClick = onDismiss) {
                 Text(text = stringResource(R.string.dismiss))
             }
         },

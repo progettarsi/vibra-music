@@ -41,7 +41,6 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
@@ -52,7 +51,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.ProvideTextStyle
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -92,12 +90,13 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import app.vibra.ui.components.VibraBottomSheet
 import com.google.common.collect.ImmutableList
+import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 import moe.rukamori.archivetune.R
 import moe.rukamori.archivetune.constants.HISTORY_DURATION_DEFAULT
 import moe.rukamori.archivetune.constants.HISTORY_DURATION_RANGE
-import kotlin.math.roundToInt
 
 val LocalPreferenceInGroup = compositionLocalOf { false }
 
@@ -496,20 +495,9 @@ private fun <T : Any> MultiSelectPreferenceBottomSheet(
     onCancel: () -> Unit,
     onConfirm: () -> Unit,
 ) {
-    ModalBottomSheet(
+    VibraBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        shape = RoundedCornerShape(topStart = 36.dp, topEnd = 36.dp),
-        containerColor = MaterialTheme.colorScheme.surface,
-        contentColor = MaterialTheme.colorScheme.onSurface,
-        dragHandle = {
-            BottomSheetDefaults.DragHandle(
-                width = 48.dp,
-                height = 5.dp,
-                shape = RoundedCornerShape(50),
-                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.55f),
-            )
-        },
     ) {
         Column(
             modifier =
@@ -657,20 +645,9 @@ private fun <T> PreferenceSelectionBottomSheet(
     onDismiss: () -> Unit,
     onValueSelected: (T) -> Unit,
 ) {
-    ModalBottomSheet(
+    VibraBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        shape = RoundedCornerShape(topStart = 36.dp, topEnd = 36.dp),
-        containerColor = MaterialTheme.colorScheme.surface,
-        contentColor = MaterialTheme.colorScheme.onSurface,
-        dragHandle = {
-            BottomSheetDefaults.DragHandle(
-                width = 48.dp,
-                height = 5.dp,
-                shape = RoundedCornerShape(50),
-                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.55f),
-            )
-        },
     ) {
         Column(
             modifier =

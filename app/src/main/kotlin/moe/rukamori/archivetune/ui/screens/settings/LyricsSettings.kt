@@ -9,17 +9,15 @@
 
 package moe.rukamori.archivetune.ui.screens.settings
 
-import moe.rukamori.archivetune.ui.component.IconButton
-import moe.rukamori.archivetune.ui.utils.backToMain
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -29,8 +27,8 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -40,9 +38,8 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -69,6 +66,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
+import app.vibra.ui.components.VibraDialogButton
 import moe.rukamori.archivetune.LocalPlayerAwareWindowInsets
 import moe.rukamori.archivetune.R
 import moe.rukamori.archivetune.constants.EnableBetterLyricsKey
@@ -99,10 +97,12 @@ import moe.rukamori.archivetune.paxsenix.models.PaxsenixStats
 import moe.rukamori.archivetune.paxsenix.models.ProviderStats
 import moe.rukamori.archivetune.ui.component.ActionPromptDialog
 import moe.rukamori.archivetune.ui.component.DefaultDialog
+import moe.rukamori.archivetune.ui.component.IconButton
 import moe.rukamori.archivetune.ui.component.PreferenceEntry
 import moe.rukamori.archivetune.ui.component.PreferenceGroup
 import moe.rukamori.archivetune.ui.component.SwitchPreference
 import moe.rukamori.archivetune.ui.component.TextFieldDialog
+import moe.rukamori.archivetune.ui.utils.backToMain
 import moe.rukamori.archivetune.utils.rememberPreference
 import moe.rukamori.archivetune.viewmodels.ContentSettingsViewModel
 import moe.rukamori.archivetune.viewmodels.PaxsenixStatsState
@@ -514,14 +514,15 @@ private fun LyricsProviderOrderDialog(
         onDismiss = onDismiss,
         constrainContentHeight = true,
         buttons = {
-            TextButton(
+            VibraDialogButton(
                 onClick = onDismiss,
                 shapes = ButtonDefaults.shapes(),
             ) {
                 Text(stringResource(android.R.string.cancel))
             }
             Spacer(Modifier.weight(1f))
-            TextButton(
+            VibraDialogButton(
+                primary = true,
                 onClick = { onConfirm(providers.toList()) },
                 shapes = ButtonDefaults.shapes(),
             ) {
@@ -631,16 +632,16 @@ private fun PaxsenixStatsDialog(
         icon = { Icon(painterResource(R.drawable.stats), contentDescription = null) },
         buttons = {
             if (state is PaxsenixStatsState.Error) {
-                TextButton(onClick = onRetry) {
+                VibraDialogButton(onClick = onRetry) {
                     Text(stringResource(R.string.retry))
                 }
             } else {
-                TextButton(onClick = { uriHandler.openUri("https://lyrics.paxsenix.org/") }) {
+                VibraDialogButton(onClick = { uriHandler.openUri("https://lyrics.paxsenix.org/") }) {
                     Text(stringResource(R.string.visit_website))
                 }
             }
             Spacer(Modifier.weight(1f))
-            TextButton(onClick = onDismiss) {
+            VibraDialogButton(primary = true, onClick = onDismiss) {
                 Text(stringResource(android.R.string.ok))
             }
         },

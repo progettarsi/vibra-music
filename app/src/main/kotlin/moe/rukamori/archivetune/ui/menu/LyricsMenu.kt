@@ -49,8 +49,8 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.ExposedDropdownMenu
-import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
+import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
@@ -91,6 +91,9 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.vibra.ui.components.VibraDialogButton
+import java.util.Locale
+import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import moe.rukamori.archivetune.R
@@ -120,8 +123,6 @@ import moe.rukamori.archivetune.viewmodels.LyricsSearchResultUiModel
 import moe.rukamori.archivetune.viewmodels.LyricsSearchScreenState
 import moe.rukamori.archivetune.viewmodels.LyricsTranslationError
 import moe.rukamori.archivetune.viewmodels.LyricsTranslationScreenState
-import java.util.Locale
-import kotlin.math.roundToInt
 
 private enum class LyricsTranslationSource {
     AI_TRANSLATION,
@@ -365,14 +366,14 @@ fun LyricsMenu(
             },
             title = { Text(stringResource(R.string.lyrics_sync_offset)) },
             buttons = {
-                TextButton(
+                VibraDialogButton(
                     onClick = { tempLyricsSyncOffset = 0f },
                     shapes = ButtonDefaults.shapes(),
                 ) {
                     Text(stringResource(R.string.reset))
                 }
                 Spacer(modifier = Modifier.weight(1f))
-                TextButton(
+                VibraDialogButton(
                     onClick = {
                         tempLyricsSyncOffset = lyricsSyncOffset.toFloat().coerceIn(-5000f, 5000f)
                         showLyricsSyncOffsetDialog = false
@@ -381,7 +382,8 @@ fun LyricsMenu(
                 ) {
                     Text(stringResource(android.R.string.cancel))
                 }
-                TextButton(
+                VibraDialogButton(
+                    primary = true,
                     onClick = {
                         onLyricsSyncOffsetChange(tempLyricsSyncOffset.roundToInt().coerceIn(-5000, 5000))
                         showLyricsSyncOffsetDialog = false
@@ -711,8 +713,7 @@ fun LyricsMenu(
                                     Icon(
                                         painter = painterResource(R.drawable.edit),
                                         contentDescription = null,
-                                        modifier = Modifier.size(28.dp),
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(24.dp),
                                     )
                                 },
                                 text = stringResource(R.string.edit),
@@ -723,8 +724,7 @@ fun LyricsMenu(
                                     Icon(
                                         painter = painterResource(R.drawable.cached),
                                         contentDescription = null,
-                                        modifier = Modifier.size(28.dp),
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(24.dp),
                                     )
                                 },
                                 text = stringResource(R.string.refetch),
@@ -737,8 +737,7 @@ fun LyricsMenu(
                                     Icon(
                                         painter = painterResource(R.drawable.translate),
                                         contentDescription = null,
-                                        modifier = Modifier.size(28.dp),
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(24.dp),
                                     )
                                 },
                                 text = stringResource(R.string.translate),
@@ -750,8 +749,7 @@ fun LyricsMenu(
                                     Icon(
                                         painter = painterResource(R.drawable.speed),
                                         contentDescription = null,
-                                        modifier = Modifier.size(28.dp),
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(24.dp),
                                     )
                                 },
                                 text = stringResource(R.string.lyrics_sync_offset),
@@ -762,8 +760,7 @@ fun LyricsMenu(
                                     Icon(
                                         painter = painterResource(R.drawable.search),
                                         contentDescription = null,
-                                        modifier = Modifier.size(28.dp),
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(24.dp),
                                     )
                                 },
                                 text = stringResource(R.string.search),

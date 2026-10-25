@@ -358,8 +358,7 @@ fun YouTubeSongMenu(
                         Icon(
                             painter = painterResource(R.drawable.radio),
                             contentDescription = null,
-                            modifier = Modifier.size(28.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(24.dp),
                         )
                     },
                     text = startRadioText,
@@ -373,8 +372,7 @@ fun YouTubeSongMenu(
                         Icon(
                             painter = painterResource(R.drawable.playlist_play),
                             contentDescription = null,
-                            modifier = Modifier.size(28.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(24.dp),
                         )
                     },
                     text = playNextText,
@@ -388,8 +386,7 @@ fun YouTubeSongMenu(
                         Icon(
                             painter = painterResource(R.drawable.queue_music),
                             contentDescription = null,
-                            modifier = Modifier.size(28.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(24.dp),
                         )
                     },
                     text = addToQueueText,
@@ -403,8 +400,7 @@ fun YouTubeSongMenu(
                         Icon(
                             painter = painterResource(R.drawable.playlist_add),
                             contentDescription = null,
-                            modifier = Modifier.size(28.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(24.dp),
                         )
                     },
                     text = addToPlaylistText,
@@ -415,8 +411,7 @@ fun YouTubeSongMenu(
                         Icon(
                             painter = painterResource(R.drawable.share),
                             contentDescription = null,
-                            modifier = Modifier.size(28.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(24.dp),
                         )
                     },
                     text = shareText,
@@ -457,9 +452,6 @@ fun YouTubeSongMenu(
             }
         }
 
-        item {
-            Spacer(modifier = Modifier.height(12.dp))
-        }
 
         item {
             MenuSurfaceSection(modifier = Modifier.padding(vertical = 6.dp)) {
@@ -529,9 +521,6 @@ fun YouTubeSongMenu(
             }
         }
 
-        item {
-            Spacer(modifier = Modifier.height(12.dp))
-        }
 
         item {
             MenuSurfaceSection(modifier = Modifier.padding(vertical = 6.dp)) {
@@ -575,9 +564,6 @@ fun YouTubeSongMenu(
             }
         }
 
-        item {
-            Spacer(modifier = Modifier.height(12.dp))
-        }
 
         item {
             MenuSurfaceSection(modifier = Modifier.padding(vertical = 6.dp)) {
@@ -669,9 +655,6 @@ fun YouTubeSongMenu(
         }
 
         if (splitArtists.isNotEmpty() || song.album != null) {
-            item {
-                Spacer(modifier = Modifier.height(12.dp))
-            }
 
             item {
                 MenuSurfaceSection(modifier = Modifier.padding(vertical = 6.dp)) {
@@ -727,9 +710,6 @@ fun YouTubeSongMenu(
             }
         }
 
-        item {
-            Spacer(modifier = Modifier.height(12.dp))
-        }
 
         item {
             MenuSurfaceSection(modifier = Modifier.padding(vertical = 6.dp)) {

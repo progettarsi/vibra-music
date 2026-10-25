@@ -38,7 +38,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -46,20 +45,16 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.ripple
 import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -80,6 +75,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.graphics.shapes.toPath
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import app.vibra.ui.blocks.BlockSize
@@ -87,6 +83,7 @@ import app.vibra.ui.blocks.VibraBlock
 import app.vibra.ui.blocks.blockColumnsFor
 import app.vibra.ui.blocks.blockGrid
 import app.vibra.ui.components.VibraArtwork
+import app.vibra.ui.components.VibraBottomSheet
 import app.vibra.ui.components.VibraCard
 import app.vibra.ui.components.VibraGlyphButton
 import app.vibra.ui.components.VibraPullToRefresh
@@ -94,6 +91,7 @@ import app.vibra.ui.components.rememberShapeTracingLoaderState
 import app.vibra.ui.components.shapeProgress
 import app.vibra.ui.components.shapeTracingLoader
 import app.vibra.ui.haptics.rememberVibraHaptics
+import app.vibra.ui.library.VibraLibraryViewModel
 import app.vibra.ui.library.libraryBlocks
 import app.vibra.ui.library.rememberLibraryData
 import app.vibra.ui.library.rememberOpenLibraryList
@@ -105,14 +103,8 @@ import app.vibra.ui.shell.VibraRoutes
 import app.vibra.ui.theme.Star
 import app.vibra.ui.theme.VibraDimens
 import app.vibra.ui.theme.VibraShapes
-import java.time.LocalDateTime
-import java.time.ZoneOffset
 import kotlin.math.roundToInt
-import kotlinx.coroutines.FlowPreview
-import kotlinx.coroutines.flow.debounce
-import kotlinx.coroutines.flow.first
 import moe.rukamori.archivetune.LocalAnimationsDisabled
-import moe.rukamori.archivetune.LocalDatabase
 import moe.rukamori.archivetune.LocalPlayerAwareWindowInsets
 import moe.rukamori.archivetune.R
 import moe.rukamori.archivetune.home.HomeAction
@@ -138,23 +130,20 @@ fun VibraProfileScreen(
     navController: NavController,
     homeViewModel: HomeViewModel,
 ) {
-    val database = LocalDatabase.current
     val actions = rememberVibraItemActions(navController)
     val style = rememberProfileStyle()
     val accountName by homeViewModel.accountName.collectAsStateWithLifecycle()
     val accountImage by homeViewModel.accountImageUrl.collectAsStateWithLifecycle()
-    val weekAgo = remember { LocalDateTime.now().minusDays(7).toInstant(ZoneOffset.UTC).toEpochMilli() }
-    val topArtists by remember(weekAgo) { database.mostPlayedArtists(weekAgo, limit = 1) }
-        .collectAsStateWithLifecycle(initialValue = emptyList())
-    val weekSongs by remember(weekAgo) { database.mostPlayedSongsStats(weekAgo, limit = 500) }
-        .collectAsStateWithLifecycle(initialValue = emptyList())
-    val library = rememberLibraryData()
+    val pageData: VibraLibraryViewModel = hiltViewModel()
+    val topArtists by pageData.weekTopArtist.collectAsStateWithLifecycle()
+    val weekSongs by pageData.weekSongs.collectAsStateWithLifecycle()
+    val library = rememberLibraryData(pageData)
     val openList = rememberOpenLibraryList(navController)
     val bottomPadding = LocalPlayerAwareWindowInsets.current.asPaddingValues().calculateBottomPadding()
     val topPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val signedIn = accountName.isNotBlank()
     var editing by rememberSaveable { mutableStateOf(false) }
-    val listState = rememberRestoredListState()
+    val listState = rememberLazyListState()
     val homeState by homeViewModel.screenState.collectAsStateWithLifecycle()
     val refreshing = (homeState as? HomeScreenState.Success)?.uiState?.isRefreshing == true
 
@@ -257,33 +246,6 @@ fun VibraProfileScreen(
     if (editing) {
         ProfileEditSheet(style = style, avatarUrl = accountImage, onDismiss = { editing = false })
     }
-}
-
-/**
- * A list state that comes back to where the user left it after visiting another screen.
- *
- * The profile's blocks come from several database flows that start empty and arrive one
- * after another, so on return the list briefly has a single row and the position Compose
- * restores is clamped to the top. This keeps its own saved position and re-applies it once
- * the rows have stopped changing.
- */
-@OptIn(FlowPreview::class)
-@Composable
-private fun rememberRestoredListState(): LazyListState {
-    val state = rememberLazyListState()
-    var savedIndex by rememberSaveable { mutableIntStateOf(0) }
-    var savedOffset by rememberSaveable { mutableIntStateOf(0) }
-    LaunchedEffect(state) {
-        if (savedIndex > 0 || savedOffset > 0) {
-            snapshotFlow { state.layoutInfo.totalItemsCount }.debounce(RestoreSettleMillis).first { it > savedIndex }
-            state.scrollToItem(savedIndex, savedOffset)
-        }
-        snapshotFlow { state.firstVisibleItemIndex to state.firstVisibleItemScrollOffset }.collect { (index, offset) ->
-            savedIndex = index
-            savedOffset = offset
-        }
-    }
-    return state
 }
 
 /** Avatar in the user's shape (tap = edit), name and the sign-in action. */
@@ -503,10 +465,9 @@ private fun ProfileEditSheet(
     onDismiss: () -> Unit,
 ) {
     val haptics = rememberVibraHaptics()
-    ModalBottomSheet(
+    VibraBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
     ) {
         Column(
             modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = VibraDimens.Gutter, vertical = 8.dp),
@@ -575,6 +536,3 @@ private fun SectionLabel(text: String) {
         modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 10.dp),
     )
 }
-
-/** How long the profile's row count must stay unchanged before the scroll is restored. */
-private const val RestoreSettleMillis = 180L

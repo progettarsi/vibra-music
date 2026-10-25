@@ -98,7 +98,12 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import androidx.window.core.layout.WindowSizeClass
+import app.vibra.ui.components.VibraDialogButton
 import coil3.compose.AsyncImage
+import java.text.SimpleDateFormat
+import java.util.Locale
+import java.util.TimeZone
+import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 import moe.rukamori.archivetune.BuildConfig
 import moe.rukamori.archivetune.LocalPlayerAwareWindowInsets
@@ -120,10 +125,6 @@ import moe.rukamori.archivetune.utils.rememberEnumPreference
 import moe.rukamori.archivetune.viewmodels.UpdateSettingsAction
 import moe.rukamori.archivetune.viewmodels.UpdateSettingsScreenState
 import moe.rukamori.archivetune.viewmodels.UpdateSettingsViewModel
-import java.text.SimpleDateFormat
-import java.util.Locale
-import java.util.TimeZone
-import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -421,7 +422,8 @@ fun UpdateScreen(
                 }
             },
             confirmButton = {
-                TextButton(
+                VibraDialogButton(
+                    primary = true,
                     onClick = {
                         showEnableUpdateNotificationConfirmDialog = false
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !hasNotificationPermission) {
@@ -435,7 +437,7 @@ fun UpdateScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showEnableUpdateNotificationConfirmDialog = false }) {
+                VibraDialogButton(onClick = { showEnableUpdateNotificationConfirmDialog = false }) {
                     Text(stringResource(android.R.string.cancel))
                 }
             },
@@ -453,7 +455,8 @@ fun UpdateScreen(
                 )
             },
             confirmButton = {
-                TextButton(
+                VibraDialogButton(
+                    primary = true,
                     onClick = {
                         showArtifactChannelConfirmDialog = false
                         onUpdateChannelChange(UpdateChannel.ARTIFACT)
@@ -463,7 +466,7 @@ fun UpdateScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showArtifactChannelConfirmDialog = false }) {
+                VibraDialogButton(onClick = { showArtifactChannelConfirmDialog = false }) {
                     Text(stringResource(android.R.string.cancel))
                 }
             },
@@ -614,7 +617,6 @@ fun UpdateScreen(
         BottomSheetPage(
             state = updateSheetState,
             modifier = Modifier.align(Alignment.BottomCenter),
-            contentWindowInsets = LocalPlayerAwareWindowInsets.current.only(WindowInsetsSides.Bottom),
         )
     }
 
@@ -709,7 +711,8 @@ fun UpdateScreen(
                 }
             },
             confirmButton = {
-                TextButton(
+                VibraDialogButton(
+                    primary = true,
                     onClick = {
                         updateDownloadJob?.cancel()
                         updateDownloadJob = null
@@ -760,7 +763,7 @@ fun UpdateScreen(
                 )
             },
             confirmButton = {
-                TextButton(onClick = { showUpdateUpToDateDialog = false }) {
+                VibraDialogButton(primary = true, onClick = { showUpdateUpToDateDialog = false }) {
                     Text(stringResource(android.R.string.ok))
                 }
             },
@@ -792,7 +795,7 @@ fun UpdateScreen(
                 )
             },
             confirmButton = {
-                TextButton(onClick = { showUpdateErrorDialog = false }) {
+                VibraDialogButton(primary = true, onClick = { showUpdateErrorDialog = false }) {
                     Text(stringResource(android.R.string.ok))
                 }
             },

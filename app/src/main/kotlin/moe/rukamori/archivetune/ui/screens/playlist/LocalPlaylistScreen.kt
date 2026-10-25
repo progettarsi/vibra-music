@@ -15,10 +15,9 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import app.vibra.ui.motion.reorderWobble
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
@@ -45,7 +44,6 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
@@ -85,6 +83,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.media3.exoplayer.offline.Download
 import androidx.navigation.NavController
+import app.vibra.ui.components.VibraDialogButton
+import app.vibra.ui.motion.reorderWobble
+import java.time.LocalDateTime
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -93,7 +94,6 @@ import moe.rukamori.archivetune.LocalDatabase
 import moe.rukamori.archivetune.LocalDownloadUtil
 import moe.rukamori.archivetune.LocalPlayerAwareWindowInsets
 import moe.rukamori.archivetune.LocalPlayerConnection
-import moe.rukamori.archivetune.playback.queues.LocalMixQueue
 import moe.rukamori.archivetune.R
 import moe.rukamori.archivetune.constants.AppBarHeight
 import moe.rukamori.archivetune.constants.PlaylistSongSortType
@@ -106,6 +106,7 @@ import moe.rukamori.archivetune.innertube.YouTube
 import moe.rukamori.archivetune.innertube.models.WatchEndpoint
 import moe.rukamori.archivetune.models.toMediaMetadata
 import moe.rukamori.archivetune.playback.queues.ListQueue
+import moe.rukamori.archivetune.playback.queues.LocalMixQueue
 import moe.rukamori.archivetune.playback.queues.YouTubeQueue
 import moe.rukamori.archivetune.playlistimport.replaceSongSource
 import moe.rukamori.archivetune.ui.component.AssignTagsDialog
@@ -142,7 +143,6 @@ import moe.rukamori.archivetune.viewmodels.PlaylistCoverState
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 import timber.log.Timber
-import java.time.LocalDateTime
 
 @SuppressLint("RememberReturnType")
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
@@ -374,14 +374,15 @@ fun LocalPlaylistScreen(
                 )
             },
             buttons = {
-                TextButton(
+                VibraDialogButton(
                     onClick = { showRemoveDownloadDialog = false },
                     shapes = ButtonDefaults.shapes(),
                 ) {
                     Text(text = stringResource(android.R.string.cancel))
                 }
 
-                TextButton(
+                VibraDialogButton(
+                    primary = true,
                     onClick = {
                         showRemoveDownloadDialog = false
                         if (!editable) {
@@ -418,13 +419,14 @@ fun LocalPlaylistScreen(
                 )
             },
             buttons = {
-                TextButton(
+                VibraDialogButton(
                     onClick = { showDeletePlaylistDialog = false },
                     shapes = ButtonDefaults.shapes(),
                 ) {
                     Text(text = stringResource(android.R.string.cancel))
                 }
-                TextButton(
+                VibraDialogButton(
+                    primary = true,
                     onClick = {
                         showDeletePlaylistDialog = false
                         database.query {

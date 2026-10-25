@@ -456,8 +456,7 @@ fun SongMenu(
                                 Icon(
                                     painter = painterResource(R.drawable.radio),
                                     contentDescription = null,
-                                    modifier = Modifier.size(28.dp),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(24.dp),
                                 )
                             },
                             text = startRadioText,
@@ -474,8 +473,7 @@ fun SongMenu(
                             Icon(
                                 painter = painterResource(R.drawable.playlist_play),
                                 contentDescription = null,
-                                modifier = Modifier.size(28.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(24.dp),
                             )
                         },
                         text = playNextText,
@@ -491,8 +489,7 @@ fun SongMenu(
                             Icon(
                                 painter = painterResource(R.drawable.queue_music),
                                 contentDescription = null,
-                                modifier = Modifier.size(28.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(24.dp),
                             )
                         },
                         text = addToQueueText,
@@ -508,8 +505,7 @@ fun SongMenu(
                             Icon(
                                 painter = painterResource(R.drawable.playlist_add),
                                 contentDescription = null,
-                                modifier = Modifier.size(28.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(24.dp),
                             )
                         },
                         text = addToPlaylistText,
@@ -522,8 +518,7 @@ fun SongMenu(
                             Icon(
                                 painter = painterResource(R.drawable.share),
                                 contentDescription = null,
-                                modifier = Modifier.size(28.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(24.dp),
                             )
                         },
                         text = shareText,
@@ -549,8 +544,7 @@ fun SongMenu(
                             Icon(
                                 painter = painterResource(R.drawable.edit),
                                 contentDescription = null,
-                                modifier = Modifier.size(28.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(24.dp),
                             )
                         },
                         text = editText,
@@ -589,9 +583,6 @@ fun SongMenu(
             }
         }
 
-        item {
-            Spacer(modifier = Modifier.height(12.dp))
-        }
 
         if (!isLocalSong) {
             item {
@@ -633,10 +624,6 @@ fun SongMenu(
                     )
                 }
             }
-
-            item {
-                Spacer(modifier = Modifier.height(12.dp))
-            }
         }
 
         item {
@@ -671,9 +658,6 @@ fun SongMenu(
             }
         }
 
-        item {
-            Spacer(modifier = Modifier.height(12.dp))
-        }
 
         if (showMutationSection) {
             item {
@@ -910,10 +894,6 @@ fun SongMenu(
                     }
                 }
             }
-
-            item {
-                Spacer(modifier = Modifier.height(12.dp))
-            }
         }
 
         item {
@@ -965,9 +945,6 @@ fun SongMenu(
             }
         }
 
-        item {
-            Spacer(modifier = Modifier.height(12.dp))
-        }
 
         item {
             MenuSurfaceSection(modifier = Modifier.padding(vertical = 6.dp)) {

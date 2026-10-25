@@ -51,7 +51,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedIconButton
 import androidx.compose.material3.Scaffold
@@ -84,11 +83,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
+import app.vibra.ui.components.VibraBottomSheet
+import app.vibra.ui.components.VibraDialogButton
 import coil3.compose.AsyncImage
+import java.util.UUID
 import moe.rukamori.archivetune.App.Companion.forgetAccount
 import moe.rukamori.archivetune.BuildConfig
 import moe.rukamori.archivetune.LocalPlayerAwareWindowInsets
-import moe.rukamori.archivetune.ui.component.SwitchPreference
 import moe.rukamori.archivetune.R
 import moe.rukamori.archivetune.constants.AccountChannelHandleKey
 import moe.rukamori.archivetune.constants.AccountEmailKey
@@ -104,6 +105,7 @@ import moe.rukamori.archivetune.constants.YtmSyncKey
 import moe.rukamori.archivetune.innertube.YouTube
 import moe.rukamori.archivetune.innertube.utils.hasYouTubeLoginCookie
 import moe.rukamori.archivetune.ui.component.IconButton
+import moe.rukamori.archivetune.ui.component.SwitchPreference
 import moe.rukamori.archivetune.ui.screens.buildLoginRoute
 import moe.rukamori.archivetune.ui.utils.appBarScrollBehavior
 import moe.rukamori.archivetune.ui.utils.backToMain
@@ -115,7 +117,6 @@ import moe.rukamori.archivetune.utils.rememberPreference
 import moe.rukamori.archivetune.viewmodels.AccountChannelUiModel
 import moe.rukamori.archivetune.viewmodels.AccountChannelsState
 import moe.rukamori.archivetune.viewmodels.HomeViewModel
-import java.util.UUID
 
 private val AccountContentMaxWidth = 840.dp
 private val AvatarSize = 72.dp
@@ -400,7 +401,8 @@ fun AccountSettings(
                 Text(text = stringResource(R.string.unsaved_account_dialog_text))
             },
             confirmButton = {
-                TextButton(
+                VibraDialogButton(
+                    primary = true,
                     onClick = {
                         showUnsavedAccountDialog = false
                         saveCurrentAccount()
@@ -412,10 +414,10 @@ fun AccountSettings(
             },
             dismissButton = {
                 Row {
-                    TextButton(onClick = { showUnsavedAccountDialog = false }) {
+                    VibraDialogButton(onClick = { showUnsavedAccountDialog = false }) {
                         Text(text = stringResource(R.string.unsaved_account_dialog_cancel))
                     }
-                    TextButton(
+                    VibraDialogButton(
                         onClick = {
                             showUnsavedAccountDialog = false
                             navController.navigate(buildLoginRoute())
@@ -630,7 +632,7 @@ private fun AccountSwitcherSheet(
             .takeIf { it.size > 1 }
             .orEmpty()
 
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    VibraBottomSheet(onDismissRequest = onDismiss) {
         Text(
             text = stringResource(R.string.saved_accounts),
             style = MaterialTheme.typography.headlineSmall,

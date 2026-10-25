@@ -40,6 +40,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import app.vibra.ui.blocks.BlockSize
@@ -59,7 +60,6 @@ import app.vibra.ui.navigation.VibraItemActions
 import app.vibra.ui.navigation.rememberVibraItemActions
 import app.vibra.ui.theme.VibraDimens
 import app.vibra.ui.theme.VibraShapes
-import moe.rukamori.archivetune.LocalDatabase
 import moe.rukamori.archivetune.LocalPlayerAwareWindowInsets
 import moe.rukamori.archivetune.R
 import moe.rukamori.archivetune.constants.LibraryFilter
@@ -68,8 +68,6 @@ import moe.rukamori.archivetune.db.entities.Artist
 import moe.rukamori.archivetune.db.entities.Playlist
 import moe.rukamori.archivetune.db.entities.Song
 import moe.rukamori.archivetune.utils.makeTimeString
-import java.time.LocalDateTime
-import java.time.ZoneOffset
 import kotlin.math.min
 
 /*
@@ -99,18 +97,15 @@ data class LibraryData(
         get() = playlists.isEmpty() && likedSongs.isEmpty() && onRepeat.isEmpty() && albums.isEmpty() && artists.isEmpty()
 }
 
-/** Collects the library from the database (lifecycle-aware). */
+/** The page's library (kept by its [VibraLibraryViewModel], see VibraLibraryData.kt). */
 @Composable
-fun rememberLibraryData(): LibraryData {
-    val database = LocalDatabase.current
-    // The engine stores event timestamps as LocalDateTime-at-UTC epoch millis.
-    val weekAgo = remember { LocalDateTime.now().minusDays(7).toInstant(ZoneOffset.UTC).toEpochMilli() }
-    val playlists by remember { database.playlistsByUpdatedDateAsc() }.collectAsStateWithLifecycle(emptyList())
-    val liked by remember { database.likedSongsByCreateDateAsc() }.collectAsStateWithLifecycle(emptyList())
-    val likedCount by remember { database.likedSongsCount() }.collectAsStateWithLifecycle(0)
-    val onRepeat by remember(weekAgo) { database.mostPlayedSongs(weekAgo, limit = 8) }.collectAsStateWithLifecycle(emptyList())
-    val albums by remember { database.albumsByPlayTimeAsc() }.collectAsStateWithLifecycle(emptyList())
-    val artists by remember { database.artistsByPlayTimeAsc() }.collectAsStateWithLifecycle(emptyList())
+fun rememberLibraryData(viewModel: VibraLibraryViewModel = hiltViewModel()): LibraryData {
+    val playlists by viewModel.playlists.collectAsStateWithLifecycle()
+    val liked by viewModel.likedSongs.collectAsStateWithLifecycle()
+    val likedCount by viewModel.likedCount.collectAsStateWithLifecycle()
+    val onRepeat by viewModel.onRepeat.collectAsStateWithLifecycle()
+    val albums by viewModel.albums.collectAsStateWithLifecycle()
+    val artists by viewModel.artists.collectAsStateWithLifecycle()
     return LibraryData(
         // "Asc" queries list oldest/least first; habits read best most-recent/most-used first.
         playlists = playlists.asReversed(),

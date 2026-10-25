@@ -14,24 +14,15 @@
 
 package moe.rukamori.archivetune.ui.component
 
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.staticCompositionLocalOf
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.material3.LocalContentColor
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.aspectRatio
@@ -42,19 +33,26 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.layout.SubcomposeLayout
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -64,12 +62,13 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.layout.SubcomposeLayout
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.vibra.ui.components.ArtworkGlow
 import app.vibra.ui.components.VibraArtwork
+import app.vibra.ui.components.VibraDialogButton
+import app.vibra.ui.components.VibraDropdownMenu
 import app.vibra.ui.components.VibraPrimaryButton
 import app.vibra.ui.haptics.rememberVibraHaptics
 import app.vibra.ui.theme.VibraDimens
@@ -236,19 +235,17 @@ private fun MediaDetailRemovalConfirmationDialog(
             Text(text = stringResource(removeContentDescription))
         },
         buttons = {
-            TextButton(
+            VibraDialogButton(
                 onClick = onDismiss,
                 shapes = ButtonDefaults.shapes(),
             ) {
                 Text(text = stringResource(android.R.string.cancel))
             }
-            TextButton(
+            VibraDialogButton(
+                primary = true,
+                destructive = true,
                 onClick = onConfirm,
                 shapes = ButtonDefaults.shapes(),
-                colors =
-                    ButtonDefaults.textButtonColors(
-                        contentColor = MaterialTheme.colorScheme.error,
-                    ),
             ) {
                 Text(text = stringResource(removeContentDescription))
             }
@@ -383,11 +380,9 @@ private fun MediaDetailOverflowAction(
             contentColor = onPrimary,
             onClick = { expanded = true },
         )
-        DropdownMenu(
+        VibraDropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
-            shape = RoundedCornerShape(24.dp),
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
         ) {
             CompositionLocalProvider(LocalMediaDetailOverflow provides MediaDetailOverflow { expanded = false }) {
                 // FlowRow with one item per line gives the RowScope the actions expect

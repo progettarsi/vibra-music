@@ -9,8 +9,6 @@
 
 package moe.rukamori.archivetune.ui.screens.settings
 
-import moe.rukamori.archivetune.ui.component.IconButton
-import moe.rukamori.archivetune.ui.utils.backToMain
 import androidx.annotation.StringRes
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -35,11 +33,10 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -55,13 +52,19 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
+import app.vibra.ui.components.VibraDialogButton
+import app.vibra.ui.components.VibraFieldShape
+import app.vibra.ui.components.vibraTextFieldColors
+import kotlin.math.roundToInt
 import moe.rukamori.archivetune.LocalPlayerAwareWindowInsets
 import moe.rukamori.archivetune.R
 import moe.rukamori.archivetune.constants.LastFmProvider
+import moe.rukamori.archivetune.ui.component.IconButton
 import moe.rukamori.archivetune.ui.component.InfoLabel
 import moe.rukamori.archivetune.ui.component.PreferenceEntry
 import moe.rukamori.archivetune.ui.component.PreferenceGroup
 import moe.rukamori.archivetune.ui.component.SwitchPreference
+import moe.rukamori.archivetune.ui.utils.backToMain
 import moe.rukamori.archivetune.viewmodels.LastFmLoginDialogUiModel
 import moe.rukamori.archivetune.viewmodels.LastFmServiceEditorUiModel
 import moe.rukamori.archivetune.viewmodels.LastFmSettingsScreenState
@@ -69,7 +72,6 @@ import moe.rukamori.archivetune.viewmodels.LastFmSettingsUiModel
 import moe.rukamori.archivetune.viewmodels.LastFmSettingsViewModel
 import moe.rukamori.archivetune.viewmodels.LastFmTimingEditorUiModel
 import moe.rukamori.archivetune.viewmodels.LastFmTimingSetting
-import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -387,7 +389,9 @@ private fun LastFmLoginDialog(
         title = { Text(stringResource(R.string.login)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
+                TextField(
+                    shape = VibraFieldShape,
+                    colors = vibraTextFieldColors(),
                     value = dialog.username,
                     onValueChange = onUsernameChange,
                     label = { Text(stringResource(R.string.username)) },
@@ -395,7 +399,9 @@ private fun LastFmLoginDialog(
                     enabled = !dialog.isLoggingIn,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                OutlinedTextField(
+                TextField(
+                    shape = VibraFieldShape,
+                    colors = vibraTextFieldColors(),
                     value = dialog.password,
                     onValueChange = onPasswordChange,
                     label = { Text(stringResource(R.string.password)) },
@@ -435,7 +441,8 @@ private fun LastFmLoginDialog(
             }
         },
         confirmButton = {
-            TextButton(
+            VibraDialogButton(
+                primary = true,
                 onClick = onLogin,
                 enabled =
                     !dialog.isLoggingIn &&
@@ -448,7 +455,7 @@ private fun LastFmLoginDialog(
             }
         },
         dismissButton = {
-            TextButton(
+            VibraDialogButton(
                 onClick = onDismiss,
                 enabled = !dialog.isLoggingIn,
                 shapes = ButtonDefaults.shapes(),
@@ -507,7 +514,9 @@ private fun LastFmServiceEditorDialog(
                 }
 
                 if (editor.showCustomEndpoint) {
-                    OutlinedTextField(
+                    TextField(
+                        shape = VibraFieldShape,
+                        colors = vibraTextFieldColors(),
                         value = editor.customEndpoint,
                         onValueChange = onCustomEndpointChange,
                         label = { Text(stringResource(R.string.lastfm_custom_endpoint)) },
@@ -519,7 +528,9 @@ private fun LastFmServiceEditorDialog(
                 }
 
                 if (editor.showApiCredentials) {
-                    OutlinedTextField(
+                    TextField(
+                        shape = VibraFieldShape,
+                        colors = vibraTextFieldColors(),
                         value = editor.apiKeyOverride,
                         onValueChange = onApiKeyOverrideChange,
                         label = { Text(stringResource(R.string.lastfm_api_key_override)) },
@@ -527,7 +538,9 @@ private fun LastFmServiceEditorDialog(
                         enabled = !editor.isSaving,
                         modifier = Modifier.fillMaxWidth(),
                     )
-                    OutlinedTextField(
+                    TextField(
+                        shape = VibraFieldShape,
+                        colors = vibraTextFieldColors(),
                         value = editor.secretOverride,
                         onValueChange = onSecretOverrideChange,
                         label = { Text(stringResource(R.string.lastfm_secret_override)) },
@@ -550,7 +563,8 @@ private fun LastFmServiceEditorDialog(
             }
         },
         confirmButton = {
-            TextButton(
+            VibraDialogButton(
+                primary = true,
                 onClick = onSave,
                 enabled = !editor.isSaving,
                 shapes = ButtonDefaults.shapes(),
@@ -559,7 +573,7 @@ private fun LastFmServiceEditorDialog(
             }
         },
         dismissButton = {
-            TextButton(
+            VibraDialogButton(
                 onClick = onDismiss,
                 enabled = !editor.isSaving,
                 shapes = ButtonDefaults.shapes(),
@@ -639,12 +653,12 @@ private fun LastFmTimingEditorDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = onSave, shapes = ButtonDefaults.shapes()) {
+            VibraDialogButton(primary = true, onClick = onSave, shapes = ButtonDefaults.shapes()) {
                 Text(stringResource(android.R.string.ok))
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss, shapes = ButtonDefaults.shapes()) {
+            VibraDialogButton(onClick = onDismiss, shapes = ButtonDefaults.shapes()) {
                 Text(stringResource(android.R.string.cancel))
             }
         },

@@ -9,8 +9,6 @@
 
 package moe.rukamori.archivetune.ui.screens.settings
 
-import moe.rukamori.archivetune.ui.component.IconButton
-import moe.rukamori.archivetune.ui.utils.backToMain
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -46,7 +44,6 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -73,7 +70,13 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
+import app.vibra.ui.components.VibraDialogButton
 import com.google.common.collect.ImmutableList
+import java.time.Instant
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import moe.rukamori.archivetune.LocalPlayerAwareWindowInsets
@@ -83,12 +86,14 @@ import moe.rukamori.archivetune.constants.ImportSourcePriorityKey
 import moe.rukamori.archivetune.db.entities.Song
 import moe.rukamori.archivetune.ui.component.DefaultDialog
 import moe.rukamori.archivetune.ui.component.EnumListPreference
+import moe.rukamori.archivetune.ui.component.IconButton
 import moe.rukamori.archivetune.ui.component.ListPreference
 import moe.rukamori.archivetune.ui.component.PreferenceEntry
 import moe.rukamori.archivetune.ui.component.PreferenceGroup
 import moe.rukamori.archivetune.ui.component.SwitchPreference
 import moe.rukamori.archivetune.ui.menu.AddToPlaylistDialogOnline
 import moe.rukamori.archivetune.ui.menu.LoadingScreen
+import moe.rukamori.archivetune.ui.utils.backToMain
 import moe.rukamori.archivetune.utils.rememberPreference
 import moe.rukamori.archivetune.viewmodels.BackupCategory
 import moe.rukamori.archivetune.viewmodels.BackupRestoreViewModel
@@ -97,11 +102,6 @@ import moe.rukamori.archivetune.viewmodels.ExportPlaylistScreenState
 import moe.rukamori.archivetune.viewmodels.ExportPlaylistUiModel
 import moe.rukamori.archivetune.viewmodels.ScheduledBackupScreenState
 import moe.rukamori.archivetune.viewmodels.ScheduledBackupUiData
-import java.time.Instant
-import java.time.LocalDate
-import java.time.LocalDateTime
-import java.time.ZoneOffset
-import java.time.format.DateTimeFormatter
 
 private val CSV_MIME_TYPES =
     arrayOf(
@@ -448,7 +448,8 @@ fun BackupAndRestore(
             onDismiss = { showRestoreValidationError = false },
             title = { Text(stringResource(R.string.restore_failed)) },
             buttons = {
-                TextButton(
+                VibraDialogButton(
+                    primary = true,
                     onClick = { showRestoreValidationError = false },
                     shapes = ButtonDefaults.shapes(),
                 ) {
@@ -532,7 +533,7 @@ private fun ExportPlaylistPickerDialog(
         title = { Text(stringResource(R.string.export_playlist_picker_title)) },
         constrainContentHeight = true,
         buttons = {
-            TextButton(
+            VibraDialogButton(
                 onClick = onDismiss,
                 shapes = ButtonDefaults.shapes(),
             ) {
@@ -717,9 +718,10 @@ private fun ScheduledBackupDatePickerDialog(
     DatePickerDialog(
         onDismissRequest = onDismiss,
         confirmButton = {
-            TextButton(
+            VibraDialogButton(
+                primary = true,
                 onClick = {
-                    val selectedMillis = datePickerState.selectedDateMillis ?: return@TextButton
+                    val selectedMillis = datePickerState.selectedDateMillis ?: return@VibraDialogButton
                     val epochDay =
                         Instant
                             .ofEpochMilli(selectedMillis)
@@ -735,7 +737,7 @@ private fun ScheduledBackupDatePickerDialog(
             }
         },
         dismissButton = {
-            TextButton(
+            VibraDialogButton(
                 onClick = onDismiss,
                 shapes = ButtonDefaults.shapes(),
             ) {
@@ -798,10 +800,11 @@ private fun BackupOptionsDialog(
         onDismiss = onDismiss,
         title = { Text(title) },
         buttons = {
-            TextButton(onClick = onDismiss, shapes = ButtonDefaults.shapes()) {
+            VibraDialogButton(onClick = onDismiss, shapes = ButtonDefaults.shapes()) {
                 Text(stringResource(android.R.string.cancel))
             }
-            TextButton(
+            VibraDialogButton(
+                primary = true,
                 onClick = { onConfirm(selected) },
                 shapes = ButtonDefaults.shapes(),
                 enabled = selected.isNotEmpty(),

@@ -9,8 +9,6 @@
 
 package moe.rukamori.archivetune
 
-import app.vibra.ui.shell.VibraAppShell
-import app.vibra.ui.shell.VibraShellController
 import android.annotation.SuppressLint
 import android.content.ComponentName
 import android.content.Context
@@ -41,8 +39,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -55,7 +53,6 @@ import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.contentColorFor
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -95,8 +92,14 @@ import androidx.media3.common.MediaMetadata.MEDIA_TYPE_MUSIC
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import app.vibra.ui.components.VibraDialogButton
+import app.vibra.ui.shell.VibraAppShell
+import app.vibra.ui.shell.VibraShellController
 import com.valentinilk.shimmer.LocalShimmerTheme
 import dagger.hilt.android.AndroidEntryPoint
+import java.util.Locale
+import javax.inject.Inject
+import kotlin.time.Duration.Companion.days
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
@@ -106,8 +109,8 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import moe.rukamori.archivetune.constants.AppFontPreference
-import moe.rukamori.archivetune.constants.UseSystemLanguageKey
 import moe.rukamori.archivetune.constants.CustomFontUriKey
+import moe.rukamori.archivetune.constants.CustomThemeColorKey
 import moe.rukamori.archivetune.constants.DarkModeDefault
 import moe.rukamori.archivetune.constants.DarkModeKey
 import moe.rukamori.archivetune.constants.DisableAnimationsKey
@@ -119,6 +122,7 @@ import moe.rukamori.archivetune.constants.StopMusicOnTaskClearKey
 import moe.rukamori.archivetune.constants.UpdateChannel
 import moe.rukamori.archivetune.constants.UpdateChannelKey
 import moe.rukamori.archivetune.constants.UseSystemFontKey
+import moe.rukamori.archivetune.constants.UseSystemLanguageKey
 import moe.rukamori.archivetune.db.MusicDatabase
 import moe.rukamori.archivetune.extensions.toMediaItem
 import moe.rukamori.archivetune.innertube.YouTube
@@ -149,7 +153,6 @@ import moe.rukamori.archivetune.ui.screens.onboarding.OnboardingRoute
 import moe.rukamori.archivetune.ui.screens.settings.DarkMode
 import moe.rukamori.archivetune.ui.theme.ArchiveTuneTheme
 import moe.rukamori.archivetune.ui.theme.DefaultThemeColor
-import moe.rukamori.archivetune.constants.CustomThemeColorKey
 import moe.rukamori.archivetune.ui.utils.navigateToAlbum
 import moe.rukamori.archivetune.ui.utils.navigateToArtist
 import moe.rukamori.archivetune.updates.ObserveUpdateSettingsUseCase
@@ -168,9 +171,6 @@ import moe.rukamori.archivetune.viewmodels.BackupRestoreViewModel
 import moe.rukamori.archivetune.viewmodels.GatekeeperViewModel
 import moe.rukamori.archivetune.viewmodels.HomeViewModel
 import moe.rukamori.archivetune.viewmodels.NetworkBannerViewModel
-import java.util.Locale
-import javax.inject.Inject
-import kotlin.time.Duration.Companion.days
 
 @Suppress("DEPRECATION", "ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
 @AndroidEntryPoint
@@ -1137,9 +1137,10 @@ class MainActivity : ComponentActivity() {
                 }
             },
             confirmButton = {
-                TextButton(
+                VibraDialogButton(
+                    primary = true,
                     onClick = {
-                        val uri = pendingBackupRestoreUri ?: return@TextButton
+                        val uri = pendingBackupRestoreUri ?: return@VibraDialogButton
                         pendingBackupRestoreUri = null
                         viewModel.restore(this@MainActivity, uri, selected)
                     },
@@ -1150,7 +1151,7 @@ class MainActivity : ComponentActivity() {
                 }
             },
             dismissButton = {
-                TextButton(
+                VibraDialogButton(
                     onClick = { pendingBackupRestoreUri = null },
                     shapes = ButtonDefaults.shapes(),
                 ) {

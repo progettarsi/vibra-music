@@ -61,7 +61,6 @@ import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SearchBar
@@ -99,11 +98,13 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import androidx.window.core.layout.WindowSizeClass
+import app.vibra.ui.components.VibraBottomSheet
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.allowHardware
 import moe.rukamori.archivetune.LocalPlayerAwareWindowInsets
 import moe.rukamori.archivetune.R
+import moe.rukamori.archivetune.musicrecognition.navigateToMusicRecognitionDetails
 import moe.rukamori.archivetune.ui.component.SwitchPreference
 import moe.rukamori.archivetune.ui.screens.search.onlineSearchResultRoute
 import moe.rukamori.archivetune.ui.utils.appBarScrollBehavior
@@ -117,7 +118,6 @@ import moe.rukamori.archivetune.viewmodels.RecognitionHistorySheetUiState
 import moe.rukamori.archivetune.viewmodels.RecognitionHistoryUiModel
 import moe.rukamori.archivetune.viewmodels.RecognitionPhaseUi
 import moe.rukamori.archivetune.viewmodels.RecognizedTrackUiModel
-import moe.rukamori.archivetune.musicrecognition.navigateToMusicRecognitionDetails
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -954,10 +954,9 @@ private fun MusicRecognitionSettingsBottomSheet(
             },
         )
 
-    ModalBottomSheet(
+    VibraBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surface,
     ) {
         Column(
             modifier =
@@ -1022,11 +1021,10 @@ private fun RecognitionHistoryBottomSheet(
     onOpenUri: (String) -> Unit,
 ) {
     val clearQuery = remember(onQueryChange) { { onQueryChange("") } }
-    ModalBottomSheet(
+    VibraBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         modifier = Modifier.fillMaxSize(),
-        containerColor = MaterialTheme.colorScheme.surface,
     ) {
         Box(
             modifier =

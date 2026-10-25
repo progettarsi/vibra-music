@@ -28,7 +28,6 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
@@ -38,6 +37,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import app.vibra.ui.components.VibraDialogButton
 import moe.rukamori.archivetune.R
 import moe.rukamori.archivetune.constants.LibraryFilter
 import sh.calvin.reorderable.ReorderableItem
@@ -61,14 +61,15 @@ fun LibraryChipOrderDialog(
         onDismiss = onDismiss,
         constrainContentHeight = true,
         buttons = {
-            TextButton(
+            VibraDialogButton(
                 onClick = onDismiss,
                 shapes = ButtonDefaults.shapes(),
             ) {
                 Text(stringResource(android.R.string.cancel))
             }
             Spacer(Modifier.weight(1f))
-            TextButton(
+            VibraDialogButton(
+                primary = true,
                 onClick = { onConfirm(filters.toList()) },
                 shapes = ButtonDefaults.shapes(),
             ) {

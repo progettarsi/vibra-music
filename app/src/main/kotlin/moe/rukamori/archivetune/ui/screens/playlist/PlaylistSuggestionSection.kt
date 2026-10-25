@@ -40,8 +40,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.vibra.ui.components.VibraDialogButton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -86,7 +87,7 @@ fun PlaylistSuggestionsSection(
         DefaultDialog(
             title = { Text(stringResource(R.string.duplicates)) },
             buttons = {
-                TextButton(
+                VibraDialogButton(
                     onClick = {
                         showDuplicateDialog = false
                         songToCheck = null
@@ -95,7 +96,8 @@ fun PlaylistSuggestionsSection(
                 ) {
                     Text(stringResource(android.R.string.cancel))
                 }
-                TextButton(
+                VibraDialogButton(
+                    primary = true,
                     onClick = {
                         coroutineScope.launch {
                             // Add to current playlist anyway

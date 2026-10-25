@@ -364,8 +364,6 @@ fun AlbumMenu(
         },
     )
 
-    HorizontalDivider()
-
     Spacer(modifier = Modifier.height(12.dp))
 
     val configuration = LocalConfiguration.current
@@ -393,8 +391,7 @@ fun AlbumMenu(
                                         Icon(
                                             painter = painterResource(R.drawable.play),
                                             contentDescription = null,
-                                            modifier = Modifier.size(28.dp),
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(24.dp),
                                         )
                                     },
                                     text = stringResource(R.string.play),
@@ -417,8 +414,7 @@ fun AlbumMenu(
                                         Icon(
                                             painter = painterResource(R.drawable.shuffle),
                                             contentDescription = null,
-                                            modifier = Modifier.size(28.dp),
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(24.dp),
                                         )
                                     },
                                     text = stringResource(R.string.shuffle),
@@ -442,8 +438,7 @@ fun AlbumMenu(
                                             Icon(
                                                 painter = painterResource(R.drawable.share),
                                                 contentDescription = null,
-                                                modifier = Modifier.size(28.dp),
-                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.size(24.dp),
                                             )
                                         },
                                         text = stringResource(R.string.share),
@@ -469,9 +464,6 @@ fun AlbumMenu(
             }
         }
 
-        item {
-            Spacer(modifier = Modifier.height(12.dp))
-        }
 
         item {
             MenuSurfaceSection(modifier = Modifier.padding(vertical = 6.dp)) {
@@ -570,9 +562,6 @@ fun AlbumMenu(
         }
 
         if (!isLocalAlbum && remoteSongs.isNotEmpty()) {
-            item {
-                Spacer(modifier = Modifier.height(12.dp))
-            }
 
             item {
                 MenuSurfaceSection(modifier = Modifier.padding(vertical = 6.dp)) {
@@ -661,9 +650,6 @@ fun AlbumMenu(
             }
         }
 
-        item {
-            Spacer(modifier = Modifier.height(12.dp))
-        }
 
         item {
             MenuSurfaceSection(modifier = Modifier.padding(vertical = 6.dp)) {

@@ -9,40 +9,33 @@
 
 package moe.rukamori.archivetune.ui.component
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialogDefaults
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.ProvideTextStyle
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -55,22 +48,29 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
+import app.vibra.ui.components.VibraDialog
+import app.vibra.ui.components.VibraDialogButton
+import app.vibra.ui.components.VibraDialogButtonSpacing
+import app.vibra.ui.components.VibraFieldShape
+import app.vibra.ui.components.vibraTextFieldColors
 import kotlinx.coroutines.delay
 import moe.rukamori.archivetune.R
 
+// Vibra: every engine dialog is a VibraDialog card (spring entrance, Vibra radius and
+// surface); the optional icon sits in a tonal circle and the actions are pills.
 @Composable
 fun DefaultDialog(
     onDismiss: () -> Unit,
@@ -83,85 +83,66 @@ fun DefaultDialog(
     constrainContentHeight: Boolean = false,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false),
-    ) {
-        BoxWithConstraints(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(24.dp)
-                    .imePadding()
-                    .navigationBarsPadding(),
-            contentAlignment = Alignment.Center,
+    VibraDialog(onDismissRequest = onDismiss, modifier = modifier) {
+        val bodyModifier =
+            when {
+                contentScrollable ->
+                    Modifier
+                        .weight(1f, fill = false)
+                        .verticalScroll(rememberScrollState())
+                constrainContentHeight -> Modifier.weight(1f, fill = false)
+                else -> Modifier
+            }
+
+        Column(
+            horizontalAlignment = horizontalAlignment,
+            modifier = bodyModifier,
         ) {
-            Surface(
-                modifier = Modifier.heightIn(max = maxHeight),
-                shape = AlertDialogDefaults.shape,
-                color = AlertDialogDefaults.containerColor,
-                tonalElevation = AlertDialogDefaults.TonalElevation,
-            ) {
-                Column(
-                    modifier = modifier.padding(24.dp),
+            if (icon != null) {
+                Box(
+                    modifier =
+                        Modifier
+                            .align(Alignment.CenterHorizontally)
+                            .size(56.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.secondaryContainer),
+                    contentAlignment = Alignment.Center,
                 ) {
-                    val bodyModifier =
-                        when {
-                            contentScrollable ->
-                                Modifier
-                                    .weight(1f, fill = false)
-                                    .verticalScroll(rememberScrollState())
-                            constrainContentHeight -> Modifier.weight(1f, fill = false)
-                            else -> Modifier
-                        }
-
-                    Column(
-                        horizontalAlignment = horizontalAlignment,
-                        modifier = bodyModifier,
-                    ) {
-                        if (icon != null) {
-                            CompositionLocalProvider(LocalContentColor provides AlertDialogDefaults.iconContentColor) {
-                                Box(
-                                    Modifier.align(Alignment.CenterHorizontally),
-                                ) {
-                                    icon()
-                                }
-                            }
-
-                            Spacer(Modifier.height(16.dp))
-                        }
-                        if (title != null) {
-                            CompositionLocalProvider(LocalContentColor provides AlertDialogDefaults.titleContentColor) {
-                                ProvideTextStyle(MaterialTheme.typography.headlineSmall) {
-                                    Box(
-                                        Modifier.align(if (icon == null) Alignment.Start else Alignment.CenterHorizontally),
-                                    ) {
-                                        title()
-                                    }
-                                }
-                            }
-
-                            Spacer(Modifier.height(16.dp))
-                        }
-
-                        content()
+                    CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSecondaryContainer) {
+                        icon()
                     }
+                }
 
-                    if (buttons != null) {
-                        Spacer(Modifier.height(24.dp))
+                Spacer(Modifier.height(16.dp))
+            }
+            if (title != null) {
+                ProvideTextStyle(MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.SemiBold)) {
+                    Box(
+                        Modifier.align(if (icon == null) Alignment.Start else Alignment.CenterHorizontally),
+                    ) {
+                        title()
+                    }
+                }
 
-                        FlowRow(
-                            horizontalArrangement = Arrangement.End,
-                            modifier = Modifier.fillMaxWidth(),
-                        ) flowRowScope@{
-                            CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.primary) {
-                                ProvideTextStyle(
-                                    value = MaterialTheme.typography.labelLarge,
-                                ) {
-                                    this@flowRowScope.buttons()
-                                }
-                            }
-                        }
+                Spacer(Modifier.height(16.dp))
+            }
+
+            content()
+        }
+
+        if (buttons != null) {
+            Spacer(Modifier.height(24.dp))
+
+            FlowRow(
+                horizontalArrangement = VibraDialogButtonSpacing,
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth(),
+            ) flowRowScope@{
+                CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.primary) {
+                    ProvideTextStyle(
+                        value = MaterialTheme.typography.labelLarge,
+                    ) {
+                        this@flowRowScope.buttons()
                     }
                 }
             }
@@ -169,7 +150,6 @@ fun DefaultDialog(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ActionPromptDialog(
     title: String? = null,
@@ -180,79 +160,44 @@ fun ActionPromptDialog(
     onCancel: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit = {},
 ) {
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false),
-    ) {
-        BoxWithConstraints(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(24.dp)
-                    .imePadding()
-                    .navigationBarsPadding(),
-            contentAlignment = Alignment.Center,
+    VibraDialog(onDismissRequest = onDismiss) {
+        if (titleBar != null) {
+            Row {
+                titleBar()
+            }
+            Spacer(Modifier.height(16.dp))
+        } else if (title != null) {
+            Text(
+                text = title,
+                overflow = TextOverflow.Ellipsis,
+                maxLines = 1,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Spacer(Modifier.height(16.dp))
+        }
+
+        content()
+
+        Spacer(Modifier.height(24.dp))
+
+        FlowRow(
+            horizontalArrangement = VibraDialogButtonSpacing,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth(),
         ) {
-            Surface(
-                modifier = Modifier.heightIn(max = maxHeight),
-                shape = AlertDialogDefaults.shape,
-                color = AlertDialogDefaults.containerColor,
-                tonalElevation = AlertDialogDefaults.TonalElevation,
-            ) {
-                Column(
-                    modifier = Modifier.padding(24.dp),
-                ) {
-                    Column(modifier = Modifier.padding(12.dp)) {
-                        // title
-                        if (titleBar != null) {
-                            Row {
-                                titleBar()
-                            }
-                        } else if (title != null) {
-                            Text(
-                                text = title,
-                                overflow = TextOverflow.Ellipsis,
-                                maxLines = 1,
-                                style = MaterialTheme.typography.headlineSmall,
-                            )
-                            Spacer(Modifier.height(16.dp))
-                        }
-
-                        content() // body
-                    }
-
-                    Row(
-                        horizontalArrangement = Arrangement.End,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        if (onReset != null) {
-                            Row(modifier = Modifier.weight(1f)) {
-                                TextButton(
-                                    onClick = { onReset() },
-                                    shapes = ButtonDefaults.shapes(),
-                                ) {
-                                    Text(stringResource(R.string.reset))
-                                }
-                            }
-                        }
-
-                        if (onCancel != null) {
-                            TextButton(
-                                onClick = { onCancel() },
-                                shapes = ButtonDefaults.shapes(),
-                            ) {
-                                Text(stringResource(android.R.string.cancel))
-                            }
-                        }
-
-                        TextButton(
-                            onClick = { onConfirm() },
-                            shapes = ButtonDefaults.shapes(),
-                        ) {
-                            Text(stringResource(android.R.string.ok))
-                        }
-                    }
+            if (onReset != null) {
+                VibraDialogButton(onClick = onReset) {
+                    Text(stringResource(R.string.reset))
                 }
+            }
+            if (onCancel != null) {
+                VibraDialogButton(onClick = onCancel) {
+                    Text(stringResource(android.R.string.cancel))
+                }
+            }
+            VibraDialogButton(onClick = onConfirm, primary = true) {
+                Text(stringResource(android.R.string.ok))
             }
         }
     }
@@ -264,33 +209,12 @@ fun ListDialog(
     modifier: Modifier = Modifier,
     content: LazyListScope.() -> Unit,
 ) {
-    Dialog(
+    VibraDialog(
         onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false),
+        modifier = modifier,
+        contentPadding = PaddingValues(vertical = 24.dp),
     ) {
-        BoxWithConstraints(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(24.dp)
-                    .imePadding()
-                    .navigationBarsPadding(),
-            contentAlignment = Alignment.Center,
-        ) {
-            Surface(
-                modifier = Modifier.heightIn(max = maxHeight),
-                shape = AlertDialogDefaults.shape,
-                color = AlertDialogDefaults.containerColor,
-                tonalElevation = AlertDialogDefaults.TonalElevation,
-            ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = modifier.padding(vertical = 24.dp),
-                ) {
-                    LazyColumn(content = content)
-                }
-            }
-        }
+        LazyColumn(content = content)
     }
 }
 
@@ -357,7 +281,7 @@ fun TextFieldDialog(
         title = title,
         contentScrollable = true,
         buttons = {
-            TextButton(onClick = onDismiss, shapes = ButtonDefaults.shapes()) {
+            VibraDialogButton(onClick = onDismiss) {
                 Text(text = stringResource(android.R.string.cancel))
             }
 
@@ -365,7 +289,8 @@ fun TextFieldDialog(
                 textFields?.all { isInputValid(it.second.text) }
                     ?: isInputValid(currentLegacyValue)
 
-            TextButton(
+            VibraDialogButton(
+                primary = true,
                 enabled = enabled && isValid,
                 onClick = {
                     if (textFields != null && onDoneMultiple != null) {
@@ -377,7 +302,6 @@ fun TextFieldDialog(
                         onDismiss()
                     }
                 },
-                shapes = ButtonDefaults.shapes(),
             ) {
                 Text(text = stringResource(android.R.string.ok))
             }
@@ -393,7 +317,8 @@ fun TextFieldDialog(
                         enabled = enabled,
                         singleLine = singleLine,
                         maxLines = maxLines,
-                        colors = OutlinedTextFieldDefaults.colors(),
+                        shape = VibraFieldShape,
+                        colors = vibraTextFieldColors(),
                         keyboardOptions = keyboardOptions,
                         visualTransformation = visualTransformation,
                         keyboardActions =
@@ -429,7 +354,8 @@ fun TextFieldDialog(
                     enabled = enabled,
                     singleLine = singleLine,
                     maxLines = maxLines,
-                    colors = OutlinedTextFieldDefaults.colors(),
+                    shape = VibraFieldShape,
+                        colors = vibraTextFieldColors(),
                     keyboardOptions = keyboardOptions,
                     visualTransformation = visualTransformation,
                     keyboardActions =
@@ -477,17 +403,17 @@ fun EditPlaylistDialog(
         title = { Text(text = stringResource(R.string.edit_playlist)) },
         contentScrollable = true,
         buttons = {
-            TextButton(onClick = onDismiss, shapes = ButtonDefaults.shapes()) {
+            VibraDialogButton(onClick = onDismiss) {
                 Text(text = stringResource(android.R.string.cancel))
             }
-            TextButton(
+            VibraDialogButton(
+                primary = true,
                 enabled = canSave,
                 onClick = {
                     keyboardController?.hide()
                     onSave(nameField.text.trim())
                     onDismiss()
                 },
-                shapes = ButtonDefaults.shapes(),
             ) {
                 Text(text = stringResource(R.string.save))
             }
@@ -498,7 +424,8 @@ fun EditPlaylistDialog(
             onValueChange = { nameField = it },
             placeholder = { Text(text = stringResource(R.string.playlist_name)) },
             singleLine = true,
-            colors = OutlinedTextFieldDefaults.colors(),
+            shape = VibraFieldShape,
+                        colors = vibraTextFieldColors(),
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
             keyboardActions =
                 KeyboardActions(
