@@ -45,7 +45,6 @@
     <string name="assign_tags">Asing Tanda</string>
     <string name="assign_tags_to_playlists">Asingkan ke senarai main</string>
     <string name="no_tags_available">Tiada tanda. Cipta satu dahulu.</string>
-    <string name="manage_playlist_tags">Tanda senarai main</string>
     <string name="manage_playlist_tags_desc">Cipta dan urus tanda untuk susun senarai main</string>
     <string name="like_all">Suka semua</string>
     <string name="dislike_all">Tidak suka semua</string>
@@ -55,7 +54,4 @@
     <string name="close">Tutup</string>
     <string name="minimum_volume">Suara Minimum</string>
     <string name="maximum_volume">Suara Maksimum</string>
-    <string name="hide_player_thumbnail">Sorok Muka Pemain</string>
-    <string name="hide_player_thumbnail_desc">Tukar muka album dengan logo aplikasi pada pemain</string>
-    <string name="show_tags_in_library">Tunjuk tanda dalam pustaka</string>
 </resources>

@@ -20,11 +20,9 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
-import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -82,7 +80,6 @@ import moe.rukamori.archivetune.extensions.toMediaItem
 import moe.rukamori.archivetune.extensions.togglePlayPause
 import moe.rukamori.archivetune.playback.queues.ListQueue
 import moe.rukamori.archivetune.ui.component.DefaultDialog
-import moe.rukamori.archivetune.ui.component.DraggableScrollbar
 import moe.rukamori.archivetune.ui.component.EmptyPlaceholder
 import moe.rukamori.archivetune.ui.component.IconButton
 import moe.rukamori.archivetune.ui.component.LocalMenuState
@@ -197,35 +194,6 @@ fun AutoPlaylistScreen(
         }
     }
 
-    val globalDownloadState = remember(downloads) {
-        val activeDownloads = downloads.values.filter {
-            it.state == Download.STATE_DOWNLOADING ||
-            it.state == Download.STATE_QUEUED ||
-            it.state == Download.STATE_RESTARTING ||
-            it.state == Download.STATE_STOPPED
-        }
-        if (activeDownloads.isEmpty()) {
-            HeaderDownloadState.None
-        } else {
-            var progressTotal = 0f
-            var hasRunning = false
-            var hasPaused = false
-            activeDownloads.forEach { download ->
-                val progress = download.percentDownloaded.takeIf { it >= 0f }?.div(100f) ?: 0f
-                progressTotal += progress.coerceIn(0f, 1f)
-                if (download.state == Download.STATE_STOPPED) {
-                    hasPaused = hasPaused || download.stopReason == 1
-                } else {
-                    hasRunning = true
-                }
-            }
-            HeaderDownloadState.Partial(
-                progress = progressTotal / activeDownloads.size,
-                paused = hasPaused && !hasRunning,
-            )
-        }
-    }
-
     LaunchedEffect(songs) {
         val songIds = songs.map { it.song.id }
         downloadUtil.downloads.collect { currentDownloads ->
@@ -296,12 +264,6 @@ fun AutoPlaylistScreen(
     val transparentAppBar by remember {
         derivedStateOf {
             !selection && !isSearching && !showTopBarTitle
-        }
-    }
-
-    val headerItems by remember {
-        derivedStateOf {
-            if (songs.isNotEmpty() && !isSearching) 2 else 0
         }
     }
 
@@ -443,22 +405,6 @@ fun AutoPlaylistScreen(
                                         }
                                     }
                                 }
-
-                                MediaDetailAction(
-                                    contentDescription = R.string.download,
-                                    contentColor = contentColor,
-                                    onClick = {
-                                        navController.navigate("auto_playlist/downloaded?tab=progress")
-                                    },
-                                ) {
-                                    val globalProgress = (globalDownloadState as? HeaderDownloadState.Partial)?.progress ?: 0f
-                                    val globalPaused = (globalDownloadState as? HeaderDownloadState.Partial)?.paused ?: false
-                                    HeaderDownloadProgressIndicator(
-                                        progress = globalProgress,
-                                        paused = globalPaused,
-                                        icon = R.drawable.list,
-                                    )
-                                }
                             },
                         )
                     }
@@ -558,18 +504,6 @@ fun AutoPlaylistScreen(
                 }
             }
         }
-
-        DraggableScrollbar(
-            modifier =
-                Modifier
-                    .padding(
-                        LocalPlayerAwareWindowInsets.current
-                            .union(WindowInsets.ime)
-                            .asPaddingValues(),
-                    ).align(Alignment.CenterEnd),
-            scrollState = lazyListState,
-            headerItems = headerItems,
-        )
 
         TopAppBar(
             scrollBehavior = scrollBehavior,

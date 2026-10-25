@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_playback_audio">Playback &amp; audio</string>
+    <string name="settings_downloads_storage">Downloads &amp; storage</string>
+    <string name="settings_privacy_history">Privacy &amp; history</string>
+    <string name="settings_advanced">Advanced</string>
+    <string name="settings_advanced_content">Language &amp; content filters</string>
+    <string name="settings_playback_speed">Playback speed</string>
+    <string name="about_vibra_attribution">Based on ArchiveTune by Rukamori and contributors — not affiliated or endorsed.</string>
+    <string name="about_font_licenses">Font licences (OFL)</string>
+    <string name="login_page_error">The sign-in page could not load. Check your connection and retry.</string>
+    <string name="login_context_error">The account was detected, but YouTube has not provided all account details yet. Wait a moment and retry.</string>
+    <string name="login_account_error">The account could not be verified. Check your connection and retry.</string>
+    <string name="about_third_party_licenses">Third-party licences</string>
+    <string name="settings_integrations">Integrations</string>
+</resources>

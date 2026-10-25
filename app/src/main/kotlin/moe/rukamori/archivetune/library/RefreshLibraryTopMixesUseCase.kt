@@ -22,7 +22,6 @@ import moe.rukamori.archivetune.constants.AiCustomEndpointKey
 import moe.rukamori.archivetune.constants.AiCustomModelKey
 import moe.rukamori.archivetune.constants.AiProvider
 import moe.rukamori.archivetune.constants.AiProviderKey
-import moe.rukamori.archivetune.constants.AiRequestParametersKey
 import moe.rukamori.archivetune.constants.AiSelectedModelKey
 import moe.rukamori.archivetune.db.entities.Song
 import moe.rukamori.archivetune.extensions.toEnum
@@ -86,7 +85,7 @@ class RefreshLibraryTopMixesUseCase
                 provider = provider,
                 apiKey = prefs[AiApiKeyKey].orEmpty(),
                 customEndpoint = prefs[AiCustomEndpointKey].orEmpty(),
-                requestParameters = prefs[AiRequestParametersKey].orEmpty(),
+                requestParameters = "",
                 model =
                     if (provider == AiProvider.CUSTOM) {
                         prefs[AiCustomModelKey].orEmpty()
@@ -131,9 +130,9 @@ class RefreshLibraryTopMixesUseCase
                         While some overlap of songs between different mixes is fine and expected for your favorite tracks, the mixes should be substantially different from one another.
                         Select at most $TopMixSongsPerMix songs per mix, avoid duplicate songs inside a single mix, and prioritize transition flow and genre coherence.
                         Do not force every candidate song to be used if it doesn't fit any theme. Prioritize quality over quantity.
-                        
+
                         For each mix, in addition to selecting relevant songs from the candidates, you MUST recommend 3 to 5 top tracks from similar artists of the same genre for each selected candidate song in this mix (e.g. if a mix contains 3 candidate songs, recommend 9 to 15 similar songs; if it contains only 1 candidate, recommend 3 to 5 similar songs). The total songs (candidates + recommended) in each mix must not exceed $TopMixSongsPerMix. Make sure the recommendations are from similar artists of the same genre that are not in the candidates list.
-                        
+
                         Return JSON only matching this schema: {"mixes":[{"title":"Descriptive Mix Title","description":"Vibrant and appealing description of the vibe and genre","songIds":["id"],"recommendations":[{"title":"Song Title","artist":"Artist Name"}]}]}.
                         Every title must contain the word "Mix" (e.g. "90s Grunge Mix", "Late Night Vibes Mix", "Synthwave Drive Mix").
                         """.trimIndent(),

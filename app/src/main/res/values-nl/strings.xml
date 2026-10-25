@@ -1,9 +1,5 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="album_backdrop">Achtergrondvervaging</string>
-    <string name="album_backdrop_desc">Toon artwork als vervaagde achtergrond op de speler</string>
-    <string name="backdrop_blur_amount">Hoeveelheid achtergrondvervaging</string>
-    <string name="backdrop_blur_amount_value">%1$d%%</string>
     <string name="home">Startpagina</string>
     <string name="songs">Liedjes</string>
     <string name="artists">Artiesten</string>
@@ -20,7 +16,6 @@
     <string name="your_youtube_playlists">Jouw YouTube-afspeellijst</string>
     <string name="similar_to">Vergelijkbaar met</string>
     <string name="new_release_albums">Nieuwe albums</string>
-    <string name="integration">Integratie</string>
     <string name="today">Vandaag</string>
     <string name="yesterday">Gisteren</string>
     <string name="this_week">Deze week</string>
@@ -56,7 +51,7 @@
     <string name="library_top_mixes_refresh">Mixen vernieuwen</string>
     <string name="library_top_mixes_configure_ai">AI configureren</string>
     <string name="library_top_mixes_ai_not_configured_title">Stel de AI in om mixen te maken</string>
-    <string name="library_top_mixes_ai_not_configured_desc">Er is AI-integratie nodig voordat ArchiveTune persoonlijke topmixen kan samenstellen.</string>
+    <string name="library_top_mixes_ai_not_configured_desc">Er is AI-integratie nodig voordat Vibra persoonlijke topmixen kan samenstellen.</string>
     <string name="library_top_mixes_no_recent_history_title">Er is nog geen recente luistermix</string>
     <string name="library_top_mixes_no_recent_history">Luister naar meer nummers en vernieuw vervolgens de pagina om AI-mixen te maken op basis van je recente luistergeschiedenis.</string>
     <string name="library_top_mixes_no_valid_mixes">De AI heeft geen afspeelbare mixen uit je recente geschiedenis gevonden.</string>
@@ -115,7 +110,7 @@
     <string name="retry">Opnieuw proberen</string>
     <string name="cast">Cast</string>
     <string name="cast_devices">Cast apparaten</string>
-    <string name="cast_sheet_subtitle">Kies waar ArchiveTune wordt afgespeeld</string>
+    <string name="cast_sheet_subtitle">Kies waar Vibra wordt afgespeeld</string>
     <string name="cast_available_devices">Beschikbare apparaten</string>
     <string name="cast_searching_devices">Zoeken naar apparaten</string>
     <string name="cast_no_devices">Er zijn geen Cast-apparaten gevonden</string>
@@ -134,7 +129,7 @@
     <string name="play">Afspelen</string>
     <string name="widget_pause">Pauzeren</string>
     <string name="widget_previous">Vorige</string>
-    <string name="widget_tap_to_open">Klik om ArchiveTune te openen</string>
+    <string name="widget_tap_to_open">Klik om Vibra te openen</string>
     <string name="widget_insights_title">Inzichten op basis van luistergedrag</string>
     <string name="widget_recommendations">Aanbevelingen</string>
     <string name="widget_listening_time_empty">Nog geen luistertijd</string>
@@ -159,50 +154,20 @@
     <string name="import_playlist">Afspeellijst importeren</string>
     <string name="import_failed">Importeren mislukt</string>
     <string name="update_button">Bijwerken</string>
-    <string name="add">Toevoegen</string>
     <string name="add_to_playlist">Toevoegen aan afspeellijst</string>
-    <string name="add_to_n_playlists">Toevoegen aan %1$d</string>
-    <string name="no_playlists_yet">Nog geen afspeellijsten</string>
     <string name="pin_to_speed_dial">Toevoegen aan sneltoets</string>
     <string name="remove_from_speed_dial">Verwijderen van sneltoets</string>
     <string name="view_artist">Artiest bekijken</string>
     <string name="view_album">Album bekijken</string>
-    <string name="view_all">Alles bekijken</string>
     <string name="more">meer</string>
     <string name="refetch">Opnieuw ophalen</string>
     <string name="share">Delen</string>
     <string name="delete">Verwijderen</string>
-    <string name="hide_playlist">Afspeellijst verbergen</string>
-    <string name="unhide_playlist">Afspeellijst weergeven</string>
-    <string name="hide_playlist_confirm">“%1$s” verbergen in de bibliotheek?</string>
-    <string name="together_participants">Deelnemers</string>
-    <string name="together_connected_count">%1$d verbonden</string>
-    <string name="together_role_host">Host</string>
-    <string name="together_role_guest">Gast</string>
-    <string name="together_pending_approval">In afwachting van goedkeuring</string>
-    <string name="together_waiting_approval">In afwachting van goedkeuring</string>
-    <string name="together_host_left_session">De host heeft de sessies verlaten</string>
-    <string name="together_kick">Wegsturen</string>
-    <string name="together_ban">Verbannen</string>
-    <string name="together_transfer_host">Host veranderen</string>
-    <string name="together_approve">Goedkeuren</string>
-    <string name="together_reject">Afwijzen</string>
-    <string name="together_kick_confirm">Wil je %1$s wegsturen?</string>
-    <string name="together_ban_confirm">Wil je %1$s verbannen?</string>
-    <string name="together_transfer_host_confirm">Wilt u de host-functie overdragen aan %1$s?</string>
-    <string name="together_requesting_song_change">De host vragen om van nummer te wisselen…</string>
-    <string name="together_song_change_failed">Het nummer is niet gewijzigd, probeer het opnieuw.</string>
-    <string name="together_participant_joined_notification">%1$s is de ruimte binnengekomen</string>
-    <string name="together_participant_left_notification">%1$s verliet de ruimte</string>
-    <string name="together_unknown_participant">Iemand</string>
     <string name="remove_from_history">Verwijderen uit geschiedenis</string>
     <string name="remove_from_playlist">Verwijderen uit afspeellijst</string>
     <string name="remove_from_queue">Verwijderen uit wachtrij</string>
-    <string name="removed_song_from_queue">“%s” uit de wachtrij verwijderd</string>
-    <string name="removed_n_songs_from_queue">%d nummers uit de wachtrij verwijderd</string>
     <string name="search_online">Online zoeken</string>
     <string name="tempo_and_pitch">Tempo en Toonhoogte</string>
-    <string name="aod_mode">AOD-modus</string>
     <string name="tempo">Tempo</string>
     <string name="pitch">Toonhoogte</string>
     <string name="pitch_mode_semitones_short">st</string>
@@ -211,13 +176,11 @@
     <string name="sort_by_name">Naam</string>
     <string name="sort_by_artist">Artiest</string>
     <string name="sort_by_play_time">Luistertijd</string>
-    <string name="sort_by_most_played">Meest afgespeeld</string>
     <string name="sort_by_custom">Eigen volgorde</string>
     <string name="sort_order_ascending">Oplopend</string>
     <string name="sort_order_descending">Aflopend</string>
     <string name="media_id">Media-id</string>
     <string name="mime_type">MIME-type</string>
-    <string name="no_matching_playlists">Geen overeenkomende afspeellijsten</string>
     <string name="codecs">Codecs</string>
     <string name="bitrate">Bitsnelheid</string>
     <string name="sample_rate">Samplesnelheid</string>
@@ -243,7 +206,6 @@
     <string name="playlist_name">Afspeellijstnaam</string>
     <string name="artist_name">Naam van artiest</string>
     <string name="duplicates">Duplicaten</string>
-    <string name="skip_duplicates">Duplicaten overslaan</string>
     <string name="add_anyway">Toch toevoegen</string>
     <string name="duplicates_description_single">Dit liedje staat al in je afspeellijst</string>
 </resources>

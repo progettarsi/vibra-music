@@ -66,7 +66,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -136,14 +135,11 @@ fun LyricsMenu(
     mediaMetadataProvider: () -> MediaMetadata,
     lyricsSyncOffset: Int,
     onLyricsSyncOffsetChange: (Int) -> Unit,
-    showPlayerControlsState: State<Boolean>,
-    onShowPlayerControlsChange: (Boolean) -> Unit,
     onDismiss: () -> Unit,
     lyricsRenderViewModel: LyricsRenderViewModel,
     viewModel: LyricsMenuViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
-    val showPlayerControls by showPlayerControlsState
     val renderState by lyricsRenderViewModel.state.collectAsStateWithLifecycle()
     val preparedLyrics = (renderState as? LyricsRenderScreenState.Success)?.lyrics
     val hasTranslations = preparedLyrics?.hasTranslations == true
@@ -787,26 +783,6 @@ fun LyricsMenu(
                     },
                     enabled = hasTranslations,
                     modifier = translationSwitchModifier,
-                )
-                NewMenuItem(
-                    headlineContent = {
-                        Text(stringResource(R.string.show_lyrics_player_controls))
-                    },
-                    trailingContent = {
-                        Switch(
-                            checked = showPlayerControls,
-                            onCheckedChange = onShowPlayerControlsChange,
-                        )
-                    },
-                    onClick = {
-                        onShowPlayerControlsChange(!showPlayerControls)
-                    },
-                    modifier =
-                        Modifier.padding(
-                            start = 8.dp,
-                            end = 8.dp,
-                            bottom = 8.dp,
-                        ),
                 )
             }
         }

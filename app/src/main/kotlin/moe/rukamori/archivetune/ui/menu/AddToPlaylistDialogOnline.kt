@@ -9,11 +9,10 @@
 
 package moe.rukamori.archivetune.ui.menu
 
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -35,13 +34,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.TextUnit
-import androidx.compose.ui.unit.TextUnitType
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -52,7 +47,6 @@ import moe.rukamori.archivetune.LocalDatabase
 import moe.rukamori.archivetune.LocalSyncUtils
 import moe.rukamori.archivetune.R
 import moe.rukamori.archivetune.constants.ImportSourcePriorityKey
-import moe.rukamori.archivetune.constants.ListThumbnailSize
 import moe.rukamori.archivetune.db.entities.Playlist
 import moe.rukamori.archivetune.db.entities.Song
 import moe.rukamori.archivetune.models.ImportSource
@@ -61,12 +55,10 @@ import moe.rukamori.archivetune.models.toMediaMetadata
 import moe.rukamori.archivetune.playlistimport.ImportSongResolver
 import moe.rukamori.archivetune.ui.component.CreatePlaylistDialog
 import moe.rukamori.archivetune.ui.component.DefaultDialog
-import moe.rukamori.archivetune.ui.component.ListDialog
-import moe.rukamori.archivetune.ui.component.ListItem
-import moe.rukamori.archivetune.ui.component.PlaylistListItem
 import moe.rukamori.archivetune.utils.rememberPreference
 import timber.log.Timber
 
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun AddToPlaylistDialogOnline(
     isVisible: Boolean,
@@ -85,7 +77,13 @@ fun AddToPlaylistDialogOnline(
     val importResolver = remember { ImportSongResolver() }
     val (importLocalFirst) = rememberPreference(ImportSourcePriorityKey, false)
     var allPlaylists by remember { mutableStateOf(emptyList<Playlist>()) }
-    val playlists = remember(allPlaylists) { playlistsForAddToPlaylist(allPlaylists).asReversed() }
+    var playlistQuery by rememberSaveable { mutableStateOf("") }
+    val haptics = app.vibra.ui.haptics.rememberVibraHaptics()
+    val available = remember(allPlaylists) { playlistsForAddToPlaylist(allPlaylists) }
+    val playlists = remember(available, playlistQuery) {
+        visiblePlaylistsForAddToPlaylist(available, AddToPlaylistSortOption.RECENTLY_MODIFIED, playlistQuery)
+    }
+    LaunchedEffect(isVisible, available.size) { if (!isVisible || available.size <= 8) playlistQuery = "" }
 
     var showCreatePlaylistDialog by rememberSaveable {
         mutableStateOf(false)
@@ -268,62 +266,41 @@ fun AddToPlaylistDialogOnline(
     }
 
     if (isVisible) {
-        ListDialog(
-            onDismiss = onDismiss,
-        ) {
-            item {
-                ListItem(
-                    title = stringResource(R.string.create_playlist),
-                    thumbnailContent = {
-                        Image(
-                            painter = painterResource(id = R.drawable.playlist_add),
-                            contentDescription = null,
-                            colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.onBackground),
-                            modifier = Modifier.size(ListThumbnailSize),
-                        )
-                    },
-                    modifier =
-                        Modifier.clickable {
-                            showCreatePlaylistDialog = true
-                        },
-                )
-            }
-
-            items(playlists) { playlist ->
-                PlaylistListItem(
-                    playlist = playlist,
-                        modifier =
-                            Modifier.clickable {
+        androidx.compose.material3.ModalBottomSheet(onDismissRequest = onDismiss) {
+            Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp)) {
+                Text(stringResource(R.string.add_to_playlist), style = MaterialTheme.typography.headlineSmall)
+                androidx.compose.material3.Button(
+                    onClick = { showCreatePlaylistDialog = true },
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
+                    shape = MaterialTheme.shapes.extraLarge,
+                ) { Text(stringResource(R.string.new_playlist)) }
+                if (available.size > 8) {
+                    androidx.compose.material3.OutlinedTextField(
+                        value = playlistQuery,
+                        onValueChange = { playlistQuery = it },
+                        label = { Text(stringResource(R.string.search)) },
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                        singleLine = true,
+                    )
+                }
+                LazyColumn(
+                    modifier = Modifier.fillMaxWidth().heightIn(max = 480.dp),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    items(playlists, key = { it.id }) { playlist ->
+                        PlaylistMembershipRow(playlist = playlist, checked = false) {
+                            haptics.press()
                             prepareSongsForReview(targetPlaylist = playlist, addToLiked = false)
-                        },
-                )
-            }
-
-            item {
-                ListItem(
-                    modifier =
-                        Modifier.clickable {
-                            prepareSongsForReview(targetPlaylist = null, addToLiked = true)
-                        },
-                    title = stringResource(R.string.liked_songs),
-                    thumbnailContent = {
-                        Image(
-                            painter = painterResource(id = R.drawable.favorite), // The XML image
-                            contentDescription = null,
-                            modifier = Modifier.size(40.dp), // Adjust size as needed
-                            colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.onBackground), // Optional tinting
-                        )
-                    },
-                    trailingContent = {},
-                )
-            }
-
-            item {
-                Text(
-                    text = stringResource(R.string.playlist_add_local_to_synced_note),
-                    fontSize = TextUnit(12F, TextUnitType.Sp),
-                    modifier = Modifier.padding(horizontal = 20.dp),
-                )
+                        }
+                    }
+                    item {
+                        TextButton(
+                            onClick = { prepareSongsForReview(targetPlaylist = null, addToLiked = true) },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) { Text(stringResource(R.string.liked_songs)) }
+                    }
+                }
             }
         }
     }

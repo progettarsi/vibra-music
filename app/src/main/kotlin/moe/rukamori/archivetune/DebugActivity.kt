@@ -428,7 +428,7 @@ private fun buildCrashReport(
 
     val header =
         buildString {
-            appendLine("ArchiveTune crash report")
+            appendLine("Vibra crash report (built on the ArchiveTune engine)")
             if (timestampText.isNotBlank()) appendLine("Time: $timestampText")
             val appVersionLabel =
                 when {

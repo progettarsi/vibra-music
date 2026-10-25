@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Vibra (2026) - GPL-3.0 License. Derived from ArchiveTune c Rukamori. -->
+<!-- Italian translations of the Vibra presentation layer. -->
+<resources>
+    <string name="pause">Pausa</string>
+    <string name="vibra_open_player">Apri il player</string>
+    <string name="vibra_close_player">Chiudi il player</string>
+    <string name="vibra_search_hint">Cerca brani, artisti, album</string>
+    <string name="vibra_clear_search">Cancella la ricerca</string>
+    <string name="vibra_from_source">Da: %1$s</string>
+    <string name="vibra_now_playing">In riproduzione</string>
+    <string name="vibra_close_queue">Chiudi la coda</string>
+    <string name="vibra_repeat_off">Ripetizione disattivata</string>
+    <string name="vibra_repeat_all">Ripeti tutto</string>
+    <string name="vibra_repeat_one">Ripeti il brano</string>
+    <string name="vibra_seek">Posizione di riproduzione</string>
+    <string name="vibra_like">Mi piace</string>
+    <string name="vibra_unlike">Rimuovi dai preferiti</string>
+    <string name="vibra_lyrics">Testi</string>
+    <string name="vibra_sleep_timer_active">Timer di spegnimento attivo</string>
+    <string name="vibra_downloaded">Scaricato</string>
+    <string name="vibra_for_you">Per te</string>
+    <string name="vibra_for_you_subtitle">Scelti in base ai tuoi ascolti</string>
+    <string name="vibra_keep_listening">Continua ad ascoltare</string>
+    <string name="vibra_by_you">creata da te</string>
+    <string name="vibra_your_number_one">Il tuo numero uno</string>
+    <string name="vibra_your_playlists">Le tue playlist</string>
+    <string name="vibra_guest">Ascoltatore</string>
+    <string name="vibra_home_empty_title">La tua musica inizia qui</string>
+    <string name="vibra_home_empty_body">Cerca la musica che ami oppure accedi a YouTube Music per ritrovare la tua libreria.</string>
+    <string name="vibra_home_error_title">Impossibile caricare la home</string>
+    <string name="vibra_more">Altre opzioni</string>
+    <string name="vibra_skip_previous">Brano precedente</string>
+    <string name="vibra_skip_next">Brano successivo</string>
+    <string name="vibra_shuffle_on">Riproduzione casuale attiva</string>
+    <string name="vibra_shuffle_off">Riproduzione casuale disattivata</string>
+    <string name="vibra_reorder">Trascina per riordinare</string>
+    <string name="vibra_removed_from_queue">%1$s rimosso dalla coda</string>
+    <string name="vibra_device_music">Su questo dispositivo</string>
+    <string name="vibra_back">Indietro</string>
+    <string name="vibra_more_results">Altri risultati</string>
+    <string name="vibra_open_profile">Apri il tuo profilo</string>
+    <string name="vibra_for_you_explore">Esplora stati d\'animo e generi</string>
+    <string name="vibra_on_repeat">I più ascoltati della settimana</string>
+    <string name="vibra_liked_songs_count">Brani preferiti · %1$d</string>
+    <string name="vibra_library_empty">La tua libreria è ancora vuota. Aggiungi brani ai preferiti, salva album o crea una playlist: li troverai qui, organizzati in base a ciò che ascolti di più.</string>
+    <string name="vibra_listening_summary">I tuoi ascolti</string>
+    <string name="vibra_minutes_this_week">minuti questa settimana</string>
+    <string name="vibra_songs_this_week">brani diversi questa settimana</string>
+    <string name="vibra_edit_profile">Modifica profilo</string>
+    <string name="vibra_no_favourite_yet">Ascolta un po\' di musica per scoprirlo</string>
+    <string name="vibra_profile_shape">Forma</string>
+    <string name="vibra_profile_colour">Colore principale</string>
+    <string name="vibra_shape_flower">Fiore</string>
+    <string name="vibra_shape_cookie">Biscotto</string>
+    <string name="vibra_shape_sunny">Sole</string>
+    <string name="vibra_shape_clover">Quadrifoglio</string>
+    <string name="vibra_shape_puffy">Nuvola</string>
+    <string name="vibra_shape_gem">Gemma</string>
+    <string name="vibra_shape_heart">Cuore</string>
+    <string name="vibra_shape_star">Stella</string>
+    <string name="vibra_shape_burst">Esplosione</string>
+    <string name="vibra_period_week">Settimana</string>
+    <string name="vibra_period_month">Mese</string>
+    <string name="vibra_period_year">Anno</string>
+    <string name="vibra_period_all">Da sempre</string>
+    <string name="vibra_stats_empty">Non hai ancora ascoltato musica in questo periodo. Le statistiche crescono con i tuoi ascolti.</string>
+    <string name="vibra_top_artists">Artisti più ascoltati</string>
+    <string name="vibra_top_songs">Brani più ascoltati</string>
+    <string name="vibra_top_albums">Album più ascoltati</string>
+    <string name="vibra_your_stats">Le tue statistiche</string>
+    <plurals name="vibra_minutes_count">
+        <item quantity="one">%1$d minuto questa settimana</item>
+        <item quantity="other">%1$d minuti questa settimana</item>
+    </plurals>
+    <plurals name="vibra_minutes_listened">
+        <item quantity="one">minuti di ascolto · %1$d brano</item>
+        <item quantity="other">minuti di ascolto · %1$d brani</item>
+    </plurals>
+    <plurals name="vibra_minutes_total">
+        <item quantity="one">%1$d minuto</item>
+        <item quantity="other">%1$d minuti</item>
+    </plurals>
+    <plurals name="vibra_play_count">
+        <item quantity="one">%1$d ascolto</item>
+        <item quantity="other">%1$d ascolti</item>
+    </plurals>
+    <string name="vibra_cast_connected">Connesso</string>
+    <string name="vibra_about_tagline">Musica che scorre come un liquido.</string>
+</resources>

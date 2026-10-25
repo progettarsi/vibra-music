@@ -9,6 +9,7 @@
 
 package moe.rukamori.archivetune.ui.screens.settings
 
+import moe.rukamori.archivetune.ui.utils.backToMain
 import android.widget.Toast
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Spring
@@ -61,7 +62,6 @@ import androidx.compose.material3.SearchBarDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -97,7 +97,6 @@ import moe.rukamori.archivetune.ui.component.IconButton
 import moe.rukamori.archivetune.ui.component.ListPreference
 import moe.rukamori.archivetune.ui.component.PreferenceEntry
 import moe.rukamori.archivetune.ui.component.PreferenceGroup
-import moe.rukamori.archivetune.ui.utils.backToMain
 import moe.rukamori.archivetune.viewmodels.AiIntegrationSettingsScreenState
 import moe.rukamori.archivetune.viewmodels.AiIntegrationSettingsUiModel
 import moe.rukamori.archivetune.viewmodels.AiIntegrationSettingsViewModel
@@ -129,6 +128,8 @@ fun AiIntegrationSettings(
         }
     }
 
+    androidx.compose.material3.Scaffold(containerColor = androidx.compose.material3.MaterialTheme.colorScheme.background, topBar = { AiIntegrationTopAppBar(navController) }) { padding ->
+        Box(Modifier.padding(top = padding.calculateTopPadding())) {
     when (val state = screenState) {
         AiIntegrationSettingsScreenState.Loading -> AiIntegrationLoadingState()
         AiIntegrationSettingsScreenState.Empty -> Unit
@@ -151,8 +152,9 @@ fun AiIntegrationSettings(
             )
         }
     }
+        }
+    }
 
-    AiIntegrationTopAppBar(navController)
 }
 
 @Composable
@@ -193,11 +195,7 @@ private fun AiIntegrationSettingsContent(
             .verticalScroll(rememberScrollState())
             .padding(bottom = SettingsDimensions.ScreenBottomPadding),
     ) {
-        Spacer(
-            Modifier.windowInsetsPadding(
-                LocalPlayerAwareWindowInsets.current.only(WindowInsetsSides.Top),
-            ),
-        )
+
 
         PreferenceGroup(title = stringResource(R.string.ai_provider_settings)) {
             item {
@@ -260,15 +258,6 @@ private fun AiIntegrationSettingsContent(
                     description = model.customModel,
                     icon = { Icon(painterResource(R.drawable.auto_awesome), null) },
                     onClick = { onOpenEditor(AiSettingsEditorField.CUSTOM_MODEL) },
-                )
-            }
-
-            item(visible = model.provider != AiProvider.NONE && model.provider != AiProvider.GEMINI) {
-                PreferenceEntry(
-                    title = { Text(stringResource(R.string.ai_request_parameters)) },
-                    description = stringResource(R.string.ai_request_parameters_desc),
-                    icon = { Icon(painterResource(R.drawable.edit), null) },
-                    onClick = { onOpenEditor(AiSettingsEditorField.REQUEST_PARAMETERS) },
                 )
             }
 
@@ -360,28 +349,14 @@ private fun AiIntegrationSettingsContent(
         }
 
         PreferenceGroup(title = stringResource(R.string.ai_translation_settings)) {
-            item {
-                PreferenceEntry(
-                    title = { Text(stringResource(R.string.ai_custom_prompt)) },
-                    description =
-                        if (model.customPrompt.isBlank()) {
-                            stringResource(R.string.ai_custom_prompt_desc)
-                        } else {
-                            stringResource(R.string.ai_api_key_configured)
-                        },
-                    icon = { Icon(painterResource(R.drawable.edit), null) },
-                    onClick = { onOpenEditor(AiSettingsEditorField.CUSTOM_PROMPT) },
-                )
-            }
+
         }
     }
 }
 
 @Composable
 private fun AiIntegrationTopAppBar(navController: NavController) {
-    TopAppBar(
-        title = { Text(stringResource(R.string.ai_integration)) },
-        navigationIcon = {
+    moe.rukamori.archivetune.ui.component.EnginePageTopBar(title = stringResource(R.string.ai_integration), navigationIcon = {
             IconButton(
                 onClick = navController::navigateUp,
                 onLongClick = navController::backToMain,
@@ -391,8 +366,7 @@ private fun AiIntegrationTopAppBar(navController: NavController) {
                     contentDescription = stringResource(R.string.back_button_desc),
                 )
             }
-        },
-    )
+        })
 }
 
 @Composable
@@ -452,24 +426,17 @@ private fun AiSettingsEditorDialog(
     onSave: () -> Unit,
 ) {
     val field = editor.field ?: return
-    val isCustomPrompt = field == AiSettingsEditorField.CUSTOM_PROMPT
-    val isRequestParameters = field == AiSettingsEditorField.REQUEST_PARAMETERS
-    val isMultiline = isCustomPrompt || isRequestParameters
     val titleResId =
         when (field) {
             AiSettingsEditorField.API_KEY -> R.string.ai_api_key
             AiSettingsEditorField.CUSTOM_ENDPOINT -> R.string.ai_custom_endpoint
             AiSettingsEditorField.CUSTOM_MODEL -> R.string.ai_model
-            AiSettingsEditorField.CUSTOM_PROMPT -> R.string.ai_custom_prompt
-            AiSettingsEditorField.REQUEST_PARAMETERS -> R.string.ai_request_parameters
         }
     val iconResId =
         when (field) {
             AiSettingsEditorField.API_KEY -> R.drawable.token
             AiSettingsEditorField.CUSTOM_ENDPOINT -> R.drawable.website
             AiSettingsEditorField.CUSTOM_MODEL -> R.drawable.auto_awesome
-            AiSettingsEditorField.CUSTOM_PROMPT -> R.drawable.edit
-            AiSettingsEditorField.REQUEST_PARAMETERS -> R.drawable.edit
         }
     val visualTransformation =
         remember(field) {
@@ -482,13 +449,8 @@ private fun AiSettingsEditorDialog(
     val keyboardOptions =
         remember(field) {
             KeyboardOptions(
-                capitalization =
-                    if (isCustomPrompt) {
-                        KeyboardCapitalization.Sentences
-                    } else {
-                        KeyboardCapitalization.None
-                    },
-                imeAction = if (isMultiline) ImeAction.Default else ImeAction.Done,
+                capitalization = KeyboardCapitalization.None,
+                imeAction = ImeAction.Done,
             )
         }
 
@@ -513,9 +475,9 @@ private fun AiSettingsEditorDialog(
             value = editor.value,
             onValueChange = onValueChange,
             modifier = Modifier.fillMaxWidth(),
-            singleLine = !isMultiline,
-            minLines = if (isMultiline) 4 else 1,
-            maxLines = if (isMultiline) 8 else 1,
+            singleLine = true,
+            minLines = 1,
+            maxLines = 1,
             isError = editor.errorMessageResId != null,
             visualTransformation = visualTransformation,
             keyboardOptions = keyboardOptions,
@@ -523,10 +485,6 @@ private fun AiSettingsEditorDialog(
             supportingText =
                 if (editor.errorMessageResId != null) {
                     { Text(stringResource(editor.errorMessageResId)) }
-                } else if (isRequestParameters) {
-                    { Text(stringResource(R.string.ai_request_parameters_desc)) }
-                } else if (isCustomPrompt) {
-                    { Text(stringResource(R.string.ai_custom_prompt_desc)) }
                 } else {
                     null
                 },
@@ -540,7 +498,7 @@ private fun AiIntegrationLoadingState() {
         modifier =
             Modifier
                 .fillMaxSize()
-                .windowInsetsPadding(LocalPlayerAwareWindowInsets.current),
+                .windowInsetsPadding(LocalPlayerAwareWindowInsets.current.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom)),
         contentAlignment = Alignment.Center,
     ) {
         CircularWavyProgressIndicator()
@@ -553,7 +511,7 @@ private fun AiIntegrationErrorState(messageResId: Int) {
         modifier =
             Modifier
                 .fillMaxSize()
-                .windowInsetsPadding(LocalPlayerAwareWindowInsets.current)
+                .windowInsetsPadding(LocalPlayerAwareWindowInsets.current.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom))
                 .padding(24.dp),
         contentAlignment = Alignment.Center,
     ) {
@@ -645,7 +603,7 @@ private fun ModelPickerPreference(
             onDismissRequest = onDismissSheet,
             sheetState = sheetState,
             shape = RoundedCornerShape(topStart = 36.dp, topEnd = 36.dp),
-            containerColor = MaterialTheme.colorScheme.surface,
+            containerColor = MaterialTheme.colorScheme.background,
         ) {
             Text(
                 text = stringResource(R.string.ai_model),

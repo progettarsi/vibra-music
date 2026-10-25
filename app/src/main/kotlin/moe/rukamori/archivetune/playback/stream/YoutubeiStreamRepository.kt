@@ -23,6 +23,7 @@ import moe.rukamori.archivetune.morideobfuscator.youtubei.YoutubeiResolver
 import moe.rukamori.archivetune.morideobfuscator.youtubei.YoutubeiStreamRequest
 import moe.rukamori.archivetune.utils.YTPlayerUtils
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
+import moe.rukamori.archivetune.utils.potoken.BotGuardTokenGenerator
 import timber.log.Timber
 import java.util.TimeZone
 import javax.inject.Inject
@@ -59,6 +60,33 @@ class YoutubeiStreamRepository
             )
 
         internal suspend fun resolve(
+            request: AudioStreamRequest,
+            priority: StreamResolutionPriority,
+        ): ResolvedAudioStream =
+            try {
+                resolveOnce(request, priority)
+            } catch (failure: YoutubeiException) {
+                if (failure.kind != YoutubeiFailureKind.NO_FORMAT) throw failure
+                // Vibra: YouTube intermittently answers with no direct audio formats when
+                // the content-bound PO token or the youtubei.js session has gone stale
+                // (observed mid-session; a fresh process always succeeded). Retry exactly
+                // once with a freshly minted token and a new session before surfacing
+                // the error to the user.
+                Timber.tag("YoutubeiResolver").w("No direct format for %s; retrying with a fresh token", request.mediaId)
+                BotGuardTokenGenerator.invalidateVideo(request.mediaId)
+                resolver.invalidateSessions()
+                val refreshedAuthState =
+                    try {
+                        YTPlayerUtils.ensureYoutubeiPoTokensForPlayback(request.mediaId, request.authState)
+                    } catch (cancellation: CancellationException) {
+                        throw cancellation
+                    } catch (_: Exception) {
+                        throw failure
+                    }
+                resolveOnce(request.copy(authState = refreshedAuthState), priority)
+            }
+
+        private suspend fun resolveOnce(
             request: AudioStreamRequest,
             priority: StreamResolutionPriority,
         ): ResolvedAudioStream {

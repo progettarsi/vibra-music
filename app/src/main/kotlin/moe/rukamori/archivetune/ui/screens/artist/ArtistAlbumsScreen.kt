@@ -27,7 +27,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -140,9 +139,7 @@ fun ArtistAlbumsScreen(
             }
         }
 
-        TopAppBar(
-            title = { Text(artist?.artist?.name.orEmpty()) },
-            navigationIcon = {
+        moe.rukamori.archivetune.ui.component.EnginePageTopBar(title = artist?.artist?.name.orEmpty(), navigationIcon = {
                 IconButton(
                     onClick = navController::navigateUp,
                     onLongClick = navController::backToMain,
@@ -152,9 +149,7 @@ fun ArtistAlbumsScreen(
                         contentDescription = null,
                     )
                 }
-            },
-            scrollBehavior = scrollBehavior,
-        )
+            }, scrollBehavior = scrollBehavior)
 
         SnackbarHost(
             hostState = snackbarHostState,

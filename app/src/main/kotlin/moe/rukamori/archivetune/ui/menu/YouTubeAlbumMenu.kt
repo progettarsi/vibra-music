@@ -71,7 +71,6 @@ import moe.rukamori.archivetune.LocalDatabase
 import moe.rukamori.archivetune.LocalDownloadUtil
 import moe.rukamori.archivetune.LocalPlayerConnection
 import moe.rukamori.archivetune.R
-import moe.rukamori.archivetune.constants.ArtistSeparatorsKey
 import moe.rukamori.archivetune.constants.ListItemHeight
 import moe.rukamori.archivetune.constants.ListThumbnailSize
 import moe.rukamori.archivetune.constants.SpeedDialSongIdsKey
@@ -152,7 +151,7 @@ fun YouTubeAlbumMenu(
         }
     }
 
-    val (artistSeparators) = rememberPreference(ArtistSeparatorsKey, defaultValue = ",;/&")
+    val artistSeparators = ",;/&"
     val (speedDialSongIds, onSpeedDialSongIdsChange) = rememberPreference(SpeedDialSongIdsKey, "")
     val speedDialPins = remember(speedDialSongIds) { parseSpeedDialPins(speedDialSongIds) }
     val albumPin = remember(albumItem.id) { SpeedDialPin(type = SpeedDialPinType.ALBUM, id = albumItem.id) }

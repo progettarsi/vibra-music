@@ -57,7 +57,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.collectAsState
@@ -109,10 +108,8 @@ import moe.rukamori.archivetune.LocalDatabase
 import moe.rukamori.archivetune.LocalDownloadUtil
 import moe.rukamori.archivetune.LocalPlayerConnection
 import moe.rukamori.archivetune.R
-import moe.rukamori.archivetune.constants.CropThumbnailToSquareKey
 import moe.rukamori.archivetune.constants.GridThumbnailCornerRadius
 import moe.rukamori.archivetune.constants.GridThumbnailHeight
-import moe.rukamori.archivetune.constants.ListItemHeight
 import moe.rukamori.archivetune.constants.ListThumbnailSize
 import moe.rukamori.archivetune.constants.SwipeToSongKey
 import moe.rukamori.archivetune.constants.ThumbnailCornerRadius
@@ -146,81 +143,35 @@ import kotlin.math.roundToInt
 
 const val ActiveBoxAlpha = 0.6f
 
+/**
+ * Vibra: every engine list row is drawn by the Vibra song row (Figma "Canzone": rounded
+ * surface-container card, 50 dp rounded thumbnail, title-large title). The signature is
+ * unchanged, so the ~40 list screens inherited from ArchiveTune adopt the design as-is.
+ * The caller's [modifier] (click handlers, item animations) is applied inside the card
+ * clip so ripples follow the rounded shape.
+ */
 @Composable
 inline fun ListItem(
     modifier: Modifier = Modifier,
     title: String,
     noinline subtitle: (@Composable RowScope.() -> Unit)? = null,
-    thumbnailContent: @Composable () -> Unit,
+    noinline thumbnailContent: @Composable () -> Unit,
     crossinline trailingContent: @Composable RowScope.() -> Unit = {},
     isActive: Boolean = false,
     showActiveContainer: Boolean = true,
 ) {
-    val titleColor =
-        if (isActive) {
-            MaterialTheme.colorScheme.onSecondaryContainer
-        } else {
-            MaterialTheme.colorScheme.onSurface
-        }
-    val subtitleContentColor =
-        if (isActive) {
-            MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f)
-        } else {
-            MaterialTheme.colorScheme.onSurfaceVariant
-        }
-    val trailingContentColor =
-        if (isActive) {
-            MaterialTheme.colorScheme.onSecondaryContainer
-        } else {
-            MaterialTheme.colorScheme.onSurfaceVariant
-        }
-
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
+    app.vibra.ui.components.VibraRow(
+        title = title,
+        thumbnail = thumbnailContent,
+        subtitle = subtitle,
+        trailing = { trailingContent() },
+        isActive = isActive && showActiveContainer,
+        interactionModifier = modifier.focusable(),
         modifier =
-            modifier
-                .focusable()
-                .height(ListItemHeight)
-                .padding(horizontal = 8.dp)
-                .then(
-                    if (isActive && showActiveContainer) {
-                        Modifier
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(MaterialTheme.colorScheme.secondaryContainer)
-                    } else {
-                        Modifier
-                    },
-                ),
-    ) {
-        Box(Modifier.padding(8.dp), contentAlignment = Alignment.Center) { thumbnailContent() }
-        Column(
-            modifier =
-                Modifier
-                    .weight(1f)
-                    .padding(horizontal = 6.dp),
-            verticalArrangement = Arrangement.spacedBy(2.dp),
-        ) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                color = titleColor,
-            )
-            if (subtitle != null) {
-                CompositionLocalProvider(LocalContentColor provides subtitleContentColor) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    ) { subtitle() }
-                }
-            }
-        }
-        CompositionLocalProvider(LocalContentColor provides trailingContentColor) {
-            trailingContent()
-        }
-    }
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 4.dp),
+    )
 }
 
 @Composable
@@ -1484,8 +1435,7 @@ fun YouTubeGridItem(
     isPlaying: Boolean = false,
     fillMaxWidth: Boolean = false,
 ) {
-    val (cropThumbnailToSquare, _) = rememberPreference(CropThumbnailToSquareKey, false)
-    val resolvedThumbnailRatio = thumbnailRatio ?: item.preferredThumbnailRatio(cropThumbnailToSquare)
+    val resolvedThumbnailRatio = thumbnailRatio ?: item.preferredThumbnailRatio
 
     GridItem(
         title = {
@@ -1691,9 +1641,8 @@ fun ItemThumbnail(
                     }
                 },
     ) {
-        val (cropThumbnailToSquare, _) = rememberPreference(CropThumbnailToSquareKey, false)
-        val isYouTubeThumb = thumbnailUrl?.contains("ytimg.com", ignoreCase = true) == true
-        val shouldApplySquareCrop = cropThumbnailToSquare && isYouTubeThumb && kotlin.math.abs(thumbnailRatio - 1f) < 0.001f
+        // Vibra: square slots always centre-crop (wide video thumbnails become squares).
+        val shouldApplySquareCrop = kotlin.math.abs(thumbnailRatio - 1f) < 0.001f
         val resolvedContentScale = contentScale ?: if (shouldApplySquareCrop) ContentScale.Crop else ContentScale.Fit
         val widthPx = if (maxWidth == Dp.Infinity) null else with(density) { maxWidth.roundToPx().coerceAtLeast(1) }
         val heightPx = if (maxHeight == Dp.Infinity) null else with(density) { maxHeight.roundToPx().coerceAtLeast(1) }
@@ -1849,9 +1798,8 @@ fun LocalThumbnail(
                 .aspectRatio(thumbnailRatio)
                 .clip(shape),
     ) {
-        val (cropThumbnailToSquare, _) = rememberPreference(CropThumbnailToSquareKey, false)
-        val isYouTubeThumb = thumbnailUrl?.contains("ytimg.com", ignoreCase = true) == true
-        val shouldApplySquareCrop = cropThumbnailToSquare && isYouTubeThumb && kotlin.math.abs(thumbnailRatio - 1f) < 0.001f
+        // Vibra: square slots always centre-crop (wide video thumbnails become squares).
+        val shouldApplySquareCrop = kotlin.math.abs(thumbnailRatio - 1f) < 0.001f
         val widthPx = if (maxWidth == Dp.Infinity) null else with(density) { maxWidth.roundToPx().coerceAtLeast(1) }
         val heightPx = if (maxHeight == Dp.Infinity) null else with(density) { maxHeight.roundToPx().coerceAtLeast(1) }
         val request =

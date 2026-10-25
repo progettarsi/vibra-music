@@ -128,20 +128,16 @@ import kotlinx.coroutines.launch
 import moe.rukamori.archivetune.LocalAnimationsDisabled
 import moe.rukamori.archivetune.LocalPlayerConnection
 import moe.rukamori.archivetune.R
+import moe.rukamori.archivetune.constants.DarkModeDefault
 import moe.rukamori.archivetune.constants.DarkModeKey
 import moe.rukamori.archivetune.constants.LyricsAnimationStyle
-import moe.rukamori.archivetune.constants.LyricsAnimationStyleKey
 import moe.rukamori.archivetune.constants.LyricsClickKey
-import moe.rukamori.archivetune.constants.LyricsLineBlurKey
-import moe.rukamori.archivetune.constants.LyricsLineSpacingKey
 import moe.rukamori.archivetune.constants.LyricsRomanizeChineseKey
 import moe.rukamori.archivetune.constants.LyricsRomanizeHindiKey
 import moe.rukamori.archivetune.constants.LyricsRomanizeJapaneseKey
 import moe.rukamori.archivetune.constants.LyricsRomanizeKoreanKey
 import moe.rukamori.archivetune.constants.LyricsRomanizeOtherLanguagesKey
 import moe.rukamori.archivetune.constants.LyricsScrollKey
-import moe.rukamori.archivetune.constants.LyricsTextPositionKey
-import moe.rukamori.archivetune.constants.LyricsTextSizeKey
 import moe.rukamori.archivetune.constants.PlayerBackgroundStyle
 import moe.rukamori.archivetune.constants.PlayerBackgroundStyleKey
 import moe.rukamori.archivetune.db.entities.LyricsEntity.Companion.LYRICS_NOT_FOUND
@@ -428,11 +424,11 @@ fun Lyrics(
     val landscapeOffset =
         configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
-    val lyricsTextPosition by rememberEnumPreference(LyricsTextPositionKey, LyricsPosition.LEFT)
-    val lyricsAnimationStyle by rememberEnumPreference(LyricsAnimationStyleKey, LyricsAnimationStyle.APPLE)
-    val lyricsTextSize by rememberPreference(LyricsTextSizeKey, 26f)
-    val lyricsLineSpacing by rememberPreference(LyricsLineSpacingKey, 1.3f)
-    val lyricsLineBlur by rememberPreference(LyricsLineBlurKey, true)
+    val lyricsTextPosition = LyricsPosition.LEFT
+    val lyricsAnimationStyle = LyricsAnimationStyle.APPLE
+    val lyricsTextSize = 26f
+    val lyricsLineSpacing = 1.3f
+    val lyricsLineBlur = true
     val animationsDisabled = LocalAnimationsDisabled.current
     val lyricsFontFamily = rememberArchiveTuneLyricsFontFamily()
 
@@ -474,7 +470,7 @@ fun Lyrics(
         defaultValue = PlayerBackgroundStyle.DEFAULT,
     )
 
-    val darkTheme by rememberEnumPreference(DarkModeKey, defaultValue = DarkMode.AUTO)
+    val darkTheme by rememberEnumPreference(DarkModeKey, defaultValue = DarkModeDefault)
     val isSystemInDarkTheme = isSystemInDarkTheme()
     val useDarkTheme =
         remember(darkTheme, isSystemInDarkTheme) {

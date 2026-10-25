@@ -75,20 +75,15 @@ import kotlinx.coroutines.launch
 import moe.rukamori.archivetune.LocalDatabase
 import moe.rukamori.archivetune.R
 import moe.rukamori.archivetune.constants.AppBarHeight
-import moe.rukamori.archivetune.constants.ChipSortTypeKey
 import moe.rukamori.archivetune.constants.DefaultLibraryFilterOrderPreference
-import moe.rukamori.archivetune.constants.DisableBlurKey
-import moe.rukamori.archivetune.constants.LibraryChipOrderKey
 import moe.rukamori.archivetune.constants.LibraryFilter
 import moe.rukamori.archivetune.constants.PlaylistTagOrderKey
 import moe.rukamori.archivetune.constants.ShowSpotifyPlaylistsKey
-import moe.rukamori.archivetune.constants.ShowTagsInLibraryKey
 import moe.rukamori.archivetune.constants.toLibraryFilterOrder
 import moe.rukamori.archivetune.constants.toPlaylistTagOrder
 import moe.rukamori.archivetune.db.entities.TagEntity
 import moe.rukamori.archivetune.ui.component.TagsManagementDialog
 import moe.rukamori.archivetune.ui.utils.resetHeightOffset
-import moe.rukamori.archivetune.utils.rememberEnumPreference
 import moe.rukamori.archivetune.utils.rememberPreference
 
 internal val LibraryHeaderContentPadding = 64.dp
@@ -99,19 +94,18 @@ internal val LibraryPullToRefreshIndicatorOffset = 0.dp
 fun LibraryScreen(
     navController: NavController,
     scrollBehavior: TopAppBarScrollBehavior,
+    initialFilter: LibraryFilter = LibraryFilter.LIBRARY,
 ) {
-    val defaultFilter by rememberEnumPreference(ChipSortTypeKey, LibraryFilter.LIBRARY)
+    // Vibra: library blocks open this list on the tab they represent.
+    val defaultFilter = initialFilter
     val database = LocalDatabase.current
     val (selectedTagIds, onSelectedTagIdsChange) = rememberPlaylistTagFilterState(database)
     val allTags by database.allTags().collectAsState(initial = emptyList())
-    val (showTagsInLibrary) = rememberPreference(ShowTagsInLibraryKey, defaultValue = true)
+    val showTagsInLibrary = true
     val (showSpotifyPlaylists) = rememberPreference(ShowSpotifyPlaylistsKey, defaultValue = false)
-    val (disableBlur) = rememberPreference(DisableBlurKey, false)
-    val (libraryChipOrderPreference) =
-        rememberPreference(
-            LibraryChipOrderKey,
-            defaultValue = DefaultLibraryFilterOrderPreference,
-        )
+    val disableBlur = false
+
+    val libraryChipOrderPreference = DefaultLibraryFilterOrderPreference
     val (playlistTagOrderPreference) = rememberPreference(PlaylistTagOrderKey, defaultValue = "")
     var showTagsManagementDialog by rememberSaveable { mutableStateOf(false) }
     val activeSelectedTagIds = if (showTagsInLibrary) selectedTagIds else emptySet()
@@ -220,7 +214,6 @@ fun LibraryScreen(
                         LibraryFilter.SONGS -> 102.dp
                         LibraryFilter.ARTISTS -> 116.dp
                         LibraryFilter.ALBUMS -> 110.dp
-                        else -> 116.dp
                     }
                 val screenWidth = configuration.screenWidthDp.dp
                 val targetOffsetDp = (screenWidth - tabWidth) / 2

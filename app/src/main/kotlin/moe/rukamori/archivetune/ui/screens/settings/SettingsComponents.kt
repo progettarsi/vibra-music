@@ -594,13 +594,13 @@ fun SettingsSegmentedItem(
                 Modifier
                     .fillMaxWidth()
                     .heightIn(min = 88.dp)
-                    .padding(horizontal = 22.dp, vertical = 14.dp),
+                    .padding(horizontal = SettingsDimensions.SegmentedRowHorizontalPadding, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
                 modifier =
                     Modifier
-                        .size(52.dp)
+                        .size(SettingsDimensions.SegmentedIconSize)
                         .clip(CircleShape)
                         .background(effectiveAccent),
                 contentAlignment = Alignment.Center,
@@ -631,7 +631,7 @@ fun SettingsSegmentedItem(
                 }
             }
 
-            Spacer(modifier = Modifier.width(18.dp))
+            Spacer(modifier = Modifier.width(SettingsDimensions.SegmentedIconTextSpacing))
 
             Column(
                 modifier = Modifier.weight(1f),

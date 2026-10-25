@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Vibra (2026) - GPL-3.0 License. Derived from ArchiveTune c Rukamori. -->
+<resources>
+    <string name="new_playlist">Nuova playlist</string>
+    <string name="playlist_membership_selected">Già presente in questa playlist</string>
+    <string name="reorder_wobble">Oscillazione durante il riordino</string>
+</resources>

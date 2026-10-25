@@ -100,7 +100,6 @@ import moe.rukamori.archivetune.innertube.models.SongItem
 import moe.rukamori.archivetune.innertube.models.WatchEndpoint
 import moe.rukamori.archivetune.models.toMediaMetadata
 import moe.rukamori.archivetune.playback.queues.YouTubeQueue
-import moe.rukamori.archivetune.ui.component.DraggableScrollbar
 import moe.rukamori.archivetune.ui.component.ExpressivePullToRefreshBox
 import moe.rukamori.archivetune.ui.component.IconButton
 import moe.rukamori.archivetune.ui.component.LocalMenuState
@@ -155,35 +154,6 @@ fun OnlinePlaylistScreen(
     val downloadUtil = LocalDownloadUtil.current
     var downloads by remember { mutableStateOf<Map<String, Download>>(emptyMap()) }
     var downloadState by remember { mutableStateOf<HeaderDownloadState>(HeaderDownloadState.None) }
-    val globalDownloadState = remember(downloads) {
-        val activeDownloads = downloads.values.filter {
-            it.state == Download.STATE_DOWNLOADING ||
-            it.state == Download.STATE_QUEUED ||
-            it.state == Download.STATE_RESTARTING ||
-            it.state == Download.STATE_STOPPED
-        }
-        if (activeDownloads.isEmpty()) {
-            HeaderDownloadState.None
-        } else {
-            var progressTotal = 0f
-            var hasRunning = false
-            var hasPaused = false
-            activeDownloads.forEach { download ->
-                val progress = download.percentDownloaded.takeIf { it >= 0f }?.div(100f) ?: 0f
-                progressTotal += progress.coerceIn(0f, 1f)
-                if (download.state == Download.STATE_STOPPED) {
-                    hasPaused = hasPaused || download.stopReason == 1
-                } else {
-                    hasRunning = true
-                }
-            }
-            HeaderDownloadState.Partial(
-                progress = progressTotal / activeDownloads.size,
-                paused = hasPaused && !hasRunning,
-            )
-        }
-    }
-
     var selection by remember { mutableStateOf(false) }
     val hideExplicit by rememberPreference(key = HideExplicitKey, defaultValue = false)
 
@@ -252,13 +222,6 @@ fun OnlinePlaylistScreen(
 
     val transparentAppBar by remember {
         derivedStateOf { !selection && !isSearching && !showTopBarTitle }
-    }
-
-    val headerItems by remember {
-        derivedStateOf {
-            val current = playlist
-            if (!isLoading && current != null && !isSearching) 1 else 0
-        }
     }
 
     LaunchedEffect(lazyListState) {
@@ -582,38 +545,7 @@ fun OnlinePlaylistScreen(
                                                 }
                                         }
                                     }
-
-                                    MediaDetailAction(
-                                        contentDescription = R.string.download,
-                                        contentColor = contentColor,
-                                        onClick = {
-                                            navController.navigate(
-                                                "auto_playlist/downloaded?tab=progress",
-                                            )
-                                        },
-                                    ) {
-                                        val globalProgress = (globalDownloadState as? HeaderDownloadState.Partial)?.progress ?: 0f
-                                        val globalPaused = (globalDownloadState as? HeaderDownloadState.Partial)?.paused ?: false
-                                        HeaderDownloadProgressIndicator(
-                                            progress = globalProgress,
-                                            paused = globalPaused,
-                                            icon = R.drawable.list,
-                                        )
-                                    }
                                 }
-
-                                    playlist.shuffleEndpoint?.let { mixEndpoint ->
-                                        MediaDetailIconAction(
-                                            icon = R.drawable.mix,
-                                            contentDescription = R.string.start_mix,
-                                            contentColor = contentColor,
-                                            onClick = {
-                                                playerConnection.playQueue(
-                                                    YouTubeQueue.playlist(mixEndpoint),
-                                                )
-                                            },
-                                        )
-                                    }
 
                                     playlist.radioEndpoint?.let { radioEndpoint ->
                                         MediaDetailIconAction(
@@ -756,18 +688,6 @@ fun OnlinePlaylistScreen(
                 }
             }
         }
-
-        DraggableScrollbar(
-            modifier =
-                Modifier
-                    .padding(
-                        LocalPlayerAwareWindowInsets.current
-                            .union(WindowInsets.ime)
-                            .asPaddingValues(),
-                    ).align(Alignment.CenterEnd),
-            scrollState = lazyListState,
-            headerItems = headerItems,
-        )
 
         // Top App Bar
         val topAppBarColors =

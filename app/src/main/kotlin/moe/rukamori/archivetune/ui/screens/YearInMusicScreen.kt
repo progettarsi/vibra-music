@@ -96,7 +96,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import moe.rukamori.archivetune.LocalPlayerAwareWindowInsets
 import moe.rukamori.archivetune.R
-import moe.rukamori.archivetune.constants.DisableBlurKey
 import moe.rukamori.archivetune.db.entities.Album
 import moe.rukamori.archivetune.db.entities.Artist
 import moe.rukamori.archivetune.db.entities.Song
@@ -107,7 +106,6 @@ import moe.rukamori.archivetune.ui.menu.SongMenu
 import moe.rukamori.archivetune.utils.ComposeToImage
 import moe.rukamori.archivetune.utils.joinByBullet
 import moe.rukamori.archivetune.utils.makeTimeString
-import moe.rukamori.archivetune.utils.rememberPreference
 import moe.rukamori.archivetune.viewmodels.YearInMusicUiState
 import moe.rukamori.archivetune.viewmodels.YearInMusicViewModel
 import java.text.NumberFormat
@@ -177,7 +175,7 @@ private fun YearInMusicRecapScreen(
     val haptic = LocalHapticFeedback.current
     val coroutineScope = rememberCoroutineScope()
     val content = uiState as YearInMusicUiState.Content
-    val (disableBlur) = rememberPreference(DisableBlurKey, false)
+    val disableBlur = false
 
     var isGeneratingImage by remember { mutableStateOf(false) }
     var isShareCaptureMode by remember { mutableStateOf(false) }

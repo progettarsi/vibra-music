@@ -76,11 +76,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
-import androidx.core.net.toUri
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.exoplayer.offline.Download
-import androidx.media3.exoplayer.offline.DownloadRequest
 import androidx.media3.exoplayer.offline.DownloadService
 import androidx.navigation.NavController
 import coil3.compose.AsyncImage
@@ -89,18 +86,14 @@ import moe.rukamori.archivetune.LocalDatabase
 import moe.rukamori.archivetune.LocalDownloadUtil
 import moe.rukamori.archivetune.LocalPlayerConnection
 import moe.rukamori.archivetune.R
-import moe.rukamori.archivetune.constants.ArchiveTuneCanvasKey
-import moe.rukamori.archivetune.constants.AodModeEnabledKey
-import moe.rukamori.archivetune.constants.ArtistSeparatorsKey
-import moe.rukamori.archivetune.constants.ExternalDownloaderEnabledKey
-import moe.rukamori.archivetune.constants.ExternalDownloaderPackageKey
 import moe.rukamori.archivetune.constants.PlayerDesignStyle
 import moe.rukamori.archivetune.constants.PlayerDesignStyleKey
 import moe.rukamori.archivetune.constants.SpeedDialSongIdsKey
 import moe.rukamori.archivetune.models.MediaMetadata
 import moe.rukamori.archivetune.ui.component.rememberControlledSliderState
-import moe.rukamori.archivetune.playback.CanvasArtworkRefetchResult
 import moe.rukamori.archivetune.playback.ExoDownloadService
+import moe.rukamori.archivetune.playback.songShareUrl
+import moe.rukamori.archivetune.playback.startSongDownload
 import moe.rukamori.archivetune.ui.component.BottomSheetState
 import moe.rukamori.archivetune.ui.component.ListDialog
 import moe.rukamori.archivetune.ui.component.MenuSurfaceSection
@@ -109,11 +102,9 @@ import moe.rukamori.archivetune.ui.component.NewActionGrid
 import moe.rukamori.archivetune.ui.player.rememberDeviceMusicVolumeController
 import moe.rukamori.archivetune.ui.utils.navigateToAlbum
 import moe.rukamori.archivetune.ui.utils.navigateToArtist
-import moe.rukamori.archivetune.utils.ExternalDownloaderLaunchResult
 import moe.rukamori.archivetune.utils.SpeedDialPin
 import moe.rukamori.archivetune.utils.SpeedDialPinType
 import moe.rukamori.archivetune.utils.isLocalMediaId
-import moe.rukamori.archivetune.utils.openExternalDownloader
 import moe.rukamori.archivetune.utils.parseSpeedDialPins
 import moe.rukamori.archivetune.utils.rememberEnumPreference
 import moe.rukamori.archivetune.utils.rememberLowDataModeActive
@@ -127,11 +118,42 @@ import kotlin.math.pow
 import kotlin.math.round
 import kotlin.math.roundToInt
 
+/** Legacy entry point for the bottom-sheet player; forwards to the callback-based menu. */
 @Composable
 fun PlayerMenu(
     mediaMetadata: MediaMetadata?,
     navController: NavController,
     playerBottomSheetState: BottomSheetState,
+    isQueueTrigger: Boolean? = false,
+    sleepTimerEnabled: Boolean = false,
+    onSleepTimerClick: (() -> Unit)? = null,
+    onPlayNextFromQueue: (() -> Unit)? = null,
+    onRemoveFromQueue: (() -> Unit)? = null,
+    onShowDetailsDialog: () -> Unit,
+    onDismiss: () -> Unit,
+) = PlayerMenu(
+    mediaMetadata = mediaMetadata,
+    navController = navController,
+    onCollapsePlayer = playerBottomSheetState::collapseSoft,
+    isQueueTrigger = isQueueTrigger,
+    sleepTimerEnabled = sleepTimerEnabled,
+    onSleepTimerClick = onSleepTimerClick,
+    onPlayNextFromQueue = onPlayNextFromQueue,
+    onRemoveFromQueue = onRemoveFromQueue,
+    onShowDetailsDialog = onShowDetailsDialog,
+    onDismiss = onDismiss,
+)
+
+/**
+ * Player overflow menu. [onCollapsePlayer] is invoked before navigating away from the
+ * player (e.g. "Go to artist") so the destination is visible. Vibra passes its own
+ * player-sheet collapse here.
+ */
+@Composable
+fun PlayerMenu(
+    mediaMetadata: MediaMetadata?,
+    navController: NavController,
+    onCollapsePlayer: () -> Unit,
     isQueueTrigger: Boolean? = false,
     sleepTimerEnabled: Boolean = false,
     onSleepTimerClick: (() -> Unit)? = null,
@@ -164,15 +186,9 @@ fun PlayerMenu(
         }
 
     // Artist separators for splitting artist names
-    val (artistSeparators) = rememberPreference(ArtistSeparatorsKey, defaultValue = ",;/&")
-    val (externalDownloaderEnabled) = rememberPreference(ExternalDownloaderEnabledKey, defaultValue = false)
-    val (aodFeatureEnabled, onAodFeatureEnabledChange) = rememberPreference(AodModeEnabledKey, defaultValue = false)
-    val (externalDownloaderPackage) = rememberPreference(ExternalDownloaderPackageKey, defaultValue = "")
-    val (archiveTuneCanvasEnabled) = rememberPreference(ArchiveTuneCanvasKey, defaultValue = false)
+    val artistSeparators = ",;/&"
     val playerDesignStyle by rememberEnumPreference(PlayerDesignStyleKey, defaultValue = PlayerDesignStyle.V4)
     val lowDataModeActive = rememberLowDataModeActive()
-    val canvasNetworkAllowed by playerConnection.canvasNetworkAllowed.collectAsStateWithLifecycle()
-    val isCanvasArtworkRefetching by playerConnection.isCanvasArtworkRefetching.collectAsStateWithLifecycle()
     val (speedDialSongIds, onSpeedDialSongIdsChange) = rememberPreference(SpeedDialSongIdsKey, "")
     val speedDialPins = remember(speedDialSongIds) { parseSpeedDialPins(speedDialSongIds) }
     val songPin = remember(mediaMetadata.id) { SpeedDialPin(type = SpeedDialPinType.SONG, id = mediaMetadata.id) }
@@ -294,7 +310,7 @@ fun PlayerMenu(
                                 splitArtist.originalArtist?.let { artist ->
                                     navController.navigateToArtist(artist.id)
                                     showSelectArtistDialog = false
-                                    playerBottomSheetState.collapseSoft()
+                                    onCollapsePlayer()
                                     onDismiss()
                                 }
                             },
@@ -499,55 +515,6 @@ fun PlayerMenu(
                                     ),
                                 )
                             }
-                            if (
-                                !isLocalMedia &&
-                                isQueueTrigger != true &&
-                                archiveTuneCanvasEnabled &&
-                                !lowDataModeActive &&
-                                canvasNetworkAllowed &&
-                                playerDesignStyle != PlayerDesignStyle.V5
-                            ) {
-                                add(
-                                    NewAction(
-                                        icon = {
-                                            if (isCanvasArtworkRefetching) {
-                                                CircularWavyProgressIndicator(modifier = Modifier.size(28.dp))
-                                            } else {
-                                                Icon(
-                                                    painter = painterResource(R.drawable.sync),
-                                                    contentDescription = null,
-                                                    modifier = Modifier.size(28.dp),
-                                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                )
-                                            }
-                                        },
-                                        text = stringResource(R.string.refetch_canvas),
-                                        onClick = {
-                                            coroutineScope.launch {
-                                                when (
-                                                    playerConnection.refetchCanvasArtwork(
-                                                        metadata = mediaMetadata,
-                                                        requireVertical = playerDesignStyle == PlayerDesignStyle.V7,
-                                                    )
-                                                ) {
-                                                    CanvasArtworkRefetchResult.Success -> onDismiss()
-                                                    CanvasArtworkRefetchResult.Failure -> {
-                                                        Toast
-                                                            .makeText(
-                                                                context,
-                                                                R.string.canvas_refetch_failed,
-                                                                Toast.LENGTH_SHORT,
-                                                            ).show()
-                                                    }
-
-                                                    CanvasArtworkRefetchResult.AlreadyRunning -> Unit
-                                                }
-                                            }
-                                        },
-                                        enabled = !isCanvasArtworkRefetching,
-                                    ),
-                                )
-                            }
                             add(
                                 NewAction(
                                     icon = {
@@ -626,7 +593,7 @@ fun PlayerMenu(
                                             val clip =
                                                 android.content.ClipData.newPlainText(
                                                     context.getString(R.string.copy_link),
-                                                    "https://music.youtube.com/watch?v=${mediaMetadata.id}",
+                                                    songShareUrl(mediaMetadata.id),
                                                 )
                                             clipboard.setPrimaryClip(clip)
                                             android.widget.Toast
@@ -640,52 +607,6 @@ fun PlayerMenu(
                                     )
                                 },
                             )
-                            if (!isLocalMedia) {
-                                add(
-                                    NewAction(
-                                        icon = {
-                                            Icon(
-                                                painter = painterResource(R.drawable.fire),
-                                                contentDescription = null,
-                                                modifier = Modifier.size(28.dp),
-                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            )
-                                        },
-                                        text = stringResource(R.string.music_together),
-                                        onClick = {
-                                            onDismiss()
-                                            playerBottomSheetState.collapseSoft()
-                                            navController.navigate("settings/music_together")
-                                        },
-                                    ),
-                                )
-                            }
-                            if (isQueueTrigger != true) {
-                                val aodBgColor = if (aodFeatureEnabled) MaterialTheme.colorScheme.primary else Color.Unspecified
-                                val aodContentColor = if (aodFeatureEnabled) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
-                                add(
-                                    NewAction(
-                                        icon = {
-                                            Icon(
-                                                painter = painterResource(R.drawable.bedtime),
-                                                contentDescription = null,
-                                                modifier = Modifier.size(28.dp),
-                                                tint = aodContentColor,
-                                            )
-                                        },
-                                        text = stringResource(R.string.aod_mode),
-                                        onClick = {
-                                            if (!aodFeatureEnabled) {
-                                                onAodFeatureEnabledChange(true)
-                                            }
-                                            playerConnection.aodModeEnabled.value = true
-                                            onDismiss()
-                                        },
-                                        backgroundColor = aodBgColor,
-                                        contentColor = aodContentColor,
-                                    ),
-                                )
-                            }
                         },
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
                 )
@@ -711,7 +632,7 @@ fun PlayerMenu(
                                     Modifier.clickable {
                                         if (splitArtists.size == 1 && splitArtists[0].originalArtist != null) {
                                             onDismiss()
-                                            playerBottomSheetState.collapseSoft()
+                                            onCollapsePlayer()
                                             navController.navigateToArtist(splitArtists[0].originalArtist!!.id)
                                         } else {
                                             showSelectArtistDialog = true
@@ -740,7 +661,7 @@ fun PlayerMenu(
                                 modifier =
                                     Modifier.clickable {
                                         onDismiss()
-                                        playerBottomSheetState.collapseSoft()
+                                        onCollapsePlayer()
                                         navController.navigateToAlbum(mediaMetadata.album.id)
                                     },
                                 colors = ListItemDefaults.colors(containerColor = Color.Transparent),
@@ -817,66 +738,13 @@ fun PlayerMenu(
                                 },
                                 modifier =
                                     Modifier.clickable {
-                                        database.transaction {
-                                            insert(mediaMetadata)
-                                        }
-                                        val downloadRequest =
-                                            DownloadRequest
-                                                .Builder(mediaMetadata.id, mediaMetadata.id.toUri())
-                                                .setCustomCacheKey(mediaMetadata.id)
-                                                .setData(mediaMetadata.title.toByteArray())
-                                                .build()
-                                        DownloadService.sendAddDownload(
-                                            context,
-                                            ExoDownloadService::class.java,
-                                            downloadRequest,
-                                            false,
-                                        )
+                                        startSongDownload(context, database, mediaMetadata)
                                     },
                                 colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                             )
                         }
                     }
-                    if (externalDownloaderEnabled) {
-                        HorizontalDivider(
-                            modifier = Modifier.padding(start = 56.dp),
-                            color = MaterialTheme.colorScheme.outlineVariant,
-                        )
-                        ListItem(
-                            headlineContent = { Text(text = stringResource(R.string.open_with_downloader)) },
-                            leadingContent = {
-                                Icon(
-                                    painter = painterResource(R.drawable.download),
-                                    contentDescription = null,
-                                )
-                            },
-                            modifier =
-                                Modifier.clickable {
-                                    onDismiss()
-                                    val url = "https://music.youtube.com/watch?v=${mediaMetadata.id}"
-                                    when (context.openExternalDownloader(externalDownloaderPackage, url)) {
-                                        ExternalDownloaderLaunchResult.STARTED -> Unit
-                                        ExternalDownloaderLaunchResult.NOT_CONFIGURED -> {
-                                            Toast
-                                                .makeText(
-                                                    context,
-                                                    context.getString(R.string.external_downloader_not_configured),
-                                                    Toast.LENGTH_LONG,
-                                                ).show()
-                                        }
-                                        ExternalDownloaderLaunchResult.NOT_INSTALLED -> {
-                                            Toast
-                                                .makeText(
-                                                    context,
-                                                    context.getString(R.string.external_downloader_not_installed),
-                                                    Toast.LENGTH_SHORT,
-                                                ).show()
-                                        }
-                                    }
-                                },
-                            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                        )
-                    }
+
                 }
             }
         }

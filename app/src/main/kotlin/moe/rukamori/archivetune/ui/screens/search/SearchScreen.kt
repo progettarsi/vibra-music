@@ -70,7 +70,6 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import moe.rukamori.archivetune.LocalPlayerAwareWindowInsets
 import moe.rukamori.archivetune.LocalPlayerConnection
 import moe.rukamori.archivetune.R
-import moe.rukamori.archivetune.constants.DisableBlurKey
 import moe.rukamori.archivetune.extensions.togglePlayPause
 import moe.rukamori.archivetune.innertube.models.AlbumItem
 import moe.rukamori.archivetune.innertube.models.ArtistItem
@@ -92,7 +91,6 @@ import moe.rukamori.archivetune.ui.screens.MoodAndGenresButton
 import moe.rukamori.archivetune.ui.screens.MoodAndGenresButtonHeight
 import moe.rukamori.archivetune.ui.utils.navigateToAlbum
 import moe.rukamori.archivetune.ui.utils.navigateToArtist
-import moe.rukamori.archivetune.utils.rememberPreference
 import moe.rukamori.archivetune.viewmodels.SearchDiscoveryScreenState
 import moe.rukamori.archivetune.viewmodels.SearchDiscoveryTab
 import moe.rukamori.archivetune.viewmodels.SearchDiscoveryViewModel
@@ -107,7 +105,7 @@ fun SearchScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val selectedTab by viewModel.selectedTab.collectAsStateWithLifecycle()
-    val (disableBlur) = rememberPreference(DisableBlurKey, false)
+    val disableBlur = false
     val tonalStart = MaterialTheme.colorScheme.primaryContainer
     val tonalMiddle = MaterialTheme.colorScheme.secondaryContainer
     val lazyListState = rememberLazyListState()

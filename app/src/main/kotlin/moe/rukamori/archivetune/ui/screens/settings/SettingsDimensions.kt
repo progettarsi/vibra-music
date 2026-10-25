@@ -24,6 +24,11 @@ object SettingsDimensions {
     val SectionSpacing = 14.dp
     val SegmentedGroupHorizontalPadding = 26.dp
     val SegmentedItemGap = 2.dp
+    val SegmentedRowHorizontalPadding = 22.dp
+    val SegmentedIconSize = 52.dp
+    val SegmentedIconTextSpacing = 18.dp
+    val ItemTextStartPadding = SegmentedGroupHorizontalPadding +
+        SegmentedRowHorizontalPadding + SegmentedIconSize + SegmentedIconTextSpacing
     val RowVerticalPadding = 14.dp
     val RowHorizontalPadding = 16.dp
 

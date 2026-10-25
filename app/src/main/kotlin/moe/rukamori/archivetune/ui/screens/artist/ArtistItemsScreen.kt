@@ -21,8 +21,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -343,9 +341,7 @@ fun ArtistItemsScreen(
         }
     }
 
-    TopAppBar(
-        title = { Text(title) },
-        navigationIcon = {
+    moe.rukamori.archivetune.ui.component.EnginePageTopBar(title = title, navigationIcon = {
             IconButton(
                 onClick = navController::navigateUp,
                 onLongClick = navController::backToMain,
@@ -355,8 +351,7 @@ fun ArtistItemsScreen(
                     contentDescription = null,
                 )
             }
-        },
-        actions = {
+        }, actions = {
             val songs = itemsPage?.items.orEmpty().filterIsInstance<SongItem>()
             if (songs.isNotEmpty()) {
                 IconButton(
@@ -392,8 +387,7 @@ fun ArtistItemsScreen(
                     )
                 }
             }
-        },
-    )
+        })
 }
 
 private val YTItem.contentKey: String

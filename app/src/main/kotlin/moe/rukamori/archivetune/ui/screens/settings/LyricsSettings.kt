@@ -9,9 +9,12 @@
 
 package moe.rukamori.archivetune.ui.screens.settings
 
+import moe.rukamori.archivetune.ui.component.IconButton
+import moe.rukamori.archivetune.ui.utils.backToMain
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -37,15 +40,13 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -83,10 +84,6 @@ import moe.rukamori.archivetune.constants.EnableSimpMusicLyricsKey
 import moe.rukamori.archivetune.constants.EnableUnisonLyricsKey
 import moe.rukamori.archivetune.constants.EnableYouLyPlusLyricsKey
 import moe.rukamori.archivetune.constants.LyricsClickKey
-import moe.rukamori.archivetune.constants.LyricsLineBlurKey
-import moe.rukamori.archivetune.constants.LyricsLineSpacingKey
-import moe.rukamori.archivetune.constants.LyricsMode
-import moe.rukamori.archivetune.constants.LyricsModeKey
 import moe.rukamori.archivetune.constants.LyricsProviderOrderKey
 import moe.rukamori.archivetune.constants.LyricsRomanizeChineseKey
 import moe.rukamori.archivetune.constants.LyricsRomanizeHindiKey
@@ -94,7 +91,6 @@ import moe.rukamori.archivetune.constants.LyricsRomanizeJapaneseKey
 import moe.rukamori.archivetune.constants.LyricsRomanizeKoreanKey
 import moe.rukamori.archivetune.constants.LyricsRomanizeOtherLanguagesKey
 import moe.rukamori.archivetune.constants.LyricsScrollKey
-import moe.rukamori.archivetune.constants.LyricsTextSizeKey
 import moe.rukamori.archivetune.constants.PaxsenixApiKeyKey
 import moe.rukamori.archivetune.constants.PreferredLyricsProvider
 import moe.rukamori.archivetune.constants.deserializeLyricsProviderOrder
@@ -103,20 +99,15 @@ import moe.rukamori.archivetune.paxsenix.models.PaxsenixStats
 import moe.rukamori.archivetune.paxsenix.models.ProviderStats
 import moe.rukamori.archivetune.ui.component.ActionPromptDialog
 import moe.rukamori.archivetune.ui.component.DefaultDialog
-import moe.rukamori.archivetune.ui.component.EnumListPreference
-import moe.rukamori.archivetune.ui.component.IconButton
 import moe.rukamori.archivetune.ui.component.PreferenceEntry
 import moe.rukamori.archivetune.ui.component.PreferenceGroup
 import moe.rukamori.archivetune.ui.component.SwitchPreference
 import moe.rukamori.archivetune.ui.component.TextFieldDialog
-import moe.rukamori.archivetune.ui.utils.backToMain
-import moe.rukamori.archivetune.utils.rememberEnumPreference
 import moe.rukamori.archivetune.utils.rememberPreference
 import moe.rukamori.archivetune.viewmodels.ContentSettingsViewModel
 import moe.rukamori.archivetune.viewmodels.PaxsenixStatsState
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
-import kotlin.math.roundToInt
 
 @Composable
 fun LyricsSettings(
@@ -157,9 +148,6 @@ fun LyricsSettings(
 
     val (lyricsClick, onLyricsClickChange) = rememberPreference(LyricsClickKey, defaultValue = true)
     val (lyricsScroll, onLyricsScrollChange) = rememberPreference(LyricsScrollKey, defaultValue = true)
-    val (lyricsTextSize, onLyricsTextSizeChange) = rememberPreference(LyricsTextSizeKey, defaultValue = 26f)
-    val (lyricsLineSpacing, onLyricsLineSpacingChange) = rememberPreference(LyricsLineSpacingKey, defaultValue = 1.3f)
-    val (lyricsMode, onLyricsModeChange) = rememberEnumPreference(LyricsModeKey, defaultValue = LyricsMode.ENHANCED)
     val (enableLrclib, onEnableLrclibChange) = rememberPreference(key = EnableLrcLibKey, defaultValue = true)
     val (enableKugou, onEnableKugouChange) = rememberPreference(key = EnableKugouKey, defaultValue = true)
     val (enableBetterLyrics, onEnableBetterLyricsChange) = rememberPreference(key = EnableBetterLyricsKey, defaultValue = true)
@@ -200,7 +188,7 @@ fun LyricsSettings(
         remember(providerOrderStr) {
             deserializeLyricsProviderOrder(providerOrderStr)
         }
-    val (lyricsLineBlur, onLyricsLineBlurChange) = rememberPreference(LyricsLineBlurKey, defaultValue = true)
+
     val (lyricsRomanizeJapanese, onLyricsRomanizeJapaneseChange) = rememberPreference(LyricsRomanizeJapaneseKey, defaultValue = true)
     val (lyricsRomanizeKorean, onLyricsRomanizeKoreanChange) = rememberPreference(LyricsRomanizeKoreanKey, defaultValue = true)
     val (lyricsRomanizeChinese, onLyricsRomanizeChineseChange) = rememberPreference(LyricsRomanizeChineseKey, defaultValue = true)
@@ -249,174 +237,27 @@ fun LyricsSettings(
         )
     }
 
+    Scaffold(containerColor = androidx.compose.material3.MaterialTheme.colorScheme.background, topBar = {
+    moe.rukamori.archivetune.ui.component.EnginePageTopBar(title = stringResource(R.string.lyrics), navigationIcon = {
+            IconButton(
+                onClick = navController::navigateUp,
+                onLongClick = navController::backToMain,
+            ) {
+                Icon(
+                    painterResource(R.drawable.arrow_back),
+                    contentDescription = null,
+                )
+            }
+        })
+    }) { pagePadding ->
+        Box(Modifier.padding(top = pagePadding.calculateTopPadding())) {
     Column(
         Modifier
-            .windowInsetsPadding(LocalPlayerAwareWindowInsets.current)
+            .windowInsetsPadding(LocalPlayerAwareWindowInsets.current.only(androidx.compose.foundation.layout.WindowInsetsSides.Horizontal + androidx.compose.foundation.layout.WindowInsetsSides.Bottom))
             .verticalScroll(rememberScrollState())
             .padding(bottom = SettingsDimensions.ScreenBottomPadding),
     ) {
-        var showLyricsTextSizeDialog by rememberSaveable { mutableStateOf(false) }
-
-        if (showLyricsTextSizeDialog) {
-            var tempTextSize by remember { mutableFloatStateOf(lyricsTextSize) }
-
-            DefaultDialog(
-                onDismiss = {
-                    tempTextSize = lyricsTextSize
-                    showLyricsTextSizeDialog = false
-                },
-                buttons = {
-                    TextButton(
-                        onClick = { tempTextSize = 24f },
-                        shapes = ButtonDefaults.shapes(),
-                    ) {
-                        Text(stringResource(R.string.reset))
-                    }
-
-                    Spacer(modifier = Modifier.weight(1f))
-
-                    TextButton(
-                        onClick = {
-                            tempTextSize = lyricsTextSize
-                            showLyricsTextSizeDialog = false
-                        },
-                        shapes = ButtonDefaults.shapes(),
-                    ) {
-                        Text(stringResource(android.R.string.cancel))
-                    }
-                    TextButton(
-                        onClick = {
-                            onLyricsTextSizeChange(tempTextSize)
-                            showLyricsTextSizeDialog = false
-                        },
-                        shapes = ButtonDefaults.shapes(),
-                    ) {
-                        Text(stringResource(android.R.string.ok))
-                    }
-                },
-            ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.padding(16.dp),
-                ) {
-                    Text(
-                        text = stringResource(R.string.lyrics_text_size),
-                        style = MaterialTheme.typography.headlineSmall,
-                        modifier = Modifier.padding(bottom = 16.dp),
-                    )
-
-                    Text(
-                        text = "${tempTextSize.roundToInt()} sp",
-                        style = MaterialTheme.typography.bodyLarge,
-                        modifier = Modifier.padding(bottom = 16.dp),
-                    )
-
-                    Slider(
-                        value = tempTextSize,
-                        onValueChange = { tempTextSize = it },
-                        valueRange = 16f..36f,
-                        steps = 19,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
-            }
-        }
-
-        var showLyricsLineSpacingDialog by rememberSaveable { mutableStateOf(false) }
-
-        if (showLyricsLineSpacingDialog) {
-            var tempLineSpacing by remember { mutableFloatStateOf(lyricsLineSpacing) }
-
-            DefaultDialog(
-                onDismiss = {
-                    tempLineSpacing = lyricsLineSpacing
-                    showLyricsLineSpacingDialog = false
-                },
-                buttons = {
-                    TextButton(
-                        onClick = { tempLineSpacing = 1.3f },
-                        shapes = ButtonDefaults.shapes(),
-                    ) {
-                        Text(stringResource(R.string.reset))
-                    }
-
-                    Spacer(modifier = Modifier.weight(1f))
-
-                    TextButton(
-                        onClick = {
-                            tempLineSpacing = lyricsLineSpacing
-                            showLyricsLineSpacingDialog = false
-                        },
-                        shapes = ButtonDefaults.shapes(),
-                    ) {
-                        Text(stringResource(android.R.string.cancel))
-                    }
-                    TextButton(
-                        onClick = {
-                            onLyricsLineSpacingChange(tempLineSpacing)
-                            showLyricsLineSpacingDialog = false
-                        },
-                        shapes = ButtonDefaults.shapes(),
-                    ) {
-                        Text(stringResource(android.R.string.ok))
-                    }
-                },
-            ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.padding(16.dp),
-                ) {
-                    Text(
-                        text = stringResource(R.string.lyrics_line_spacing),
-                        style = MaterialTheme.typography.headlineSmall,
-                        modifier = Modifier.padding(bottom = 16.dp),
-                    )
-
-                    Text(
-                        text = "${String.format("%.1f", tempLineSpacing)}x",
-                        style = MaterialTheme.typography.bodyLarge,
-                        modifier = Modifier.padding(bottom = 16.dp),
-                    )
-
-                    Slider(
-                        value = tempLineSpacing,
-                        onValueChange = { tempLineSpacing = it },
-                        valueRange = 1.0f..2.0f,
-                        steps = 19,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
-            }
-        }
-
-        PreferenceGroup(title = stringResource(R.string.display)) {
-            item {
-                EnumListPreference(
-                    title = { Text(stringResource(R.string.lyrics_mode)) },
-                    icon = { Icon(painterResource(R.drawable.lyrics), null) },
-                    selectedValue = lyricsMode,
-                    onValueSelected = onLyricsModeChange,
-                    valueText = {
-                        when (it) {
-                            LyricsMode.V2 -> stringResource(R.string.lyrics_mode_v2)
-                            LyricsMode.ENHANCED -> stringResource(R.string.lyrics_mode_enhanced)
-                        }
-                    },
-                )
-            }
-
-            item {
-                val animationSettingsEnabled = lyricsMode == LyricsMode.V2
-
-                PreferenceEntry(
-                    title = { Text(stringResource(R.string.lyrics_animation_style)) },
-                    description = if (animationSettingsEnabled) null else stringResource(R.string.lyrics_animation_style_v2_only),
-                    icon = { Icon(painterResource(R.drawable.animation), null) },
-                    onClick = { navController.navigate("settings/appearance/lyrics_animations") },
-                    isEnabled = animationSettingsEnabled,
-                )
-            }
-
+        PreferenceGroup(title = stringResource(R.string.settings_playback_audio)) {
             item {
                 SwitchPreference(
                     title = { Text(stringResource(R.string.lyrics_click_change)) },
@@ -425,7 +266,6 @@ fun LyricsSettings(
                     onCheckedChange = onLyricsClickChange,
                 )
             }
-
             item {
                 SwitchPreference(
                     title = { Text(stringResource(R.string.lyrics_auto_scroll)) },
@@ -434,35 +274,7 @@ fun LyricsSettings(
                     onCheckedChange = onLyricsScrollChange,
                 )
             }
-
-            item {
-                SwitchPreference(
-                    title = { Text(stringResource(R.string.lyrics_line_blur)) },
-                    icon = { Icon(painterResource(R.drawable.lyrics), null) },
-                    checked = lyricsLineBlur,
-                    onCheckedChange = onLyricsLineBlurChange,
-                )
-            }
-
-            item {
-                PreferenceEntry(
-                    title = { Text(stringResource(R.string.lyrics_text_size)) },
-                    description = "${lyricsTextSize.roundToInt()} sp",
-                    icon = { Icon(painterResource(R.drawable.text_fields), null) },
-                    onClick = { showLyricsTextSizeDialog = true },
-                )
-            }
-
-            item {
-                PreferenceEntry(
-                    title = { Text(stringResource(R.string.lyrics_line_spacing)) },
-                    description = "${String.format("%.1f", lyricsLineSpacing)}x",
-                    icon = { Icon(painterResource(R.drawable.text_fields), null) },
-                    onClick = { showLyricsLineSpacingDialog = true },
-                )
-            }
         }
-
         PreferenceGroup(title = stringResource(R.string.providers)) {
             item {
                 SwitchPreference(
@@ -651,7 +463,6 @@ fun LyricsSettings(
             }
         }
 
-
         PreferenceGroup(title = stringResource(R.string.cache)) {
             item {
                 PreferenceEntry(
@@ -662,21 +473,9 @@ fun LyricsSettings(
             }
         }
     }
+        }
+    }
 
-    TopAppBar(
-        title = { Text(stringResource(R.string.lyrics)) },
-        navigationIcon = {
-            IconButton(
-                onClick = navController::navigateUp,
-                onLongClick = navController::backToMain,
-            ) {
-                Icon(
-                    painterResource(R.drawable.arrow_back),
-                    contentDescription = null,
-                )
-            }
-        },
-    )
 }
 
 private enum class PaxsenixServerStatus { Operational, Degraded, Down }

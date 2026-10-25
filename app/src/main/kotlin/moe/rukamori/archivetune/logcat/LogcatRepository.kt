@@ -203,8 +203,7 @@ private fun isRelevantLogcatEntry(
         "LeakCanaryController", "MusicDatabase", "MusicWidgetActions", "RLog" -> true
         "System.err" -> message.startsWith("PaxsenixLyrics:")
         "System.out" ->
-            message.startsWith("AppleMusicCanvas:") ||
-                message.startsWith("Error converting chart item:") ||
+            message.startsWith("Error converting chart item:") ||
                 message.startsWith("Error converting two row item:")
 
         else -> false

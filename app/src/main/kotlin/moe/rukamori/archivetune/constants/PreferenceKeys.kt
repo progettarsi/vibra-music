@@ -12,170 +12,35 @@ import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import moe.rukamori.archivetune.ui.screens.settings.DarkMode
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import java.time.LocalDateTime
 import java.time.ZoneOffset
 
-val DynamicThemeKey = booleanPreferencesKey("dynamicTheme")
-val CustomThemeColorKey = stringPreferencesKey("customThemeColor")
-val RandomThemeOnStartupKey = booleanPreferencesKey("randomThemeOnStartup")
 val DarkModeKey = stringPreferencesKey("darkMode")
+
+// Vibra is designed dark-first (the Figma file ships the dark scheme only).
+val DarkModeDefault = DarkMode.ON
 val PureBlackKey = booleanPreferencesKey("pureBlack")
+
+/** Vibra main colour chosen in the profile's edit mode ("#RRGGBB", or "default"). */
+val CustomThemeColorKey = stringPreferencesKey("customThemeColor")
 val DisableAnimationsKey = booleanPreferencesKey("disableAnimations")
-val ForceHighRefreshRateKey = booleanPreferencesKey("forceHighRefreshRate")
-val WallpaperExtractionFailedKey = booleanPreferencesKey("wallpaperExtractionFailed")
 val EnableHapticFeedbackKey = booleanPreferencesKey("enableHapticFeedback")
 val UseSystemFontKey = booleanPreferencesKey("useSystemFont")
 val FontPreferenceKey = stringPreferencesKey("fontPreference")
 val CustomFontUriKey = stringPreferencesKey("customFontUri")
 val CustomFontNameKey = stringPreferencesKey("customFontName")
-val DefaultOpenTabKey = stringPreferencesKey("defaultOpenTab")
 val GridItemsSizeKey = stringPreferencesKey("gridItemSize")
-val SliderStyleKey = stringPreferencesKey("sliderStyle")
 val SwipeToSongKey = booleanPreferencesKey("SwipeToSong")
 val PlayerDesignStyleKey = stringPreferencesKey("playerDesignStyle")
-val ShowPlayerVolumeBarKey = booleanPreferencesKey("showPlayerVolumeBar")
-val HidePlayerThumbnailKey = booleanPreferencesKey("hidePlayerThumbnail")
-val ArchiveTuneCanvasKey = booleanPreferencesKey("archiveTuneCanvas")
-val CanvasSourceKey = stringPreferencesKey("canvasSource")
-val CanvasWifiOnlyKey = booleanPreferencesKey("canvasWifiOnly")
-val AndroidAutoOnlineRecommendationsKey = booleanPreferencesKey("androidAutoOnlineRecommendations")
-val AndroidAutoOnlineVoiceSearchKey = booleanPreferencesKey("androidAutoOnlineVoiceSearch")
-val AndroidAutoLocalSongsKey = booleanPreferencesKey("androidAutoLocalSongs")
-val AndroidAutoMeteredPlaybackKey = booleanPreferencesKey("androidAutoMeteredPlayback")
-val AndroidAutoMeteredArtworkKey = booleanPreferencesKey("androidAutoMeteredArtwork")
-val AndroidAutoPrimaryActionKey = stringPreferencesKey("androidAutoPrimaryAction")
-val AndroidAutoSecondaryActionKey = stringPreferencesKey("androidAutoSecondaryAction")
 val ThumbnailCornerRadiusKey = floatPreferencesKey("thumbnailCornerRadius")
-val CropThumbnailToSquareKey = booleanPreferencesKey("cropThumbnailToSquare")
 
-val AodModeEnabledKey = booleanPreferencesKey("aodModeEnabled")
-val AodThumbnailShapeKey = stringPreferencesKey("aodThumbnailShape")
-val AodThumbnailSizeKey = floatPreferencesKey("aodThumbnailSize")
-val AodThumbnailShapeRotationKey = intPreferencesKey("aodThumbnailShapeRotation")
-val AodShowThumbnailKey = booleanPreferencesKey("aodShowThumbnail")
-val AodShowArtistKey = booleanPreferencesKey("aodShowArtist")
-val AodShowAlbumKey = booleanPreferencesKey("aodShowAlbum")
-val AodShowProgressKey = booleanPreferencesKey("aodShowProgress")
-val AodShowTimeLabelsKey = booleanPreferencesKey("aodShowTimeLabels")
-val AodShowControlsKey = booleanPreferencesKey("aodShowControls")
-val AodShowExitButtonKey = booleanPreferencesKey("aodShowExitButton")
-val AodArtworkGlowKey = booleanPreferencesKey("aodArtworkGlow")
-val AodBackgroundStyleKey = stringPreferencesKey("aodBackgroundStyle")
-val AodAccentStyleKey = stringPreferencesKey("aodAccentStyle")
-val AodContentPositionKey = stringPreferencesKey("aodContentPosition")
-val AodTextAlignmentKey = stringPreferencesKey("aodTextAlignment")
-val AodControlStyleKey = stringPreferencesKey("aodControlStyle")
-val AodControlSizeKey = floatPreferencesKey("aodControlSize")
-val AodHorizontalPaddingKey = floatPreferencesKey("aodHorizontalPadding")
-val AodVerticalSpacingKey = floatPreferencesKey("aodVerticalSpacing")
-val AodTitleMaxLinesKey = intPreferencesKey("aodTitleMaxLines")
-val AodAmbientIntensityKey = floatPreferencesKey("aodAmbientIntensity")
-val AodTouchLockEnabledKey = booleanPreferencesKey("aodTouchLockEnabled")
-val AodUnlockMethodKey = stringPreferencesKey("aodUnlockMethod")
-val AodShowClockKey = booleanPreferencesKey("aodShowClock")
-val AodClockStyleKey = stringPreferencesKey("aodClockStyle")
-val AodShowBatteryKey = booleanPreferencesKey("aodShowBattery")
-val AodPixelShiftEnabledKey = booleanPreferencesKey("aodPixelShiftEnabled")
-val AodShowLyricTickerKey = booleanPreferencesKey("aodShowLyricTicker")
-val AodAutoDimmingKey = booleanPreferencesKey("aodAutoDimming")
-val AodAutoDimTimeoutKey = intPreferencesKey("aodAutoDimTimeout")
-val AodGesturesEnabledKey = booleanPreferencesKey("aodGesturesEnabled")
-
-val AodShakeToUnlockKey = booleanPreferencesKey("aodShakeToUnlock")
-val AodAutoLockEnabledKey = booleanPreferencesKey("aodAutoLockEnabled")
-val AodAutoLockTimeoutKey = intPreferencesKey("aodAutoLockTimeout")
-val AodMarqueeTitlesKey = booleanPreferencesKey("aodMarqueeTitles")
-val AodMinimalLockedStateKey = booleanPreferencesKey("aodMinimalLockedState")
-val AodBrightnessKey = floatPreferencesKey("aodBrightness")
-val AodProximityBlackoutKey = booleanPreferencesKey("aodProximityBlackout")
-val AodTrueAmbientModeKey = booleanPreferencesKey("aodTrueAmbientMode")
-val AodAutoStartScreenOffKey = booleanPreferencesKey("aodAutoStartScreenOff")
 val SeekExtraSeconds = booleanPreferencesKey("seekExtraSeconds")
-val DisableBlurKey = booleanPreferencesKey("disableBlur")
-val BlurRadiusKey = floatPreferencesKey("blurRadius")
 
 // Backdrop blur for detail pages
-val BackdropEnabledKey = booleanPreferencesKey("backdropEnabled")
-val BackdropBlurAmountKey = intPreferencesKey("backdropBlurAmount")
-val MiniPlayerLastAnchorKey = intPreferencesKey("miniPlayerLastAnchor")
-val MiniPlayerBackgroundStyleKey = stringPreferencesKey("miniPlayerBackgroundStyle")
 val NavigationBarBackgroundStyleKey = stringPreferencesKey("navigationBarBackgroundStyle")
 val NavigationBarModeKey = stringPreferencesKey("navigationBarMode")
-
-enum class AodThumbnailShape {
-    ROUNDED,
-    SQUARE,
-    CIRCLE,
-    PILL,
-    ARCH,
-    SLANTED,
-    DIAMOND,
-    PENTAGON,
-    TRIANGLE,
-    HEART,
-    FLOWER,
-    CLOVER_4,
-    COOKIE_6,
-    COOKIE_9,
-    SUNNY,
-    SOFT_BURST,
-    GHOSTISH,
-    PIXEL_CIRCLE,
-}
-
-enum class AodBackgroundStyle {
-    PURE_BLACK,
-    SOFT_RADIAL,
-    TONAL_EDGE,
-    AMBIENT_GLOW,
-    ADAPTIVE_ART,
-    FROSTED_WALLPAPER,
-    ADAPTIVE_FROSTED,
-}
-
-enum class AodAccentStyle {
-    MONOCHROME,
-    THEME,
-}
-
-enum class AodContentPosition {
-    TOP,
-    CENTER,
-    BOTTOM,
-}
-
-enum class AodTextAlignment {
-    START,
-    CENTER,
-    END,
-}
-
-enum class AodControlStyle {
-    FILLED,
-    TONAL,
-    MINIMAL,
-}
-
-enum class AodUnlockMethod {
-    SLIDE,
-    HOLD,
-}
-
-enum class AodClockStyle {
-    BOLD_DIGITAL,
-    MINIMAL,
-    ELEGANT_THIN,
-    PIXEL_STACKED,
-}
-
-enum class SliderStyle {
-    Standard,
-    Wavy,
-    Thick,
-    Circular,
-    Simple,
-}
 
 const val SYSTEM_DEFAULT = "SYSTEM_DEFAULT"
 
@@ -233,14 +98,6 @@ val LocalSongsExcludedFoldersKey = stringSetPreferencesKey("local_songs_excluded
 val LocalSongsSortTypeKey = stringPreferencesKey("local_songs_sort_type")
 val LocalSongsSortDescendingKey = booleanPreferencesKey("local_songs_sort_descending")
 
-val TogetherDisplayNameKey = stringPreferencesKey("together_display_name")
-val TogetherClientIdKey = stringPreferencesKey("together_client_id")
-val TogetherDefaultPortKey = intPreferencesKey("together_default_port")
-val TogetherAllowGuestsToAddTracksKey = booleanPreferencesKey("together_allow_guests_add_tracks")
-val TogetherAllowGuestsToControlPlaybackKey = booleanPreferencesKey("together_allow_guests_control_playback")
-val TogetherRequireHostApprovalToJoinKey = booleanPreferencesKey("together_require_host_approval_to_join")
-val TogetherLastJoinLinkKey = stringPreferencesKey("together_last_join_link")
-val TogetherWelcomeShownKey = booleanPreferencesKey("together_welcome_shown")
 
 // ListenBrainz scrobbling
 val ListenBrainzEnabledKey = booleanPreferencesKey("listenbrainz_enabled")
@@ -252,8 +109,6 @@ val AiApiKeyKey = stringPreferencesKey("ai_api_key")
 val AiApiValidationStatusKey = stringPreferencesKey("ai_api_validation_status")
 val AiSelectedModelKey = stringPreferencesKey("ai_selected_model")
 val AiCustomModelKey = stringPreferencesKey("ai_custom_model")
-val AiCustomPromptKey = stringPreferencesKey("ai_custom_prompt")
-val AiRequestParametersKey = stringPreferencesKey("ai_request_parameters")
 
 enum class AiProvider {
     CHATGPT,
@@ -309,31 +164,19 @@ enum class PlayerStreamClient {
     ANDROID_MUSIC,
 }
 
-val PersistentQueueKey = booleanPreferencesKey("persistentQueue")
 val PreloadNextSongKey = booleanPreferencesKey("preloadNextSong")
-val PermanentShuffleKey = booleanPreferencesKey("permanentShuffle")
 val SkipSilenceKey = booleanPreferencesKey("skipSilence")
 val AudioNormalizationKey = booleanPreferencesKey("audioNormalization")
-val AudioOffload = booleanPreferencesKey("audioOffload")
 val CrossfadeEnabledKey = booleanPreferencesKey("crossfadeEnabled")
 val CrossfadeDurationKey = floatPreferencesKey("crossfadeDuration")
 val CrossfadeGaplessKey = booleanPreferencesKey("crossfadeGapless")
 val AutoLoadMoreKey = booleanPreferencesKey("autoLoadMore")
-val AutoDownloadOnLikeKey = booleanPreferencesKey("autoDownloadOnLike")
-val AutoSkipNextOnErrorKey = booleanPreferencesKey("autoSkipNextOnError")
 val PauseOnDeviceMuteKey = booleanPreferencesKey("pauseOnDeviceMute")
 val DeviceMutePlaybackRecoveryVolumeKey = intPreferencesKey("deviceMutePlaybackRecoveryVolume")
 val AutoStartOnBluetoothKey = booleanPreferencesKey("autoStartOnBluetooth")
 val StopMusicOnTaskClearKey = booleanPreferencesKey("stopMusicOnTaskClear")
-val WakelockKey = booleanPreferencesKey("wakelock")
-val ArtistSeparatorsKey = stringPreferencesKey("artistSeparators")
-val ExternalDownloaderEnabledKey = booleanPreferencesKey("externalDownloaderEnabled")
-val ExternalDownloaderPackageKey = stringPreferencesKey("externalDownloaderPackage")
 val PlaylistTagsFilterKey = stringPreferencesKey("playlistTagsFilter")
-val LibraryChipOrderKey = stringPreferencesKey("libraryChipOrder")
 val PlaylistTagOrderKey = stringPreferencesKey("playlistTagOrder")
-val ShowHomeCategoryChipsKey = booleanPreferencesKey("showHomeCategoryChips")
-val ShowTagsInLibraryKey = booleanPreferencesKey("showTagsInLibrary")
 
 val EqualizerEnabledKey = booleanPreferencesKey("equalizerEnabled")
 val EqualizerControlModeKey = stringPreferencesKey("equalizerControlMode")
@@ -351,7 +194,6 @@ val EqualizerCustomProfilesJsonKey = stringPreferencesKey("equalizerCustomProfil
 val MaxImageCacheSizeKey = intPreferencesKey("maxImageCacheSize")
 val SmartTrimmerKey = booleanPreferencesKey("smartTrimmer")
 val MaxSongCacheSizeKey = intPreferencesKey("maxSongCacheSize")
-val MaxCanvasCacheSizeKey = intPreferencesKey("maxCanvasCacheSize")
 val StorageFolderIdKey = stringPreferencesKey("storageFolderId")
 val StorageFolderTreeUriKey = stringPreferencesKey("storageFolderTreeUri")
 val StorageFolderPathKey = stringPreferencesKey("storageFolderPath")
@@ -361,50 +203,10 @@ val PauseListenHistoryKey = booleanPreferencesKey("pauseListenHistory")
 val PauseSearchHistoryKey = booleanPreferencesKey("pauseSearchHistory")
 val DisableScreenshotKey = booleanPreferencesKey("disableScreenshot")
 
-val DiscordTokenKey = stringPreferencesKey("discordToken")
-val DiscordRefreshTokenKey = stringPreferencesKey("discordRefreshToken")
-val DiscordTokenExpiresAtKey = longPreferencesKey("discordTokenExpiresAt")
-val DiscordInfoDismissedKey = booleanPreferencesKey("discordInfoDismissed")
-val DiscordUsernameKey = stringPreferencesKey("discordUsername")
-val DiscordNameKey = stringPreferencesKey("discordName")
-val DiscordAvatarUrlKey = stringPreferencesKey("discordAvatarUrl")
-val EnableDiscordRPCKey = booleanPreferencesKey("discordRPCEnable")
-
-// Discord activity customization keys
-val DiscordActivityNameKey = stringPreferencesKey("discordActivityName")
-val DiscordActivityDetailsKey = stringPreferencesKey("discordActivityDetails")
-val DiscordActivityStateKey = stringPreferencesKey("discordActivityState")
-
-// Custom button labels and urls for Discord activity buttons
-val DiscordActivityButton1LabelKey = stringPreferencesKey("discordActivityButton1Label")
-val DiscordActivityButton1UrlSourceKey = stringPreferencesKey("discordActivityButton1UrlSource")
-val DiscordActivityButton1CustomUrlKey = stringPreferencesKey("discordActivityButton1CustomUrl")
-val DiscordActivityButton2LabelKey = stringPreferencesKey("discordActivityButton2Label")
-val DiscordActivityButton2UrlSourceKey = stringPreferencesKey("discordActivityButton2UrlSource")
-val DiscordActivityButton2CustomUrlKey = stringPreferencesKey("discordActivityButton2CustomUrl")
-val DiscordActivityButton1EnabledKey = booleanPreferencesKey("discordActivityButton1Enabled")
-val DiscordActivityButton2EnabledKey = booleanPreferencesKey("discordActivityButton2Enabled")
-val DiscordShowWhenPausedKey = booleanPreferencesKey("discordShowWhenPaused")
-
-// Activity type for Discord presence (PLAYING, STREAMING, LISTENING, WATCHING, COMPETING)
-val DiscordActivityTypeKey = stringPreferencesKey("discordActivityType")
-val DiscordPresenceStatusKey = stringPreferencesKey("discordPresenceStatus") // "ONLINE", "IDLE", "DND", "INVISIBLE"
-
-// Discord image selection keys
 // Values for type keys: "thumbnail", "artist", "appicon", "custom"
-val DiscordLargeImageTypeKey = stringPreferencesKey("discordLargeImageType")
-val DiscordLargeTextSourceKey = stringPreferencesKey("discordLargeTextSource")
-val DiscordLargeTextCustomKey = stringPreferencesKey("discordLargeTextCustom")
-val DiscordLargeImageCustomUrlKey = stringPreferencesKey("discordLargeImageCustomUrl")
-val DiscordSmallImageTypeKey = stringPreferencesKey("discordSmallImageType")
-val DiscordSmallImageCustomUrlKey = stringPreferencesKey("discordSmallImageCustomUrl")
 
-
-val TranslatorContextsKey = stringPreferencesKey("translatorContexts")
 val TranslatorTargetLangKey = stringPreferencesKey("translatorTargetLang")
-val EnableTranslatorKey = booleanPreferencesKey("enableTranslator")
 
-val ChipSortTypeKey = stringPreferencesKey("chipSortType")
 val SongSortTypeKey = stringPreferencesKey("songSortType")
 val SongSortDescendingKey = booleanPreferencesKey("songSortDescending")
 val PlaylistSongSortTypeKey = stringPreferencesKey("playlistSongSortType")
@@ -442,7 +244,6 @@ val NewsLastReadTimestampKey = longPreferencesKey("news_last_read_timestamp")
 val SpeedDialSongIdsKey = stringPreferencesKey("speedDialSongIds")
 val PreferredLyricsProviderKey = stringPreferencesKey("lyricsProvider")
 val LyricsProviderOrderKey = stringPreferencesKey("lyricsProviderOrder")
-val QueueEditLockKey = booleanPreferencesKey("queueEditLock")
 
 enum class LibraryViewType {
     LIST,
@@ -655,11 +456,6 @@ fun deserializeLyricsProviderOrder(orderStr: String?): List<PreferredLyricsProvi
     return normalized + missing
 }
 
-enum class PlayerButtonsStyle {
-    DEFAULT,
-    SECONDARY,
-}
-
 enum class PlayerDesignStyle {
     V1,
     V2,
@@ -684,28 +480,6 @@ enum class PlayerBackgroundStyle {
     GLOW_ANIMATED,
 }
 
-enum class LyricsBackgroundStyle {
-    DEFAULT,
-    FOLLOW_THEME,
-    COLORING,
-    CUSTOM;
-
-    fun resolveFor(playerBackgroundStyle: PlayerBackgroundStyle): LyricsBackgroundStyle =
-        when {
-            playerBackgroundStyle == PlayerBackgroundStyle.CUSTOM -> CUSTOM
-            this == CUSTOM -> DEFAULT
-            else -> this
-        }
-}
-
-enum class MiniPlayerBackgroundStyle {
-    THEME,
-    GRADIENT,
-    GLOW,
-    ACRYLIC,
-    BLUR,
-}
-
 enum class NavigationBarBackgroundStyle {
     THEME,
     BLUR,
@@ -717,13 +491,6 @@ enum class NavigationBarMode {
     STANDALONE,
 }
 
-// Keys for customized background
-val PlayerCustomImageUriKey = stringPreferencesKey("playerCustomImageUri")
-val PlayerCustomBlurKey = floatPreferencesKey("playerCustomBlur")
-val PlayerCustomContrastKey = floatPreferencesKey("playerCustomContrast")
-val PlayerCustomBrightnessKey = floatPreferencesKey("playerCustomBrightness")
-
-val LyricsAnimationStyleKey = stringPreferencesKey("lyricsAnimationStyle")
 
 enum class LyricsAnimationStyle {
     NONE,
@@ -734,10 +501,6 @@ enum class LyricsAnimationStyle {
     APPLE,
 }
 
-val LyricsTextSizeKey = floatPreferencesKey("lyricsTextSize")
-val LyricsLineSpacingKey = floatPreferencesKey("lyricsLineSpacing")
-val LyricsLineBlurKey = booleanPreferencesKey("lyricsLineBlur")
-val ShowLyricsPlayerControlsKey = booleanPreferencesKey("showLyricsPlayerControls")
 
 val TopSize = stringPreferencesKey("topSize")
 
@@ -748,11 +511,8 @@ val HISTORY_DURATION_RANGE = HISTORY_DURATION_MIN.toFloat()..HISTORY_DURATION_MA
 val HISTORY_DURATION_LEGACY_FLOAT_KEY = floatPreferencesKey("historyDuration")
 val HistoryDuration = intPreferencesKey("historyDuration")
 
-val PlayerButtonsStyleKey = stringPreferencesKey("player_buttons_style")
 val PlayerBackgroundStyleKey = stringPreferencesKey("playerBackgroundStyle")
-val LyricsBackgroundStyleKey = stringPreferencesKey("lyricsBackgroundStyle")
 val ShowLyricsKey = booleanPreferencesKey("showLyrics")
-val LyricsTextPositionKey = stringPreferencesKey("lyricsTextPosition")
 val LyricsClickKey = booleanPreferencesKey("lyricsClick")
 val LyricsScrollKey = booleanPreferencesKey("lyricsScrollKey")
 val LyricsRomanizeJapaneseKey = booleanPreferencesKey("lyricsRomanizeJapanese")
@@ -761,18 +521,12 @@ val LyricsRomanizeChineseKey = booleanPreferencesKey("lyricsRomanizeChinese")
 val LyricsRomanizeHindiKey = booleanPreferencesKey("lyricsRomanizeHindi")
 val LyricsRomanizeOtherLanguagesKey = booleanPreferencesKey("lyricsRomanizeOtherLanguages")
 val TranslateLyricsKey = booleanPreferencesKey("translateLyrics")
-val UseLyricsV2Key = booleanPreferencesKey("useLyricsV2")
-val LyricsModeKey = stringPreferencesKey("lyricsMode")
 
 enum class LyricsMode {
     V2,
     ENHANCED,
 }
 
-val LyricsV2BounceFactorKey = floatPreferencesKey("lyricsV2BounceFactor")
-val LyricsV2GlowFactorKey = floatPreferencesKey("lyricsV2GlowFactor")
-val LyricsV2FillTransitionWidthKey = floatPreferencesKey("lyricsV2FillTransitionWidth")
-val LyricsV2LrcBounceEnabledKey = booleanPreferencesKey("lyricsV2LrcBounceEnabled")
 
 val PlayerVolumeKey = floatPreferencesKey("playerVolume")
 val RepeatModeKey = intPreferencesKey("repeatMode")
@@ -781,8 +535,6 @@ val SponsorBlockCategoriesKey = stringSetPreferencesKey("sponsorBlockCategories"
 val SponsorBlockApiUrlKey = stringPreferencesKey("sponsorBlockApiUrl")
 
 val SearchSourceKey = stringPreferencesKey("searchSource")
-val SwipeThumbnailKey = booleanPreferencesKey("swipeThumbnail")
-val SwipeSensitivityKey = floatPreferencesKey("swipeSensitivity")
 
 enum class SearchSource {
     LOCAL,
@@ -933,8 +685,6 @@ val CanaryReleasesJsonKey = stringPreferencesKey("daily_nightly_releases_json")
 val CanaryReleasesLastCheckedAtKey = longPreferencesKey("daily_nightly_releases_last_checked_at")
 val CanaryReleasesFingerprintKey = stringPreferencesKey("daily_nightly_releases_fingerprint")
 
-val TogetherOnlineEndpointCacheKey = stringPreferencesKey("together_online_endpoint_cache")
-val TogetherOnlineEndpointLastCheckedAtKey = longPreferencesKey("together_online_endpoint_last_checked_at")
 
 val RedownloadOnRestoreKey = booleanPreferencesKey("redownloadOnRestore")
 

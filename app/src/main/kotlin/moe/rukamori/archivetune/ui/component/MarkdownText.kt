@@ -44,7 +44,7 @@ fun MarkdownText(
 
     val typeface =
         remember(context) {
-            ResourcesCompat.getFont(context, R.font.poppins)
+            ResourcesCompat.getFont(context, R.font.vibra_roboto)
         }
 
     val markwon =

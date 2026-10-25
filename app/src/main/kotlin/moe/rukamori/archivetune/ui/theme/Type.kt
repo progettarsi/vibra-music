@@ -9,11 +9,9 @@ package moe.rukamori.archivetune.ui.theme
 
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
-import moe.rukamori.archivetune.R
 
 private fun buildTypography(fontFamily: FontFamily) =
     Typography(
@@ -139,9 +137,11 @@ private fun buildTypography(fontFamily: FontFamily) =
             ),
     )
 
-val AppFontFamily = FontFamily(Font(R.font.poppins))
-val LyricsFontFamily = FontFamily(Font(R.font.sfprodisplaybold))
-val AppTypography = buildTypography(AppFontFamily)
+// Vibra: the design system's Google Sans Flex replaces the upstream fonts.
+// (Upstream bundled Apple's SF Pro Display, whose licence forbids redistribution on Android.)
+val AppFontFamily = app.vibra.ui.theme.VibraSans
+val LyricsFontFamily = app.vibra.ui.theme.VibraDisplay
+val AppTypography = app.vibra.ui.theme.vibraTypography(AppFontFamily)
 val SystemTypography = buildTypography(FontFamily.Default)
 
 fun typographyFor(fontFamily: FontFamily) = buildTypography(fontFamily)

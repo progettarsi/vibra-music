@@ -23,7 +23,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -70,7 +69,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -89,15 +87,13 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.media3.common.Player
+import app.vibra.ui.lyrics.VibraLyricsList
 import com.mocharealm.accompanist.lyrics.core.model.ISyncedLine
 import com.mocharealm.accompanist.lyrics.core.model.SyncedLyrics
 import com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeAlignment
 import com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeLine
 import com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeSyllable
 import com.mocharealm.accompanist.lyrics.core.model.synced.SyncedLine
-import com.mocharealm.accompanist.lyrics.ui.composable.list.rememberLyricsLazyListState
-import com.mocharealm.accompanist.lyrics.ui.composable.lyrics.KaraokeLyricsView
-import com.mocharealm.accompanist.lyrics.ui.composable.lyrics.LyricsAnchor
 import kotlinx.coroutines.isActive
 import moe.rukamori.archivetune.LocalPlayerConnection
 import moe.rukamori.archivetune.R
@@ -142,7 +138,6 @@ fun LyricsEnhanced(
     val preferences = preparedLyrics?.preferences
     val lyricsClick = preferences?.clickEnabled ?: true
     val lyricsTextSize = preferences?.textSizeSp ?: 26f
-    val lyricsLineBlurPreference = preferences?.lineBlurEnabled ?: true
 
     val lyricsFontFamily = rememberArchiveTuneLyricsFontFamily()
 
@@ -153,7 +148,6 @@ fun LyricsEnhanced(
         } else {
             Color.White
         }
-    val lyricsLineBlur = lyricsLineBlurOverride ?: lyricsLineBlurPreference
 
     var isSelectionModeActive by rememberSaveable { mutableStateOf(false) }
     val selectedLineKeys = remember { mutableStateListOf<String>() }
@@ -217,7 +211,7 @@ fun LyricsEnhanced(
     val latestLeadMs = rememberUpdatedState(leadMs)
     val playbackPositionMs = lyricsRenderViewModel.playbackPositionMs.collectAsStateWithLifecycle()
     val plainLyricsListState = key(lyricsSessionKey) { rememberLazyListState() }
-    val karaokeLyricsListState = key(lyricsSessionKey) { rememberLyricsLazyListState() }
+    val karaokeLyricsListState = key(lyricsSessionKey) { rememberLazyListState() }
 
     LaunchedEffect(lyricsSessionKey) {
         isSelectionModeActive = false
@@ -473,15 +467,12 @@ fun LyricsEnhanced(
             }
 
             else -> {
-                BoxWithConstraints(
-                    modifier = Modifier.fillMaxSize(),
-                ) {
-                    val lyricsViewportAnchor = remember(maxHeight) { LyricsAnchor.Fixed(maxHeight * 0.38f) }
-
-                    CompositionLocalProvider(LocalLayoutDirection provides lyricsLayoutDirection) {
-                        key(lyricsSessionKey, syncedLyrics) {
-                            KaraokeLyricsView(
-                                listState = karaokeLyricsListState,
+                CompositionLocalProvider(LocalLayoutDirection provides lyricsLayoutDirection) {
+                    key(lyricsSessionKey, syncedLyrics) {
+                        // Vibra's own list: the library's karaoke view re-rendered every line
+                        // into new bitmaps on each frame (see VibraLyricsList).
+                        VibraLyricsList(
+                            listState = karaokeLyricsListState,
                                 lyrics = syncedLyrics,
                                 currentPosition = playbackSyncPosition,
                                 onLineClicked = { line ->
@@ -502,19 +493,12 @@ fun LyricsEnhanced(
                                         toggleSelectedLine(lineKey)
                                     }
                                 },
-                                textColor = textColor,
-                                normalLineTextStyle = normalTextStyle,
-                                accompanimentLineTextStyle = accompanimentTextStyle,
-                                phoneticTextStyle = phoneticTextStyle,
-                                blendMode = BlendMode.SrcOver,
-                                useBlurEffect = lyricsLineBlur,
-                                showTranslation = showTranslations,
-                                showPhonetic = showPhonetics,
-                                anchor = lyricsViewportAnchor,
-                                keepAliveZone = 72.dp,
-                                modifier = Modifier.fillMaxSize(),
-                            )
-                        }
+                            textColor = textColor,
+                            textStyle = normalTextStyle,
+                            accompanimentStyle = accompanimentTextStyle,
+                            showTranslation = showTranslations,
+                            modifier = Modifier.fillMaxSize(),
+                        )
                     }
                 }
             }

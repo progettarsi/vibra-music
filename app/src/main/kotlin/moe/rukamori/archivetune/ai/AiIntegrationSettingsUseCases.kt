@@ -46,13 +46,6 @@ class UpdateAiIntegrationSettingsUseCase
             repository.setCustomModel(model)
         }
 
-        suspend fun setCustomPrompt(prompt: String) {
-            repository.setCustomPrompt(prompt)
-        }
-
-        suspend fun setRequestParameters(value: String) {
-            repository.setRequestParameters(value)
-        }
     }
 
 class FetchAiModelsUseCase

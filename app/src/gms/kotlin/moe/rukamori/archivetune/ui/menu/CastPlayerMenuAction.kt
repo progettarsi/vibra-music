@@ -535,7 +535,7 @@ private fun CastRouteRow(
 @Composable
 private fun CastRouteUiModel.supportingText(): String =
     when {
-        selected -> stringResource(R.string.together_connected)
+        selected -> stringResource(R.string.vibra_cast_connected)
         connecting -> stringResource(R.string.connecting)
         description != null -> description
         else -> stringResource(R.string.cast_available_device)

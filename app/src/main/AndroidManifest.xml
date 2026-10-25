@@ -85,17 +85,6 @@
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
 
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-
-                <data
-                    android:host="together"
-                    android:scheme="archivetune" />
-            </intent-filter>
-
             <!-- Youtube filter -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
@@ -261,29 +250,6 @@
             </intent-filter>
         </service>
 
-        <service
-            android:name=".aod.AodModeTileService"
-            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
-            android:exported="true"
-            android:icon="@drawable/bedtime"
-            android:label="@string/aod_mode">
-            <intent-filter>
-                <action android:name="android.service.quicksettings.action.QS_TILE" />
-            </intent-filter>
-        </service>
-
-        <service
-            android:name=".aod.AodDreamService"
-            android:permission="android.permission.BIND_DREAM_SERVICE"
-            android:exported="true"
-            android:icon="@drawable/bedtime"
-            android:label="@string/aod_mode">
-            <intent-filter>
-                <action android:name="android.service.dreams.DreamService" />
-                <category android:name="android.intent.category.DEFAULT" />
-            </intent-filter>
-        </service>
-
         <receiver
             android:name="androidx.media3.session.MediaButtonReceiver"
             android:exported="true">
@@ -393,21 +359,6 @@
             android:exported="true"
             android:process=":crash"
             android:theme="@style/Theme.ArchiveTune">
-        </activity>
-
-        <activity
-            android:name=".discord.DiscordOAuthCallbackActivity"
-            android:exported="true"
-            android:noHistory="true"
-            android:theme="@style/Theme.ArchiveTune">
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-
-                <data android:scheme="${discordRedirectScheme}" />
-            </intent-filter>
         </activity>
     </application>
 

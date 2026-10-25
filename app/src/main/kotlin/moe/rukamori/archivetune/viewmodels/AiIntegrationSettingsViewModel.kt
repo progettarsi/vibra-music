@@ -32,7 +32,6 @@ import kotlinx.coroutines.launch
 import moe.rukamori.archivetune.R
 import moe.rukamori.archivetune.ai.AiIntegrationSettingsData
 import moe.rukamori.archivetune.ai.AiModelOption
-import moe.rukamori.archivetune.ai.AiRequestParameters
 import moe.rukamori.archivetune.ai.AiServiceConfig
 import moe.rukamori.archivetune.ai.FetchAiModelsUseCase
 import moe.rukamori.archivetune.ai.ObserveAiIntegrationSettingsUseCase
@@ -63,8 +62,6 @@ enum class AiSettingsEditorField {
     API_KEY,
     CUSTOM_ENDPOINT,
     CUSTOM_MODEL,
-    CUSTOM_PROMPT,
-    REQUEST_PARAMETERS,
 }
 
 @Immutable
@@ -93,8 +90,6 @@ data class AiIntegrationSettingsUiModel(
     val validationStatus: AiApiValidationStatus,
     val selectedModel: String,
     val customModel: String,
-    val customPrompt: String,
-    val requestParameters: String,
     val availableModels: ImmutableList<AiModelOption>,
     val isTesting: Boolean,
     val isFetchingModels: Boolean,
@@ -191,8 +186,6 @@ class AiIntegrationSettingsViewModel
                     AiSettingsEditorField.API_KEY -> model.apiKey
                     AiSettingsEditorField.CUSTOM_ENDPOINT -> model.customEndpoint
                     AiSettingsEditorField.CUSTOM_MODEL -> model.customModel
-                    AiSettingsEditorField.CUSTOM_PROMPT -> model.customPrompt
-                    AiSettingsEditorField.REQUEST_PARAMETERS -> model.requestParameters
                 }
             transientState.update { state ->
                 state.copy(editor = editorModel(field = field, value = value))
@@ -233,13 +226,6 @@ class AiIntegrationSettingsViewModel
                     updateSetting { updateSettings.setCustomModel(editor.value) }
                 }
 
-                AiSettingsEditorField.CUSTOM_PROMPT -> {
-                    updateSetting { updateSettings.setCustomPrompt(editor.value) }
-                }
-
-                AiSettingsEditorField.REQUEST_PARAMETERS -> {
-                    updateSetting { updateSettings.setRequestParameters(editor.value) }
-                }
             }
         }
 
@@ -383,8 +369,6 @@ class AiIntegrationSettingsViewModel
             field: AiSettingsEditorField,
             value: String,
         ): AiSettingsEditorUiModel {
-            val invalidParameters = field == AiSettingsEditorField.REQUEST_PARAMETERS &&
-                runCatching { AiRequestParameters.normalize(value) }.isFailure
             val invalidEndpoint = field == AiSettingsEditorField.CUSTOM_ENDPOINT &&
                 value.trim().toHttpUrlOrNull()?.let {
                     it.username.isEmpty() && it.password.isEmpty() && it.fragment == null
@@ -400,11 +384,8 @@ class AiIntegrationSettingsViewModel
 
                         AiSettingsEditorField.CUSTOM_ENDPOINT -> !invalidEndpoint
 
-                        AiSettingsEditorField.CUSTOM_PROMPT -> true
-                        AiSettingsEditorField.REQUEST_PARAMETERS -> !invalidParameters
                     },
                 errorMessageResId = when {
-                    invalidParameters -> R.string.ai_request_parameters_invalid
                     invalidEndpoint -> R.string.ai_custom_endpoint_invalid
                     else -> null
                 },
@@ -465,8 +446,6 @@ private fun AiIntegrationSettingsData.toUiModel(
         validationStatus = validationStatus,
         selectedModel = selectedModel,
         customModel = customModel,
-        customPrompt = customPrompt,
-        requestParameters = requestParameters,
         availableModels = transient.availableModels,
         isTesting = transient.isTesting,
         isFetchingModels = transient.isFetchingModels,

@@ -15,12 +15,10 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
-import moe.rukamori.archivetune.constants.DisableBlurKey
 import moe.rukamori.archivetune.constants.QuickPicks
 import moe.rukamori.archivetune.constants.QuickPicksKey
 import moe.rukamori.archivetune.constants.QuickPicksDisplayMode
 import moe.rukamori.archivetune.constants.QuickPicksDisplayModeKey
-import moe.rukamori.archivetune.constants.ShowHomeCategoryChipsKey
 import moe.rukamori.archivetune.db.MusicDatabase
 import moe.rukamori.archivetune.db.entities.Song
 import moe.rukamori.archivetune.extensions.toEnum
@@ -42,7 +40,7 @@ class HomeRepository
     ) {
         val showCategoryChips: Flow<Boolean> =
             context.dataStore.data
-                .map { preferences -> preferences[ShowHomeCategoryChipsKey] ?: true }
+                .map { preferences -> false }
                 .distinctUntilChanged()
 
         val quickPicksDisplayMode: Flow<QuickPicksDisplayMode> =
@@ -58,7 +56,7 @@ class HomeRepository
 
         val showTonalBackdrop: Flow<Boolean> =
             context.dataStore.data
-                .map { preferences -> preferences[DisableBlurKey] != true }
+                .map { preferences -> true }
                 .distinctUntilChanged()
 
         suspend fun loadQuickPickSeeds(limit: Int): List<QuickPickSeed> {

@@ -20,11 +20,9 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
-import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -75,7 +73,6 @@ import moe.rukamori.archivetune.constants.SongSortTypeKey
 import moe.rukamori.archivetune.extensions.toMediaItem
 import moe.rukamori.archivetune.extensions.togglePlayPause
 import moe.rukamori.archivetune.playback.queues.ListQueue
-import moe.rukamori.archivetune.ui.component.DraggableScrollbar
 import moe.rukamori.archivetune.ui.component.EmptyPlaceholder
 import moe.rukamori.archivetune.ui.component.IconButton
 import moe.rukamori.archivetune.ui.component.LocalMenuState
@@ -198,12 +195,6 @@ fun CachePlaylistScreen(
     val transparentAppBar by remember {
         derivedStateOf {
             !selection && !isSearching && !showTopBarTitle
-        }
-    }
-
-    val headerItems by remember {
-        derivedStateOf {
-            if (filteredSongs.isNotEmpty() && !isSearching) 2 else 0
         }
     }
 
@@ -369,18 +360,6 @@ fun CachePlaylistScreen(
                 }
             }
         }
-
-        DraggableScrollbar(
-            modifier =
-                Modifier
-                    .padding(
-                        LocalPlayerAwareWindowInsets.current
-                            .union(WindowInsets.ime)
-                            .asPaddingValues(),
-                    ).align(Alignment.CenterEnd),
-            scrollState = lazyListState,
-            headerItems = headerItems,
-        )
 
         TopAppBar(
             scrollBehavior = scrollBehavior,

@@ -76,9 +76,6 @@ import moe.rukamori.archivetune.LocalDownloadUtil
 import moe.rukamori.archivetune.LocalPlayerConnection
 import moe.rukamori.archivetune.LocalSyncUtils
 import moe.rukamori.archivetune.R
-import moe.rukamori.archivetune.constants.ArtistSeparatorsKey
-import moe.rukamori.archivetune.constants.ExternalDownloaderEnabledKey
-import moe.rukamori.archivetune.constants.ExternalDownloaderPackageKey
 import moe.rukamori.archivetune.constants.ListItemHeight
 import moe.rukamori.archivetune.constants.ListThumbnailSize
 import moe.rukamori.archivetune.constants.SpeedDialSongIdsKey
@@ -97,12 +94,10 @@ import moe.rukamori.archivetune.ui.component.NewActionGrid
 import moe.rukamori.archivetune.ui.utils.ShowMediaInfo
 import moe.rukamori.archivetune.ui.utils.navigateToAlbum
 import moe.rukamori.archivetune.ui.utils.navigateToArtist
-import moe.rukamori.archivetune.utils.ExternalDownloaderLaunchResult
 import moe.rukamori.archivetune.utils.SpeedDialPin
 import moe.rukamori.archivetune.utils.SpeedDialPinType
 import moe.rukamori.archivetune.utils.joinByBullet
 import moe.rukamori.archivetune.utils.makeTimeString
-import moe.rukamori.archivetune.utils.openExternalDownloader
 import moe.rukamori.archivetune.utils.parseSpeedDialPins
 import moe.rukamori.archivetune.utils.rememberPreference
 import moe.rukamori.archivetune.utils.serializeSpeedDialPins
@@ -134,9 +129,7 @@ fun YouTubeSongMenu(
         }
 
     // Artist separators for splitting artist names
-    val (artistSeparators) = rememberPreference(ArtistSeparatorsKey, defaultValue = ",;/&")
-    val (externalDownloaderEnabled) = rememberPreference(ExternalDownloaderEnabledKey, defaultValue = false)
-    val (externalDownloaderPackage) = rememberPreference(ExternalDownloaderPackageKey, defaultValue = "")
+    val artistSeparators = ",;/&"
     val (speedDialSongIds, onSpeedDialSongIdsChange) = rememberPreference(SpeedDialSongIdsKey, "")
     val speedDialPins = remember(speedDialSongIds) { parseSpeedDialPins(speedDialSongIds) }
     val songPin = remember(song.id) { SpeedDialPin(type = SpeedDialPinType.SONG, id = song.id) }
@@ -671,47 +664,6 @@ fun YouTubeSongMenu(
                         }
                     }
 
-                    if (externalDownloaderEnabled) {
-                        HorizontalDivider(
-                            modifier = dividerModifier,
-                            color = MaterialTheme.colorScheme.outlineVariant,
-                        )
-
-                        ListItem(
-                            headlineContent = { Text(text = stringResource(R.string.open_with_downloader)) },
-                            leadingContent = {
-                                Icon(
-                                    painter = painterResource(R.drawable.download),
-                                    contentDescription = null,
-                                )
-                            },
-                            modifier =
-                                Modifier.clickable {
-                                    onDismiss()
-                                    val url = "https://music.youtube.com/watch?v=${song.id}"
-                                    when (context.openExternalDownloader(externalDownloaderPackage, url)) {
-                                        ExternalDownloaderLaunchResult.STARTED -> Unit
-                                        ExternalDownloaderLaunchResult.NOT_CONFIGURED -> {
-                                            Toast
-                                                .makeText(
-                                                    context,
-                                                    context.getString(R.string.external_downloader_not_configured),
-                                                    Toast.LENGTH_LONG,
-                                                ).show()
-                                        }
-                                        ExternalDownloaderLaunchResult.NOT_INSTALLED -> {
-                                            Toast
-                                                .makeText(
-                                                    context,
-                                                    context.getString(R.string.external_downloader_not_installed),
-                                                    Toast.LENGTH_SHORT,
-                                                ).show()
-                                        }
-                                    }
-                                },
-                            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                        )
-                    }
                 }
             }
         }

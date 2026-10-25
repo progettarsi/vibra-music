@@ -41,31 +41,4 @@ class AndroidAutoSettingsUseCases @Inject constructor(
         return network.online && (configuration.meteredArtwork || !network.metered)
     }
 
-    suspend fun setOnlineRecommendations(enabled: Boolean) = repository.setOnlineRecommendations(enabled)
-    suspend fun setOnlineVoiceSearch(enabled: Boolean) = repository.setOnlineVoiceSearch(enabled)
-    suspend fun setLocalSongs(enabled: Boolean) = repository.setLocalSongs(enabled)
-    suspend fun setMeteredPlayback(enabled: Boolean) = repository.setMeteredPlayback(enabled)
-    suspend fun setMeteredArtwork(enabled: Boolean) = repository.setMeteredArtwork(enabled)
-
-    suspend fun setAction(
-        slot: AndroidAutoActionSlot,
-        action: AndroidAutoCustomAction,
-        current: AndroidAutoConfiguration,
-    ) {
-        require(slot == AndroidAutoActionSlot.SECONDARY || action != AndroidAutoCustomAction.NONE)
-        val primary = when {
-            slot == AndroidAutoActionSlot.PRIMARY -> action
-            action != current.primaryAction -> current.primaryAction
-            current.secondaryAction != AndroidAutoCustomAction.NONE -> current.secondaryAction
-            action != AndroidAutoCustomAction.START_RADIO -> AndroidAutoCustomAction.START_RADIO
-            else -> AndroidAutoCustomAction.LIKE
-        }
-        val secondary = when {
-            slot == AndroidAutoActionSlot.SECONDARY -> action
-            action == current.secondaryAction -> current.primaryAction
-            else -> current.secondaryAction
-        }
-        require(primary != AndroidAutoCustomAction.NONE)
-        repository.setActions(primary, secondary)
-    }
 }

@@ -10,54 +10,29 @@
 package moe.rukamori.archivetune.ui.menu
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.AlertDialogDefaults
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -69,21 +44,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import moe.rukamori.archivetune.LocalDatabase
@@ -93,12 +60,21 @@ import moe.rukamori.archivetune.db.entities.Playlist
 import moe.rukamori.archivetune.innertube.YouTube
 import moe.rukamori.archivetune.innertube.utils.hasYouTubeLoginCookie
 import moe.rukamori.archivetune.ui.component.CreatePlaylistDialog
-import moe.rukamori.archivetune.ui.component.DefaultDialog
-import moe.rukamori.archivetune.ui.component.PlaylistListItem
 import moe.rukamori.archivetune.utils.rememberPreference
 import java.time.LocalDateTime
 import java.util.Locale
 
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.foundation.layout.height
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.layout.ContentScale
+import coil3.compose.AsyncImage
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.map
+import moe.rukamori.archivetune.db.entities.PlaylistSongMap
 private fun preferredAddTargetPlaylist(
     current: Playlist,
     candidate: Playlist,
@@ -205,620 +181,191 @@ fun AddToPlaylistDialog(
     onDismiss: () -> Unit,
     onAddComplete: ((songCount: Int, playlistNames: List<String>) -> Unit)? = null,
 ) {
+    if (!isVisible) return
     val database = LocalDatabase.current
-    val coroutineScope = rememberCoroutineScope()
-    val allPlaylists by database.playlistsByCreateDateAsc().collectAsStateWithLifecycle(initialValue = emptyList())
-    val playlistPlayCounts by database.playlistPlayCounts().collectAsStateWithLifecycle(initialValue = emptyList())
-    val (innerTubeCookie) = rememberPreference(InnerTubeCookieKey, "")
-    val isLoggedIn = remember(innerTubeCookie) { hasYouTubeLoginCookie(innerTubeCookie) }
-    var sortOption by rememberSaveable { mutableStateOf(AddToPlaylistSortOption.RECENTLY_CREATED) }
-    var searchQuery by rememberSaveable { mutableStateOf("") }
-    var showSearchField by rememberSaveable { mutableStateOf(false) }
-    val availablePlaylists =
-        remember(allPlaylists) {
-            playlistsForAddToPlaylist(allPlaylists)
-        }
-    val playlists =
-        remember(availablePlaylists, sortOption, searchQuery, playlistPlayCounts) {
-            visiblePlaylistsForAddToPlaylist(
-                playlists = availablePlaylists,
-                sortOption = sortOption,
-                query = searchQuery,
-                playlistPlayCounts = playlistPlayCounts.associate { it.playlistId to it.playCount },
-            )
-        }
-    var showCreatePlaylistDialog by rememberSaveable { mutableStateOf(false) }
-    var showDuplicateDialog by remember { mutableStateOf(false) }
-    var playlistsWithDuplicates by remember { mutableStateOf<List<Playlist>>(emptyList()) }
-    var duplicateSongsMap by remember { mutableStateOf<Map<String, List<String>>>(emptyMap()) }
+    val scope = rememberCoroutineScope()
+    val haptic = LocalHapticFeedback.current
+    val allPlaylists by database.playlistsByUpdatedDateAsc().collectAsStateWithLifecycle(initialValue = emptyList())
+    val songMaps by remember(database) {
+        database.allPlaylistSongMapsForDownloads().map<List<PlaylistSongMap>, List<PlaylistSongMap>?> { it }
+    }.collectAsStateWithLifecycle(initialValue = null)
+    val (cookie) = rememberPreference(InnerTubeCookieKey, "")
+    var query by rememberSaveable { mutableStateOf("") }
+    var showCreate by rememberSaveable { mutableStateOf(false) }
     var songIds by remember { mutableStateOf<List<String>?>(null) }
-    var selectedPlaylistIds by remember { mutableStateOf<Set<String>>(emptySet()) }
-    var isAddingToPlaylist by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf(false) }
+    var retry by remember { mutableStateOf(0) }
+    var busy by remember { mutableStateOf(false) }
+    val available = remember(allPlaylists) { playlistsForAddToPlaylist(allPlaylists).filter { it.playlist.isEditable } }
+    val visible = remember(available, query) {
+        visiblePlaylistsForAddToPlaylist(available, AddToPlaylistSortOption.RECENTLY_MODIFIED, query)
+    }
+    LaunchedEffect(retry) {
+        error = false
+        try {
+            songIds = withContext(Dispatchers.IO) { onGetSong().distinct() }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            error = true
+        }
+    }
 
-    suspend fun addSongsToPlaylistSafely(
-        playlist: Playlist,
-        requestedSongIds: List<String>,
-    ): Int {
-        if (requestedSongIds.isEmpty()) return 0
+    LaunchedEffect(available.size) { if (available.size <= 8) query = "" }
 
+    // Each successful remote mutation is persisted immediately. A later failure never
+    // pretends that the entire batch succeeded, and a retry only changes missing entries.
+    suspend fun toggleMembership(playlist: Playlist, remove: Boolean): Int = withContext(Dispatchers.IO) {
+        val ids = songIds.orEmpty().toSet()
         val browseId = playlist.playlist.browseId
-        if (isLoggedIn && browseId != null) {
-            val acceptedSongEntries = mutableListOf<Pair<String, String?>>()
-            requestedSongIds.forEach { songId ->
-                var remoteAdded = false
-                var addedSetVideoId: String? = null
-                for (attempt in 0 until 3) {
-                    val result = YouTube.addToPlaylist(browseId, songId)
-                    if (result.isSuccess) {
-                        remoteAdded = true
-                        addedSetVideoId = result.getOrNull()
-                        break
+        check(browseId == null || hasYouTubeLoginCookie(cookie))
+        var added = 0
+        if (remove) {
+            val entries = database.getPlaylistSongs(playlist.id).filter { it.map.songId in ids }
+                .sortedByDescending { it.map.position }
+            entries.forEach { entry ->
+                if (browseId != null) removeSongFromRemotePlaylist(browseId, entry.map).getOrThrow()
+                database.withTransaction {
+                    move(playlist.id, entry.map.position, Int.MAX_VALUE)
+                    delete(entry.map.copy(position = Int.MAX_VALUE))
+                    update(playlist.playlist.copy(lastUpdateTime = LocalDateTime.now()))
+                }
+            }
+        } else {
+            ids.forEach { songId ->
+                if (database.checkInPlaylist(playlist.id, songId) == 0) {
+                    val setVideoId = browseId?.let { YouTube.addToPlaylist(it, songId).getOrThrow() }
+                    database.withTransaction {
+                        val current = getPlaylistById(playlist.id) ?: kotlin.error("Playlist removed")
+                        addSongEntriesToPlaylist(current, listOf(songId to setVideoId))
                     }
-                    if (attempt < 2) delay(250)
-                }
-                if (remoteAdded) {
-                    acceptedSongEntries += songId to addedSetVideoId
+                    added++
                 }
             }
-            if (acceptedSongEntries.isNotEmpty()) {
-                database.addSongEntriesToPlaylist(playlist, acceptedSongEntries)
+        }
+        added
+    }
+
+    ModalBottomSheet(onDismissRequest = { if (!busy) onDismiss() }) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp)) {
+            Text(stringResource(R.string.add_to_playlist), style = MaterialTheme.typography.headlineSmall)
+            Spacer(Modifier.height(16.dp))
+            Button(
+                onClick = { showCreate = true },
+                enabled = !busy,
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.extraLarge,
+            ) { Text(stringResource(R.string.new_playlist)) }
+            if (available.size > 8) {
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    label = { Text(stringResource(R.string.search)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                    shape = MaterialTheme.shapes.extraLarge,
+                )
             }
-            return acceptedSongEntries.size
-        }
-
-        database.addSongToPlaylist(playlist, requestedSongIds)
-        return requestedSongIds.size
-    }
-
-    LaunchedEffect(isVisible) {
-        if (isVisible) {
-            songIds = null
-            selectedPlaylistIds = emptySet()
-            isAddingToPlaylist = false
-            showDuplicateDialog = false
-            playlistsWithDuplicates = emptyList()
-            duplicateSongsMap = emptyMap()
-            searchQuery = ""
-            showSearchField = false
-            sortOption = AddToPlaylistSortOption.RECENTLY_CREATED
-        }
-    }
-
-    LaunchedEffect(availablePlaylists) {
-        if (selectedPlaylistIds.isEmpty()) return@LaunchedEffect
-
-        val availableIds = availablePlaylists.mapTo(linkedSetOf()) { it.id }
-        val nextSelection = selectedPlaylistIds.filterTo(linkedSetOf()) { it in availableIds }
-        if (nextSelection != selectedPlaylistIds) {
-            selectedPlaylistIds = nextSelection
-        }
-    }
-
-    if (isVisible) {
-        Dialog(
-            onDismissRequest = onDismiss,
-            properties = DialogProperties(usePlatformDefaultWidth = false),
-        ) {
-            BoxWithConstraints(
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .padding(24.dp)
-                        .imePadding()
-                        .navigationBarsPadding(),
-                contentAlignment = Alignment.Center,
+            if (error) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(stringResource(R.string.error_unknown), modifier = Modifier.weight(1f))
+                    TextButton(onClick = { retry++ }) { Text(stringResource(R.string.retry)) }
+                }
+            }
+            if (songIds == null || songMaps == null || busy) {
+                CircularProgressIndicator(Modifier.padding(16.dp).size(24.dp))
+            }
+            LazyColumn(
+                modifier = Modifier.fillMaxWidth().heightIn(max = 480.dp),
+                contentPadding = PaddingValues(top = 12.dp, bottom = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Surface(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .widthIn(max = 560.dp)
-                            .heightIn(max = maxHeight),
-                    shape = AlertDialogDefaults.shape,
-                    color = AlertDialogDefaults.containerColor,
-                    tonalElevation = AlertDialogDefaults.TonalElevation,
-                ) {
-                    Column(modifier = Modifier.fillMaxWidth()) {
-                        Column(
-                            modifier = Modifier.padding(start = 24.dp, end = 16.dp, top = 24.dp, bottom = 16.dp),
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            ) {
-                                Box(
-                                    contentAlignment = Alignment.Center,
-                                    modifier =
-                                        Modifier
-                                            .size(40.dp)
-                                            .clip(CircleShape)
-                                            .background(MaterialTheme.colorScheme.secondaryContainer),
-                                ) {
-                                    Icon(
-                                        painter = painterResource(R.drawable.playlist_add),
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                                        modifier = Modifier.size(22.dp),
-                                    )
-                                }
-
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = stringResource(R.string.add_to_playlist),
-                                        style = MaterialTheme.typography.titleLarge,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = MaterialTheme.colorScheme.onSurface,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                    if (selectedPlaylistIds.isNotEmpty()) {
-                                        Text(
-                                            text =
-                                                pluralStringResource(
-                                                    R.plurals.n_selected,
-                                                    selectedPlaylistIds.size,
-                                                    selectedPlaylistIds.size,
-                                                ),
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.primary,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                        )
-                                    }
-                                }
-
-                                IconButton(
-                                    onClick = {
-                                        if (showSearchField) {
-                                            showSearchField = false
-                                            searchQuery = ""
-                                        } else {
-                                            showSearchField = true
-                                        }
-                                    },
-                                ) {
-                                    Icon(
-                                        painter =
-                                            painterResource(
-                                                if (showSearchField) R.drawable.close else R.drawable.search,
-                                            ),
-                                        contentDescription =
-                                            stringResource(
-                                                if (showSearchField) R.string.close else R.string.search,
-                                            ),
-                                    )
-                                }
-                            }
-
-                            AnimatedVisibility(visible = showSearchField) {
-                                TextField(
-                                    value = searchQuery,
-                                    onValueChange = { searchQuery = it },
-                                    singleLine = true,
-                                    placeholder = { Text(stringResource(R.string.search)) },
-                                    leadingIcon = {
-                                        Icon(
-                                            painter = painterResource(R.drawable.search),
-                                            contentDescription = null,
-                                        )
-                                    },
-                                    trailingIcon = {
-                                        if (searchQuery.isNotBlank()) {
-                                            IconButton(onClick = { searchQuery = "" }) {
-                                                Icon(
-                                                    painter = painterResource(R.drawable.close),
-                                                    contentDescription = stringResource(R.string.close),
-                                                )
-                                            }
-                                        }
-                                    },
-                                    keyboardOptions =
-                                        KeyboardOptions(
-                                            imeAction = ImeAction.Search,
-                                        ),
-                                    colors =
-                                        TextFieldDefaults.colors(
-                                            focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                                            disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                                            focusedIndicatorColor = Color.Transparent,
-                                            unfocusedIndicatorColor = Color.Transparent,
-                                        ),
-                                    shape = RoundedCornerShape(18.dp),
-                                    modifier =
-                                        Modifier
-                                            .fillMaxWidth()
-                                            .padding(top = 16.dp, end = 8.dp),
-                                )
-                            }
-                        }
-
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-
-                        LazyColumn(
-                            modifier =
-                                Modifier
-                                    .fillMaxWidth()
-                                    .weight(1f, fill = false),
-                            contentPadding = PaddingValues(bottom = 8.dp),
-                        ) {
-                            item(contentType = "sort") {
-                                Row(
-                                    modifier =
-                                        Modifier
-                                            .fillMaxWidth()
-                                            .horizontalScroll(rememberScrollState())
-                                            .padding(horizontal = 20.dp, vertical = 12.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                ) {
-                                    AddToPlaylistSortChip(
-                                        label = stringResource(R.string.sort_by_last_updated),
-                                        selected = sortOption == AddToPlaylistSortOption.RECENTLY_MODIFIED,
-                                        onClick = { sortOption = AddToPlaylistSortOption.RECENTLY_MODIFIED },
-                                    )
-                                    AddToPlaylistSortChip(
-                                        label = stringResource(R.string.sort_by_create_date),
-                                        selected = sortOption == AddToPlaylistSortOption.RECENTLY_CREATED,
-                                        onClick = { sortOption = AddToPlaylistSortOption.RECENTLY_CREATED },
-                                    )
-                                    AddToPlaylistSortChip(
-                                        label = stringResource(R.string.sort_by_most_played),
-                                        selected = sortOption == AddToPlaylistSortOption.MOST_PLAYED,
-                                        onClick = { sortOption = AddToPlaylistSortOption.MOST_PLAYED },
-                                    )
-                                }
-                            }
-
-                            item(contentType = "create") {
-                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
-
-                                ListItem(
-                                    headlineContent = {
-                                        Text(
-                                            text = stringResource(R.string.create_playlist),
-                                            fontWeight = FontWeight.Medium,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                        )
-                                    },
-                                    leadingContent = {
-                                        Box(
-                                            contentAlignment = Alignment.Center,
-                                            modifier =
-                                                Modifier
-                                                    .size(44.dp)
-                                                    .clip(RoundedCornerShape(12.dp))
-                                                    .background(MaterialTheme.colorScheme.primaryContainer),
-                                        ) {
-                                            Icon(
-                                                painter = painterResource(R.drawable.add),
-                                                contentDescription = null,
-                                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                                                modifier = Modifier.size(20.dp),
-                                            )
-                                        }
-                                    },
-                                    modifier =
-                                        Modifier
-                                            .fillMaxWidth()
-                                            .clickable { showCreatePlaylistDialog = true }
-                                            .padding(horizontal = 8.dp),
-                                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                                )
-                            }
-
-                            item(contentType = "playlistDivider") {
-                                HorizontalDivider(
-                                    modifier = Modifier.padding(horizontal = 20.dp),
-                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
-                                )
-                            }
-
-                            if (playlists.isNotEmpty()) {
-                                items(
-                                    items = playlists,
-                                    key = { it.id },
-                                    contentType = { "playlist" },
-                                ) { playlist ->
-                                    val isSelected = selectedPlaylistIds.contains(playlist.id)
-                                    val rowBackground by animateColorAsState(
-                                        targetValue =
-                                            if (isSelected) {
-                                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
-                                            } else {
-                                                Color.Transparent
-                                            },
-                                        animationSpec = tween(durationMillis = 180),
-                                        label = "rowBackground",
-                                    )
-
-                                    Row(
-                                        modifier =
-                                            Modifier
-                                                .fillMaxWidth()
-                                                .background(rowBackground)
-                                                .clickable(enabled = !isAddingToPlaylist) {
-                                                    selectedPlaylistIds =
-                                                        if (isSelected) {
-                                                            selectedPlaylistIds - playlist.id
-                                                        } else {
-                                                            selectedPlaylistIds + playlist.id
-                                                        }
-                                                },
-                                        verticalAlignment = Alignment.CenterVertically,
-                                    ) {
-                                        PlaylistListItem(
-                                            playlist = playlist,
-                                            modifier = Modifier.weight(1f),
-                                        )
-
-                                        Checkbox(
-                                            checked = isSelected,
-                                            onCheckedChange = null,
-                                            modifier = Modifier.padding(end = 12.dp),
-                                        )
-                                    }
-                                }
-                            } else {
-                                item(contentType = "empty") {
-                                    Box(
-                                        contentAlignment = Alignment.Center,
-                                        modifier =
-                                            Modifier
-                                                .fillMaxWidth()
-                                                .heightIn(min = 96.dp)
-                                                .padding(horizontal = 24.dp, vertical = 16.dp),
-                                    ) {
-                                        Text(
-                                            text =
-                                                if (searchQuery.isBlank()) {
-                                                    stringResource(R.string.no_playlists_yet)
-                                                } else {
-                                                    stringResource(R.string.no_matching_playlists)
-                                                },
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            textAlign = TextAlign.Center,
-                                        )
+                items(visible, key = { it.id }) { playlist ->
+                    val ids = songIds.orEmpty()
+                    val members = songMaps.orEmpty().filter { it.playlistId == playlist.id }.map { it.songId }.toSet()
+                    val checked = ids.isNotEmpty() && ids.all { it in members }
+                    PlaylistMembershipRow(
+                        playlist = playlist,
+                        checked = checked,
+                        enabled = !busy && songIds != null && songMaps != null && ids.isNotEmpty(),
+                        onClick = {
+                            if (!busy && songIds != null && songMaps != null && ids.isNotEmpty()) {
+                                busy = true
+                                error = false
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                scope.launch {
+                                    try {
+                                        val added = toggleMembership(playlist, checked)
+                                        if (added > 0) onAddComplete?.invoke(added, listOf(playlist.playlist.name))
+                                    } catch (cancelled: CancellationException) {
+                                        throw cancelled
+                                    } catch (_: Exception) {
+                                        error = true
+                                    } finally {
+                                        busy = false
                                     }
                                 }
                             }
-                        }
-
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-
-                        FlowRow(
-                            modifier =
-                                Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            TextButton(onClick = onDismiss, shapes = ButtonDefaults.shapes()) {
-                                Text(stringResource(android.R.string.cancel))
-                            }
-
-                            Button(
-                                enabled = selectedPlaylistIds.isNotEmpty() && !isAddingToPlaylist,
-                                onClick = {
-                                    val selectedPlaylistIdsSnapshot = selectedPlaylistIds
-                                    isAddingToPlaylist = true
-                                    coroutineScope.launch {
-                                        val currentSongIds =
-                                            withContext(Dispatchers.IO) {
-                                                songIds ?: onGetSong()
-                                            }
-
-                                        if (currentSongIds.isNullOrEmpty()) {
-                                            isAddingToPlaylist = false
-                                            onDismiss()
-                                            return@launch
-                                        }
-                                        songIds = currentSongIds
-
-                                        val selectedPlaylists = availablePlaylists.filter { it.id in selectedPlaylistIdsSnapshot }
-                                        if (selectedPlaylists.isEmpty()) {
-                                            isAddingToPlaylist = false
-                                            onDismiss()
-                                            return@launch
-                                        }
-
-                                        val (withDuplicates, duplicatesMap, successfullyAddedPlaylistIds) =
-                                            withContext(Dispatchers.IO) {
-                                                val tempDuplicatesMap = mutableMapOf<String, List<String>>()
-                                                val addedPlaylistIds = mutableSetOf<String>()
-
-                                                val (playlistsWithDups, playlistsWithoutDups) =
-                                                    selectedPlaylists.partition { playlist ->
-                                                        val dups = database.playlistDuplicates(playlist.id, currentSongIds)
-                                                        if (dups.isNotEmpty()) {
-                                                            tempDuplicatesMap[playlist.id] = dups
-                                                            true
-                                                        } else {
-                                                            false
-                                                        }
-                                                    }
-
-                                                playlistsWithoutDups.forEach { playlist ->
-                                                    val addedCount = addSongsToPlaylistSafely(playlist, currentSongIds)
-                                                    if (addedCount > 0) {
-                                                        addedPlaylistIds += playlist.id
-                                                    }
-                                                }
-                                                Triple(playlistsWithDups, tempDuplicatesMap, addedPlaylistIds)
-                                            }
-
-                                        isAddingToPlaylist = false
-
-                                        val addedPlaylistNames =
-                                            selectedPlaylists
-                                                .filter { successfullyAddedPlaylistIds.contains(it.id) }
-                                                .map { it.playlist.name }
-                                        if (addedPlaylistNames.isNotEmpty()) {
-                                            onAddComplete?.invoke(currentSongIds.size, addedPlaylistNames)
-                                        }
-
-                                        if (withDuplicates.isNotEmpty()) {
-                                            playlistsWithDuplicates = withDuplicates
-                                            duplicateSongsMap = duplicatesMap
-                                            showDuplicateDialog = true
-                                        }
-                                        onDismiss()
-                                    }
-                                },
-                                contentPadding = ButtonDefaults.ButtonWithIconContentPadding,
-                                shapes = ButtonDefaults.shapes(),
-                            ) {
-                                if (isAddingToPlaylist) {
-                                    CircularWavyProgressIndicator(
-                                        modifier = Modifier.size(16.dp),
-                                        color = MaterialTheme.colorScheme.onPrimary,
-                                    )
-                                } else {
-                                    Icon(
-                                        painter = painterResource(R.drawable.done),
-                                        contentDescription = null,
-                                        modifier = Modifier.size(ButtonDefaults.IconSize),
-                                    )
-                                    Spacer(modifier = Modifier.width(ButtonDefaults.IconSpacing))
-                                    Text(
-                                        text =
-                                            if (selectedPlaylistIds.size > 1) {
-                                                stringResource(R.string.add_to_n_playlists, selectedPlaylistIds.size)
-                                            } else {
-                                                stringResource(R.string.add)
-                                            },
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                }
-                            }
-                        }
-                    }
+                        },
+                    )
                 }
             }
         }
     }
-
-    if (showCreatePlaylistDialog) {
+    if (showCreate) {
         CreatePlaylistDialog(
-            onDismiss = { showCreatePlaylistDialog = false },
+            onDismiss = { showCreate = false },
             initialTextFieldValue = initialTextFieldValue,
             allowSyncing = allowSyncing,
         )
     }
-
-    if (showDuplicateDialog) {
-        val totalDuplicates =
-            duplicateSongsMap.values
-                .flatten()
-                .distinct()
-                .size
-        DefaultDialog(
-            title = { Text(stringResource(R.string.duplicates)) },
-            buttons = {
-                TextButton(
-                    onClick = {
-                        coroutineScope.launch(Dispatchers.IO) {
-                            var totalAdded = 0
-                            val names = mutableListOf<String>()
-                            playlistsWithDuplicates.forEach { playlist ->
-                                val duplicatesForThisPlaylist = duplicateSongsMap[playlist.id] ?: emptyList()
-                                val songsToAdd = songIds!!.filter { it !in duplicatesForThisPlaylist }
-                                val addedCount = addSongsToPlaylistSafely(playlist, songsToAdd)
-                                if (addedCount > 0) {
-                                    totalAdded += addedCount
-                                    names += playlist.playlist.name
-                                }
-                            }
-                            if (totalAdded > 0) {
-                                withContext(Dispatchers.Main) {
-                                    onAddComplete?.invoke(totalAdded, names)
-                                }
-                            }
-                        }
-                        showDuplicateDialog = false
-                        onDismiss()
-                    },
-                    shapes = ButtonDefaults.shapes(),
-                ) {
-                    Text(stringResource(R.string.skip_duplicates))
-                }
-
-                TextButton(
-                    onClick = {
-                        coroutineScope.launch(Dispatchers.IO) {
-                            var totalAdded = 0
-                            val names = mutableListOf<String>()
-                            playlistsWithDuplicates.forEach { playlist ->
-                                val addedCount = addSongsToPlaylistSafely(playlist, songIds!!)
-                                if (addedCount > 0) {
-                                    totalAdded += addedCount
-                                    names += playlist.playlist.name
-                                }
-                            }
-                            if (totalAdded > 0) {
-                                withContext(Dispatchers.Main) {
-                                    onAddComplete?.invoke(totalAdded, names)
-                                }
-                            }
-                        }
-                        showDuplicateDialog = false
-                        onDismiss()
-                    },
-                    shapes = ButtonDefaults.shapes(),
-                ) {
-                    Text(stringResource(R.string.add_anyway))
-                }
-
-                TextButton(onClick = { showDuplicateDialog = false }, shapes = ButtonDefaults.shapes()) {
-                    Text(stringResource(android.R.string.cancel))
-                }
-            },
-            onDismiss = { showDuplicateDialog = false },
-        ) {
-            Text(
-                text =
-                    if (totalDuplicates == 1) {
-                        stringResource(R.string.duplicates_description_single)
-                    } else {
-                        stringResource(R.string.duplicates_description_multiple, totalDuplicates)
-                    },
-                textAlign = TextAlign.Start,
-                modifier = Modifier.align(Alignment.Start),
-            )
-        }
-    }
 }
 
+/** Shared picker row for saved-song membership and the import-to-playlist workflow. */
 @Composable
-private fun AddToPlaylistSortChip(
-    label: String,
-    selected: Boolean,
+internal fun PlaylistMembershipRow(
+    playlist: Playlist,
+    checked: Boolean,
+    enabled: Boolean = true,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    minHeight: Dp = 40.dp,
 ) {
-    FilterChip(
-        selected = selected,
+    Surface(
         onClick = onClick,
-        label = { Text(label) },
-        leadingIcon = {
-            if (selected) {
-                Icon(
-                    painter = painterResource(R.drawable.done),
-                    contentDescription = null,
-                    modifier = Modifier.size(FilterChipDefaults.IconSize),
-                )
-            }
-        },
-        modifier = modifier.heightIn(min = minHeight),
-        shape = RoundedCornerShape(16.dp),
-        border = null,
-        colors =
-            FilterChipDefaults.filterChipColors(
-                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-            ),
-    )
+        enabled = enabled,
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        shape = MaterialTheme.shapes.large,
+    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            Box(
+                                Modifier.size(48.dp).clip(RoundedCornerShape(12.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                if (playlist.thumbnails.isNotEmpty()) {
+                                    AsyncImage(
+                                        model = playlist.thumbnails.first(), contentDescription = null,
+                                        contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize(),
+                                    )
+                                } else {
+                                    Icon(painterResource(R.drawable.queue_music), contentDescription = null)
+                                }
+                            }
+                            Column(Modifier.weight(1f)) {
+                                Text(playlist.playlist.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(
+                                    pluralStringResource(R.plurals.n_song, playlist.songCount, playlist.songCount),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            AnimatedVisibility(visible = checked, enter = androidx.compose.animation.fadeIn(app.vibra.ui.motion.Liquid.effects()), exit = androidx.compose.animation.fadeOut(app.vibra.ui.motion.Liquid.effects())) {
+                                Icon(painterResource(R.drawable.check), contentDescription = stringResource(R.string.playlist_membership_selected))
+                            }
+                        }
+
+    }
 }

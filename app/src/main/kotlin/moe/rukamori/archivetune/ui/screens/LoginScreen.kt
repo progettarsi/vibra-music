@@ -8,6 +8,9 @@
 package moe.rukamori.archivetune.ui.screens
 
 import android.annotation.SuppressLint
+import android.graphics.Bitmap
+import android.webkit.RenderProcessGoneDetail
+import android.webkit.WebResourceError
 import android.content.Intent
 import android.net.Uri
 import android.webkit.CookieManager
@@ -15,8 +18,23 @@ import android.webkit.JavascriptInterface
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import android.widget.Toast
+import kotlinx.coroutines.delay
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.unit.dp
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.TextButton
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -26,6 +44,11 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -42,6 +65,7 @@ import moe.rukamori.archivetune.ui.utils.backToMain
 import moe.rukamori.archivetune.utils.resetAuthWebViewSession
 import moe.rukamori.archivetune.viewmodels.LoginScreenState
 import moe.rukamori.archivetune.viewmodels.LoginViewModel
+import moe.rukamori.archivetune.viewmodels.LoginError
 
 const val LOGIN_ROUTE = "login"
 const val LOGIN_URL_ARGUMENT = "url"
@@ -79,12 +103,17 @@ fun LoginScreen(
     val context = LocalContext.current
 
     val screenState by viewModel.screenState.collectAsStateWithLifecycle()
-    val loginSuccessMessage = stringResource(R.string.login_success)
-    var webView: WebView? = null
+    val loginSuccessMessage = stringResource(R.string.onboarding_profile_loaded)
+    var webView by remember { mutableStateOf<WebView?>(null) }
+    var webViewCanGoBack by remember { mutableStateOf(false) }
+    var pageLoading by remember { mutableStateOf(true) }
+    var pageError by remember { mutableStateOf(false) }
+    var webViewGeneration by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(screenState, loginSuccessMessage) {
         if (screenState is LoginScreenState.Success) {
-            Toast.makeText(context, loginSuccessMessage, Toast.LENGTH_SHORT).show()
+            // Vibra: keep the loaded profile visible briefly before completing onboarding.
+            delay(1_000)
             if (onLoginComplete != null) {
                 onLoginComplete()
             } else {
@@ -93,62 +122,7 @@ fun LoginScreen(
         }
     }
 
-    AndroidView(
-        modifier =
-            Modifier
-                .windowInsetsPadding(LocalPlayerAwareWindowInsets.current)
-                .fillMaxSize(),
-        factory = { context ->
-            WebView(context).apply {
-                val cookieManager = CookieManager.getInstance()
-                webViewClient =
-                    YouTubeLoginWebViewClient(
-                        cookieManager = cookieManager,
-                        onCookiesCaptured = viewModel::onCookiesCaptured,
-                    )
-                settings.apply {
-                    javaScriptEnabled = true
-                    setSupportZoom(true)
-                    builtInZoomControls = true
-                    displayZoomControls = false
-                }
-                val loginWebView = this
-                addJavascriptInterface(
-                    object {
-                        @JavascriptInterface
-                        fun onRetrieveVisitorData(newVisitorData: String?) {
-                            loginWebView.post {
-                                viewModel.onVisitorDataExtracted(newVisitorData)
-                            }
-                        }
-
-                        @JavascriptInterface
-                        fun onRetrieveDataSyncId(newDataSyncId: String?) {
-                            loginWebView.post {
-                                viewModel.onDataSyncIdExtracted(newDataSyncId)
-                            }
-                        }
-
-                    },
-                    "Android",
-                )
-                webView = this
-                resetAuthWebViewSession(context, this, clearCookies = true) {
-                    loadUrl(startUrl?.takeIf { it.isNotBlank() } ?: DEFAULT_LOGIN_URL)
-                }
-            }
-        },
-        onRelease = { releasedWebView ->
-            (releasedWebView.webViewClient as? YouTubeLoginWebViewClient)?.release(releasedWebView)
-            releasedWebView.removeJavascriptInterface("Android")
-            releasedWebView.stopLoading()
-            releasedWebView.destroy()
-            if (webView === releasedWebView) {
-                webView = null
-            }
-        },
-    )
-
+    Scaffold(topBar = {
     TopAppBar(
         title = { Text(stringResource(R.string.login)) },
         navigationIcon = {
@@ -170,13 +144,133 @@ fun LoginScreen(
             ) {
                 Icon(
                     painterResource(R.drawable.arrow_back),
-                    contentDescription = null,
+                    contentDescription = stringResource(R.string.back_button_desc),
                 )
             }
         },
     )
+    }) { padding ->
+        Box(Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize()) {
+            // A crashed renderer cannot be reused: a new generation recreates the WebView.
+            key(webViewGeneration) {
+            AndroidView(
+                modifier =
+                    Modifier
+                        .windowInsetsPadding(LocalPlayerAwareWindowInsets.current.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom))
+                        .fillMaxSize(),
+                factory = { context ->
+                    WebView(context).apply {
+                        val cookieManager = CookieManager.getInstance()
+                        webViewClient =
+                            YouTubeLoginWebViewClient(
+                                cookieManager = cookieManager,
+                                onCookiesCaptured = viewModel::onCookiesCaptured,
+                                onHistoryChanged = { webViewCanGoBack = it },
+                                onPageLoadingChanged = { loading ->
+                                    pageLoading = loading
+                                    if (loading) pageError = false
+                                },
+                                onMainFrameError = { pageError = true },
+                        onRenderProcessGone = {
+                            pageError = true
+                            webViewGeneration++
+                        },
+                            )
+                        settings.apply {
+                            javaScriptEnabled = true
+                            domStorageEnabled = true
+                            setSupportZoom(true)
+                            builtInZoomControls = true
+                            displayZoomControls = false
+                        }
+                        val loginWebView = this
+                        addJavascriptInterface(
+                            object {
+                                @JavascriptInterface
+                                fun onRetrieveVisitorData(newVisitorData: String?) {
+                                    loginWebView.post {
+                                        viewModel.onVisitorDataExtracted(newVisitorData)
+                                    }
+                                }
 
-    BackHandler(enabled = onNavigateBack != null || webView?.canGoBack() == true) {
+                                @JavascriptInterface
+                                fun onRetrieveDataSyncId(newDataSyncId: String?) {
+                                    loginWebView.post {
+                                        viewModel.onDataSyncIdExtracted(newDataSyncId)
+                                    }
+                                }
+
+                            },
+                            "Android",
+                        )
+                        webView = this
+                        resetAuthWebViewSession(context, this, clearCookies = true) {
+                            loadUrl(startUrl?.takeIf { it.isNotBlank() } ?: DEFAULT_LOGIN_URL)
+                        }
+                    }
+                },
+                onRelease = { releasedWebView ->
+                    (releasedWebView.webViewClient as? YouTubeLoginWebViewClient)?.release(releasedWebView)
+                    releasedWebView.removeJavascriptInterface("Android")
+                    releasedWebView.stopLoading()
+                    releasedWebView.destroy()
+                    if (webView === releasedWebView) {
+                        webView = null
+                    }
+                },
+            )
+            }
+            val loadedProfile = (screenState as? LoginScreenState.Success)?.account
+            if (loadedProfile != null) {
+                Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                    Column(
+                        modifier = Modifier.padding(24.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Text(loginSuccessMessage, style = MaterialTheme.typography.headlineSmall)
+                        if (loadedProfile.name.isNotBlank()) {
+                            Text(loadedProfile.name, style = MaterialTheme.typography.titleMedium)
+                        }
+                    }
+                }
+            }
+            if (loadedProfile == null && (pageLoading || screenState is LoginScreenState.Loading)) {
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            }
+        }
+    }
+
+    val loginError = (screenState as? LoginScreenState.Error)?.error
+    if (pageError || loginError != null) {
+        val dismiss = {
+            pageError = false
+            viewModel.dismissError()
+        }
+        AlertDialog(
+            onDismissRequest = dismiss,
+            title = { Text(stringResource(R.string.login)) },
+            text = { Text(stringResource(when {
+                pageError -> R.string.login_page_error
+                loginError == LoginError.MissingDataSyncId -> R.string.login_context_error
+                else -> R.string.login_account_error
+            })) },
+            confirmButton = {
+                TextButton(onClick = {
+                    pageError = false
+                    if (loginError != null) viewModel.retryLogin() else webView?.reload()
+                }) { Text(stringResource(R.string.retry)) }
+            },
+            dismissButton = {
+                TextButton(onClick = dismiss) { Text(stringResource(android.R.string.cancel)) }
+            },
+        )
+    }
+
+
+
+
+    BackHandler(enabled = onNavigateBack != null || webViewCanGoBack) {
         if (webView?.canGoBack() == true) {
             webView?.goBack()
         } else {
@@ -188,9 +282,37 @@ fun LoginScreen(
 private class YouTubeLoginWebViewClient(
     private val cookieManager: CookieManager,
     private val onCookiesCaptured: (String) -> Unit,
+    private val onHistoryChanged: (Boolean) -> Unit,
+    private val onPageLoadingChanged: (Boolean) -> Unit,
+    private val onMainFrameError: () -> Unit,
+    private val onRenderProcessGone: () -> Unit,
 ) : WebViewClient() {
     private var extractionRunnable: Runnable? = null
     private var lastCapturedCookie: String? = null
+
+    override fun onPageStarted(view: WebView, url: String?, favicon: Bitmap?) {
+        super.onPageStarted(view, url, favicon)
+        onPageLoadingChanged(true)
+        onHistoryChanged(view.canGoBack())
+    }
+
+    override fun onRenderProcessGone(
+        view: WebView,
+        detail: RenderProcessGoneDetail,
+    ): Boolean {
+        // Handled: the screen shows the error and recreates the WebView instead of the
+        // whole app being killed with the renderer.
+        onRenderProcessGone()
+        return true
+    }
+
+    override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
+        super.onReceivedError(view, request, error)
+        if (request.isForMainFrame) {
+            onPageLoadingChanged(false)
+            onMainFrameError()
+        }
+    }
 
     override fun shouldOverrideUrlLoading(
         view: WebView,
@@ -212,6 +334,8 @@ private class YouTubeLoginWebViewClient(
         url: String?,
     ) {
         super.onPageFinished(view, url)
+        onPageLoadingChanged(false)
+        onHistoryChanged(view.canGoBack())
         scheduleLoginContextExtraction(view, url)
     }
 
@@ -221,6 +345,7 @@ private class YouTubeLoginWebViewClient(
         isReload: Boolean,
     ) {
         super.doUpdateVisitedHistory(view, url, isReload)
+        onHistoryChanged(view.canGoBack())
         scheduleLoginContextExtraction(view, url)
     }
 

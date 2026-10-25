@@ -55,7 +55,6 @@ import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MediumFlexibleTopAppBar
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SearchBar
@@ -223,7 +222,7 @@ private fun DownloadLibraryScreenContent(
 
     Scaffold(
         modifier = Modifier.fillMaxSize().nestedScroll(scrollBehavior.nestedScrollConnection),
-        containerColor = MaterialTheme.colorScheme.surface,
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             AnimatedContent(
                 targetState = isSearchActive,
@@ -276,16 +275,7 @@ private fun DownloadLibraryScreenContent(
                     ) {}
                 } else {
                     Column {
-                        MediumFlexibleTopAppBar(
-                            title = {
-                                Text(
-                                    text = stringResource(R.string.downloads),
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            },
-                            navigationIcon = {
+                        moe.rukamori.archivetune.ui.component.EnginePageTopBar(title = stringResource(R.string.downloads), navigationIcon = {
                                 moe.rukamori.archivetune.ui.component.IconButton(
                                     onClick = onBack,
                                     onLongClick = onBackToMain,
@@ -295,8 +285,7 @@ private fun DownloadLibraryScreenContent(
                                         contentDescription = null,
                                     )
                                 }
-                            },
-                            actions = {
+                            }, actions = {
                                 DownloadSortMenu(
                                     sortField = sort.field,
                                     sortOrder = sort.order,
@@ -309,14 +298,7 @@ private fun DownloadLibraryScreenContent(
                                         contentDescription = stringResource(R.string.search),
                                     )
                                 }
-                            },
-                            colors =
-                                TopAppBarDefaults.topAppBarColors(
-                                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
-                                    scrolledContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f),
-                                ),
-                            scrollBehavior = scrollBehavior,
-                        )
+                            }, scrollBehavior = scrollBehavior)
                         DownloadTabs(
                             tabs = tabs,
                             pagerState = pagerState,

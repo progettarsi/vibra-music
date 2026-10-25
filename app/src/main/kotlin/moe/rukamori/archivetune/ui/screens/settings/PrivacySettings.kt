@@ -9,6 +9,8 @@
 
 package moe.rukamori.archivetune.ui.screens.settings
 
+import moe.rukamori.archivetune.ui.component.IconButton
+import moe.rukamori.archivetune.ui.utils.backToMain
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.only
@@ -24,7 +26,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -41,15 +42,12 @@ import moe.rukamori.archivetune.LocalDatabase
 import moe.rukamori.archivetune.LocalPlayerAwareWindowInsets
 import moe.rukamori.archivetune.R
 import moe.rukamori.archivetune.constants.DisableScreenshotKey
-import moe.rukamori.archivetune.constants.EnableHapticFeedbackKey
 import moe.rukamori.archivetune.constants.PauseListenHistoryKey
 import moe.rukamori.archivetune.constants.PauseSearchHistoryKey
 import moe.rukamori.archivetune.ui.component.DefaultDialog
-import moe.rukamori.archivetune.ui.component.IconButton
 import moe.rukamori.archivetune.ui.component.PreferenceEntry
 import moe.rukamori.archivetune.ui.component.PreferenceGroup
 import moe.rukamori.archivetune.ui.component.SwitchPreference
-import moe.rukamori.archivetune.ui.utils.backToMain
 import moe.rukamori.archivetune.utils.rememberPreference
 import moe.rukamori.archivetune.viewmodels.ResetListeningStatsState
 import moe.rukamori.archivetune.viewmodels.ResetListeningStatsViewModel
@@ -80,11 +78,6 @@ fun PrivacySettings(
         rememberPreference(
             key = DisableScreenshotKey,
             defaultValue = false,
-        )
-    val (enableHapticFeedback, onEnableHapticFeedbackChange) =
-        rememberPreference(
-            key = EnableHapticFeedbackKey,
-            defaultValue = true,
         )
 
     var showClearListenHistoryDialog by remember {
@@ -161,11 +154,9 @@ fun PrivacySettings(
         )
     }
 
-    Scaffold(
+    Scaffold(containerColor = androidx.compose.material3.MaterialTheme.colorScheme.background,
         topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.settings_behavior_title)) },
-                navigationIcon = {
+            moe.rukamori.archivetune.ui.component.EnginePageTopBar(title = stringResource(R.string.settings_privacy_history), navigationIcon = {
                     IconButton(
                         onClick = navController::navigateUp,
                         onLongClick = navController::backToMain,
@@ -175,8 +166,7 @@ fun PrivacySettings(
                             contentDescription = null,
                         )
                     }
-                },
-            )
+                })
         },
     ) { innerPadding ->
         val topPadding = innerPadding.calculateTopPadding()
@@ -235,15 +225,6 @@ fun PrivacySettings(
             }
 
             PreferenceGroup(title = stringResource(R.string.misc)) {
-                item {
-                    SwitchPreference(
-                        title = { Text(stringResource(R.string.haptics)) },
-                        description = stringResource(R.string.haptics_desc),
-                        icon = { Icon(painterResource(R.drawable.vibration), null) },
-                        checked = enableHapticFeedback,
-                        onCheckedChange = onEnableHapticFeedbackChange,
-                    )
-                }
 
                 item {
                     SwitchPreference(

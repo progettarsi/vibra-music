@@ -100,7 +100,13 @@ class OnboardingViewModel
             val success = screenState.value as? OnboardingScreenState.Success ?: return
             val currentPageIndex = success.uiState.currentPage
             if (success.uiState.pages.getOrNull(currentPageIndex)?.id == OnboardingPageId.LOGIN) {
-                currentPage.value = currentPageIndex + 1
+                // Vibra: login is the final page after the upstream community page was removed.
+                // Incrementing past the end is clamped by the UI builder and never completes onboarding.
+                if (currentPageIndex == success.uiState.pages.lastIndex) {
+                    complete()
+                } else {
+                    currentPage.value = currentPageIndex + 1
+                }
             }
         }
 

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_playback_audio">Riproduzione e audio</string>
+    <string name="settings_downloads_storage">Download e spazio</string>
+    <string name="settings_privacy_history">Privacy e cronologia</string>
+    <string name="settings_advanced">Avanzate</string>
+    <string name="settings_advanced_content">Lingua e filtri dei contenuti</string>
+    <string name="settings_playback_speed">Velocità di riproduzione</string>
+    <string name="about_vibra_attribution">Basata su ArchiveTune di Rukamori e collaboratori. Progetto indipendente, non affiliato né approvato dagli autori.</string>
+    <string name="about_font_licenses">Licenze dei font (OFL)</string>
+    <string name="login_page_error">Impossibile caricare la pagina di accesso. Controlla la connessione e riprova.</string>
+    <string name="login_context_error">Account rilevato, ma YouTube non ha ancora fornito tutti i dati necessari. Attendi un momento e riprova.</string>
+    <string name="login_account_error">Impossibile verificare l’account. Controlla la connessione e riprova.</string>
+    <string name="about_third_party_licenses">Licenze di terze parti</string>
+    <string name="settings_integrations">Integrazioni</string>
+</resources>

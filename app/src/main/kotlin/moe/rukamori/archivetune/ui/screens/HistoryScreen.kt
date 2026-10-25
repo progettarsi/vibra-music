@@ -58,7 +58,6 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FloatingToolbarDefaults
 import androidx.compose.material3.HorizontalFloatingToolbar
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LargeFlexibleTopAppBar
 import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -66,7 +65,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.ToggleButton
 import androidx.compose.material3.ToggleButtonDefaults
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -451,23 +449,11 @@ fun HistoryScreen(
             Modifier
                 .fillMaxSize()
                 .nestedScroll(scrollBehavior.nestedScrollConnection),
-        containerColor = MaterialTheme.colorScheme.surface,
+        containerColor = MaterialTheme.colorScheme.background,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             if (!showSearchBar) {
-                LargeFlexibleTopAppBar(
-                    title = {
-                        Text(
-                            text =
-                                if (selectionCount > 0) {
-                                    pluralStringResource(R.plurals.n_song, selectionCount, selectionCount)
-                                } else {
-                                    stringResource(R.string.history)
-                                },
-                            fontWeight = FontWeight.Bold,
-                        )
-                    },
-                    navigationIcon = {
+                moe.rukamori.archivetune.ui.component.EnginePageTopBar(title = if (selectionCount > 0) pluralStringResource(R.plurals.n_song, selectionCount, selectionCount) else stringResource(R.string.history), navigationIcon = {
                         AppIconButton(
                             onClick = {
                                 if (selectionCount > 0) {
@@ -490,8 +476,7 @@ fun HistoryScreen(
                                 contentDescription = null,
                             )
                         }
-                    },
-                    actions = {
+                    }, actions = {
                         if (selectionCount == 0) {
                             AppIconButton(
                                 onClick = { isSearching = true },
@@ -503,14 +488,7 @@ fun HistoryScreen(
                                 )
                             }
                         }
-                    },
-                    scrollBehavior = scrollBehavior,
-                    colors =
-                        TopAppBarDefaults.topAppBarColors(
-                            containerColor = MaterialTheme.colorScheme.surface,
-                            scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-                        ),
-                )
+                    }, scrollBehavior = scrollBehavior)
             }
         },
         floatingActionButton = {

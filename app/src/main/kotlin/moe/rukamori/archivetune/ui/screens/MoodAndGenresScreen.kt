@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
@@ -59,7 +58,6 @@ import moe.rukamori.archivetune.LocalPlayerAwareWindowInsets
 import moe.rukamori.archivetune.R
 import moe.rukamori.archivetune.innertube.YouTube
 import moe.rukamori.archivetune.innertube.models.BrowseEndpoint
-import moe.rukamori.archivetune.ui.component.NavigationTitle
 import moe.rukamori.archivetune.ui.component.shimmer.ShimmerHost
 import moe.rukamori.archivetune.ui.component.shimmer.TextPlaceholder
 import moe.rukamori.archivetune.viewmodels.MoodAndGenresViewModel
@@ -88,24 +86,21 @@ fun MoodAndGenresScreen(
         }
     }
 
+    androidx.compose.material3.Scaffold(
+        containerColor = androidx.compose.material3.MaterialTheme.colorScheme.background,
+        topBar = { moe.rukamori.archivetune.ui.component.EnginePageTopBar(stringResource(R.string.mood_and_genres), onBack = { navController.navigateUp() }) },
+    ) { pagePadding ->
     LazyVerticalGrid(
         columns = GridCells.Adaptive(minSize = 180.dp),
         state = gridState,
         contentPadding =
             PaddingValues(
                 start = 6.dp,
-                top = topPadding,
+                top = pagePadding.calculateTopPadding(),
                 end = 6.dp,
                 bottom = bottomPadding,
             ),
     ) {
-        item(span = { GridItemSpan(maxLineSpan) }) {
-            NavigationTitle(
-                title = stringResource(R.string.mood_and_genres),
-                modifier = Modifier.animateItem(),
-            )
-        }
-
         if (moodAndGenres == null) {
             items(
                 count = 12,
@@ -141,6 +136,7 @@ fun MoodAndGenresScreen(
                 )
             }
         }
+    }
     }
 }
 

@@ -218,7 +218,11 @@ class HomeViewModel
         private val isLoading = MutableStateFlow(false)
         private val isInitialLoadComplete = MutableStateFlow(false)
         private val loadError = MutableStateFlow<Int?>(null)
-        private val isLoadingMore = MutableStateFlow(false)
+        private val _isLoadingMore = MutableStateFlow(false)
+        val isLoadingMore: StateFlow<Boolean> = _isLoadingMore.asStateFlow()
+        private val feedPolicies = java.util.concurrent.ConcurrentHashMap<String, moe.rukamori.archivetune.home.HomeFeedExposure>()
+        @Volatile
+        private var feedExhausted = false
         private val homeLoadMutex = Mutex()
 
         private val quickPicksMode =
@@ -234,6 +238,39 @@ class HomeViewModel
         private val similarRecommendations = MutableStateFlow<List<SimilarRecommendation>?>(null)
         private val accountPlaylists = MutableStateFlow<List<PlaylistItem>?>(null)
         private val homePage = MutableStateFlow<HomePage?>(null)
+        val homeSections: StateFlow<List<moe.rukamori.archivetune.home.HomeSection>> = homePage
+            .map { it?.sections.orEmpty() }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+        private fun feedAccountKey(): String = java.security.MessageDigest.getInstance("SHA-256")
+            .digest(context.dataStore.get(DataSyncIdKey, "").toByteArray())
+            .joinToString("") { "%02x".format(it) }.take(24)
+
+        private fun feedPolicy(account: String): moe.rukamori.archivetune.home.HomeFeedExposure = feedPolicies.getOrPut(account) {
+            moe.rukamori.archivetune.home.HomeFeedExposure()
+        }
+
+        /** Called by the home UI when an item actually becomes visible, not on prefetch. */
+        fun markHomeItemsShown(items: Collection<YTItem>) {
+            val account = feedAccountKey()
+            val keys = items.map { moe.rukamori.archivetune.home.HomeFeedExposure.key(it) }
+            val now = System.currentTimeMillis()
+            feedPolicy(account).markShown(keys, now)
+            viewModelScope.launch(Dispatchers.IO) {
+                val key = androidx.datastore.preferences.core.stringSetPreferencesKey("vibraHomeShownAt_$account")
+                context.dataStore.edit { preferences ->
+                    val history = preferences[key].orEmpty().mapNotNull { entry ->
+                        entry.substringBefore('|').toLongOrNull()?.let { entry.substringAfter('|') to it }
+                    }.toMap().toMutableMap()
+                    keys.forEach { history[it] = maxOf(history[it] ?: Long.MIN_VALUE, now) }
+                    preferences[key] = history.filterValues { shownAt -> now - shownAt < 14L * 24 * 60 * 60 * 1_000 }.entries
+                        .mapTo(mutableSetOf()) { "${it.value}|${it.key}" }
+                }
+            }
+        }
+
+        /** Continuations first; once exhausted, try a fresh personalized home response. */
+        fun loadMore() = loadMoreYouTubeItems(homePage.value?.continuation)
         private val remoteQuickPicks = MutableStateFlow<HomePage.Section?>(null)
         private val communitySection = MutableStateFlow<HomePage.Section?>(null)
         private val selectedChip = MutableStateFlow<HomePage.Chip?>(null)
@@ -368,6 +405,10 @@ class HomeViewModel
                     homePage = page,
                     allowStructuralFallback = replaceCommunitySection || communitySection.value == null,
                 )
+            feedPolicy(feedAccountKey()).reserve(
+                prepared.homePage.sections.flatMap { it.items }.map { moe.rukamori.archivetune.home.HomeFeedExposure.key(it) },
+            )
+            if (replaceCommunitySection) feedExhausted = false
             homePage.value = prepared.homePage
             val newCommunitySection = prepared.communitySection
             if (newCommunitySection != null) {
@@ -925,46 +966,67 @@ class HomeViewModel
         }
 
         private fun loadMoreYouTubeItems(continuation: String?) {
-            if (continuation == null || isLoadingMore.value) return
-            val hideExplicit = context.dataStore.get(HideExplicitKey, false)
-            val hideVideo = context.dataStore.get(HideVideoKey, false)
-
+            if (feedExhausted || homePage.value == null || !_isLoadingMore.compareAndSet(false, true)) return
+            val account = feedAccountKey()
             viewModelScope.launch(Dispatchers.IO) {
-                isLoadingMore.value = true
                 try {
-                    val blockedArtistIds = database.getBlockedArtistIds().toSet()
-                    val aiContentFilterPolicy = loadAiContentFilterPolicy()
-                    val nextSections = YouTube.home(continuation).getOrNull() ?: return@launch
-                    val mergedSections = homePage.value?.sections.orEmpty() + nextSections.sections
-                    val mergedPage =
-                        nextSections.copy(
-                            chips = homePage.value?.chips,
-                            sections =
-                                mergedSections.map { section ->
-                                    section.copy(
-                                        items =
-                                            filterAiContent(
-                                                section.items
-                                                    .filterExplicit(hideExplicit)
-                                                    .filterVideo(hideVideo)
-                                                    .filterBlockedArtists(blockedArtistIds),
-                                                aiContentFilterPolicy,
-                                            ),
-                                    )
-                                }.filter(HomePage.Section::hasVisibleContent),
+                    homeLoadMutex.withLock {
+                        val original = homePage.value ?: return@withLock
+                        if (feedAccountKey() != account || continuation != original.continuation) return@withLock
+                        val exposure = feedPolicy(account)
+                        exposure.reserve((
+                            original.sections.flatMap { it.items } + remoteQuickPicks.value?.items.orEmpty() +
+                                similarRecommendations.value.orEmpty().flatMap { it.items } + accountPlaylists.value.orEmpty()
+                            ).map { moe.rukamori.archivetune.home.HomeFeedExposure.key(it) })
+                        val historyKey = androidx.datastore.preferences.core.stringSetPreferencesKey("vibraHomeShownAt_$account")
+                        val history = context.dataStore.data.first()[historyKey].orEmpty().mapNotNull { entry ->
+                            entry.substringBefore('|').toLongOrNull()?.let { entry.substringAfter('|') to it }
+                        }.toMap()
+                        exposure.restore(history)
+                        val next = YouTube.home(continuation).getOrElse { error ->
+                            if (error is CancellationException) throw error
+                            return@withLock
+                        }
+                        if (homePage.value !== original || feedAccountKey() != account) return@withLock
+                        val blocked = database.getBlockedArtistIds().toSet()
+                        val aiPolicy = loadAiContentFilterPolicy()
+                        val hideExplicit = context.dataStore.get(HideExplicitKey, false)
+                        val hideVideo = context.dataStore.get(HideVideoKey, false)
+                        val candidates = next.sections.map { section ->
+                            section.copy(items = filterAiContent(
+                                section.items.filterExplicit(hideExplicit).filterVideo(hideVideo).filterBlockedArtists(blocked),
+                                aiPolicy,
+                            ))
+                        }
+                        val allowed = exposure.accept(
+                            candidates.flatMap { it.items }.map { moe.rukamori.archivetune.home.HomeFeedExposure.key(it) },
+                            System.currentTimeMillis(),
+                        ).toMutableSet()
+                        val additions = candidates.map { section ->
+                            section.copy(
+                                items = section.items.filter { allowed.remove(moe.rukamori.archivetune.home.HomeFeedExposure.key(it)) },
+                                featuredCards = emptyList(),
+                            )
+                        }.filter { it.items.isNotEmpty() }
+                        val repeatedToken = continuation != null && continuation == next.continuation
+                        feedExhausted = repeatedToken || (additions.isEmpty() && next.continuation == null)
+                        val merged = next.copy(
+                            chips = original.chips,
+                            sections = original.sections + additions,
+                            continuation = if (repeatedToken) null else next.continuation,
                         )
-                    val (pageWithoutQuickPicks, _) = mergedPage.extractQuickPicks()
-                    applyRemoteHomePage(
-                        page = pageWithoutQuickPicks,
-                        replaceCommunitySection = false,
-                    )
-                    updateAllYtItems()
+                        applyRemoteHomePage(merged, replaceCommunitySection = false)
+                        updateAllYtItems()
+                    }
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (error: Exception) {
+                    Timber.w("Home continuation unavailable (%s)", error.javaClass.simpleName)
                 } finally {
-                    isLoadingMore.value = false
+                    _isLoadingMore.value = false
                 }
             }
         }
-
         private fun toggleChip(chip: HomePage.Chip?) {
             chipLoadJob?.cancel()
             if (chip == null || chip == selectedChip.value && previousHomePage.value != null) {

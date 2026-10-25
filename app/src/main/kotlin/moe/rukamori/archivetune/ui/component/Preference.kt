@@ -107,7 +107,7 @@ val LocalPreferenceGroupPosition = compositionLocalOf<PreferenceGroupPosition?> 
 
 private val PreferenceGroupLargeCorner = 28.dp
 private val PreferenceGroupSmallCorner = 6.dp
-private val PreferenceGroupHorizontalPadding = 26.dp
+private val PreferenceGroupHorizontalPadding = app.vibra.ui.theme.VibraDimens.Gutter
 private val PreferenceEntryMinHeight = 88.dp
 private val PreferenceEntryHorizontalPadding = 22.dp
 private val PreferenceEntryVerticalPadding = 18.dp
@@ -1304,7 +1304,7 @@ fun PreferenceGroup(
 
     if (itemCount == 0) return
 
-    Column(modifier = modifier) {
+    Column(modifier = modifier.padding(top = 24.dp)) {
         if (title != null) {
             PreferenceGroupTitle(
                 title = title,
@@ -1354,9 +1354,9 @@ fun PreferenceGroupTitle(
 ) {
     Text(
         text = title,
-        style = MaterialTheme.typography.titleSmall,
+        style = MaterialTheme.typography.titleLarge,
         fontWeight = FontWeight.SemiBold,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = modifier.padding(horizontal = 20.dp, vertical = 10.dp),
+        color = MaterialTheme.colorScheme.onBackground,
+        modifier = modifier.padding(horizontal = app.vibra.ui.theme.VibraDimens.Gutter - PreferenceGroupHorizontalPadding).padding(bottom = 12.dp),
     )
 }

@@ -7,6 +7,7 @@
 
 package moe.rukamori.archivetune.ui.screens
 
+import moe.rukamori.archivetune.ui.utils.backToMain
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
@@ -52,7 +53,6 @@ import moe.rukamori.archivetune.ui.component.shimmer.ShimmerHost
 import moe.rukamori.archivetune.ui.component.shimmer.TextPlaceholder
 import moe.rukamori.archivetune.ui.menu.YouTubeSongMenu
 import moe.rukamori.archivetune.ui.utils.SnapLayoutInfoProvider
-import moe.rukamori.archivetune.ui.utils.backToMain
 import moe.rukamori.archivetune.viewmodels.ChartsViewModel
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
@@ -79,11 +79,9 @@ fun ChartsScreen(
         }
     }
 
-    Scaffold(
+    Scaffold(containerColor = androidx.compose.material3.MaterialTheme.colorScheme.background,
         topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.charts)) },
-                navigationIcon = {
+            moe.rukamori.archivetune.ui.component.EnginePageTopBar(title = stringResource(R.string.charts), navigationIcon = {
                     IconButton(
                         onClick = { navController.navigateUp() },
                         onLongClick = { navController.backToMain() },
@@ -93,8 +91,7 @@ fun ChartsScreen(
                             contentDescription = null,
                         )
                     }
-                },
-            )
+                })
         },
     ) { paddingValues ->
         BoxWithConstraints(

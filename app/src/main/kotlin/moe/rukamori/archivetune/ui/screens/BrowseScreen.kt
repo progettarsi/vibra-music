@@ -23,8 +23,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -237,9 +235,7 @@ private fun BrowseScreenContent(
             }
         }
 
-        TopAppBar(
-            title = { Text(state.title()) },
-            navigationIcon = {
+        moe.rukamori.archivetune.ui.component.EnginePageTopBar(title = state.title(), navigationIcon = {
                 IconButton(
                     onClick = onBack,
                     onLongClick = onBackToMain,
@@ -249,10 +245,7 @@ private fun BrowseScreenContent(
                         contentDescription = stringResource(R.string.back_button_desc),
                     )
                 }
-            },
-            scrollBehavior = scrollBehavior,
-            modifier = Modifier.align(Alignment.TopCenter),
-        )
+            }, scrollBehavior = scrollBehavior)
         SnackbarHost(
             hostState = snackbarHostState,
             modifier =

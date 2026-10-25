@@ -54,7 +54,6 @@ import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MediumFlexibleTopAppBar
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -66,7 +65,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.WavyProgressIndicatorDefaults
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.compose.material3.toShape
@@ -515,25 +513,11 @@ fun UpdateScreen(
             Modifier
                 .fillMaxSize()
                 .nestedScroll(scrollBehavior.nestedScrollConnection),
-        containerColor = MaterialTheme.colorScheme.surface,
+        containerColor = MaterialTheme.colorScheme.background,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         topBar = {
-            MediumFlexibleTopAppBar(
-                title = {
-                    Text(
-                        text = stringResource(R.string.updates),
-                        fontWeight = FontWeight.Bold,
-                    )
-                },
-                subtitle = {
-                    Text(
-                        text = topBarSubtitle,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                },
-                navigationIcon = {
+            moe.rukamori.archivetune.ui.component.EnginePageTopBar(title = stringResource(R.string.updates), navigationIcon = {
                     IconButton(
                         onClick = navController::navigateUp,
                         onLongClick = navController::backToMain,
@@ -543,15 +527,13 @@ fun UpdateScreen(
                             contentDescription = stringResource(R.string.back_button_desc),
                         )
                     }
-                },
-                actions = {},
-                scrollBehavior = scrollBehavior,
-                colors =
-                    TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.surface,
-                        scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-                    ),
-            )
+                }, actions = {}, subtitle = {
+                    Text(
+                        text = topBarSubtitle,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }, scrollBehavior = scrollBehavior)
         },
     ) { paddingValues ->
         LazyColumn(

@@ -49,7 +49,6 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.material3.LargeFlexibleTopAppBar
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -60,10 +59,8 @@ import androidx.compose.material3.SegmentedListItem
 import androidx.compose.material3.SplitButtonDefaults
 import androidx.compose.material3.SplitButtonLayout
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
@@ -83,7 +80,6 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -92,6 +88,7 @@ import coil3.compose.AsyncImage
 import moe.rukamori.archivetune.App.Companion.forgetAccount
 import moe.rukamori.archivetune.BuildConfig
 import moe.rukamori.archivetune.LocalPlayerAwareWindowInsets
+import moe.rukamori.archivetune.ui.component.SwitchPreference
 import moe.rukamori.archivetune.R
 import moe.rukamori.archivetune.constants.AccountChannelHandleKey
 import moe.rukamori.archivetune.constants.AccountEmailKey
@@ -107,18 +104,13 @@ import moe.rukamori.archivetune.constants.YtmSyncKey
 import moe.rukamori.archivetune.innertube.YouTube
 import moe.rukamori.archivetune.innertube.utils.hasYouTubeLoginCookie
 import moe.rukamori.archivetune.ui.component.IconButton
-import moe.rukamori.archivetune.ui.component.InfoLabel
-import moe.rukamori.archivetune.ui.component.TextFieldDialog
 import moe.rukamori.archivetune.ui.screens.buildLoginRoute
 import moe.rukamori.archivetune.ui.utils.appBarScrollBehavior
 import moe.rukamori.archivetune.ui.utils.backToMain
-import moe.rukamori.archivetune.utils.PreferenceStore
 import moe.rukamori.archivetune.utils.SavedAccount
 import moe.rukamori.archivetune.utils.Updater
-import moe.rukamori.archivetune.utils.dataStore
 import moe.rukamori.archivetune.utils.decodeSavedAccounts
 import moe.rukamori.archivetune.utils.encodeSavedAccounts
-import moe.rukamori.archivetune.utils.putLegacyPoToken
 import moe.rukamori.archivetune.utils.rememberPreference
 import moe.rukamori.archivetune.viewmodels.AccountChannelUiModel
 import moe.rukamori.archivetune.viewmodels.AccountChannelsState
@@ -146,10 +138,7 @@ fun AccountSettings(
 
     val accountLabel = stringResource(R.string.account)
     val generalLabel = stringResource(R.string.general)
-    val integrationLabel = stringResource(R.string.integration)
-    val miscLabel = stringResource(R.string.misc)
     val loginLabel = stringResource(R.string.login)
-    val tokenDescription = stringResource(R.string.token_adv_login_description)
 
     val (accountNamePref, onAccountNameChange) = rememberPreference(AccountNameKey, "")
     val (accountEmail, onAccountEmailChange) = rememberPreference(AccountEmailKey, "")
@@ -168,11 +157,7 @@ fun AccountSettings(
             SavedAccountCollection(decodeSavedAccounts(savedAccountsJson))
         }
 
-    val onLegacyPoTokenChange: (String) -> Unit = { value ->
-        PreferenceStore.launchEdit(context.dataStore) {
-            putLegacyPoToken(value)
-        }
-    }
+
 
     val isLoggedIn =
         remember(innerTubeCookie) {
@@ -200,27 +185,14 @@ fun AccountSettings(
             ?.size
             .let { (it ?: 0) > 1 }
 
-    var showToken by remember { mutableStateOf(false) }
-    var showTokenEditor by remember { mutableStateOf(false) }
     var showUnsavedAccountDialog by remember { mutableStateOf(false) }
     var showAccountSwitcher by remember { mutableStateOf(false) }
 
-    LaunchedEffect(isLoggedIn) {
-        if (!isLoggedIn) {
-            showToken = false
-        }
-    }
+
 
     val hasUpdate =
         BuildConfig.UPDATER_AVAILABLE &&
             Updater.isUpdateAvailable(latestVersionName, BuildConfig.VERSION_NAME)
-    val tokenActionTitle =
-        when {
-            !isLoggedIn -> stringResource(R.string.advanced_login)
-            showToken -> stringResource(R.string.token_shown)
-            else -> stringResource(R.string.token_hidden)
-        }
-
     val saveCurrentAccount: () -> Unit = {
         val existing = decodeSavedAccounts(savedAccountsJson)
         if (isLoggedIn && existing.none { it.innerTubeCookie == innerTubeCookie }) {
@@ -264,21 +236,10 @@ fun AccountSettings(
             Modifier
                 .fillMaxSize()
                 .nestedScroll(scrollBehavior.nestedScrollConnection),
-        containerColor = MaterialTheme.colorScheme.surface,
+        containerColor = MaterialTheme.colorScheme.background,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
-            LargeFlexibleTopAppBar(
-                title = {
-                    Column {
-                        Text(
-                            text = accountLabel,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                },
-                navigationIcon = {
+            moe.rukamori.archivetune.ui.component.EnginePageTopBar(title = accountLabel, navigationIcon = {
                     IconButton(
                         onClick = navController::navigateUp,
                         onLongClick = navController::backToMain,
@@ -288,15 +249,7 @@ fun AccountSettings(
                             contentDescription = null,
                         )
                     }
-                },
-                windowInsets = TopAppBarDefaults.windowInsets,
-                colors =
-                    TopAppBarDefaults.largeTopAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.surface,
-                        scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-                    ),
-                scrollBehavior = scrollBehavior,
-            )
+                }, scrollBehavior = scrollBehavior)
         },
     ) { innerPadding ->
         Box(
@@ -342,13 +295,8 @@ fun AccountSettings(
                             }
                         },
                         onSecondaryAction = {
-                            if (isLoggedIn) {
-                                showToken = false
-                                onInnerTubeCookieChange("")
-                                forgetAccount(context, clearWebAuthSession = true)
-                            } else {
-                                showTokenEditor = true
-                            }
+                            onInnerTubeCookieChange("")
+                            forgetAccount(context, clearWebAuthSession = true)
                         },
                         onOpenAccountSwitcher = { showAccountSwitcher = true },
                     )
@@ -380,8 +328,6 @@ fun AccountSettings(
                                 subtitle = stringResource(R.string.use_login_for_browse_desc),
                                 checked = useLoginForBrowse,
                                 onCheckedChange = onUseLoginForBrowseChange,
-                                index = 0,
-                                count = 3,
                             )
 
                             ExpressiveSwitchRow(
@@ -389,8 +335,6 @@ fun AccountSettings(
                                 title = stringResource(R.string.yt_sync),
                                 checked = ytmSync,
                                 onCheckedChange = onYtmSyncChange,
-                                index = 1,
-                                count = 3,
                             )
 
                             ExpressiveSwitchRow(
@@ -399,64 +343,13 @@ fun AccountSettings(
                                 subtitle = stringResource(R.string.force_sync_on_switch_account_desc),
                                 checked = forceSyncOnAccountSwitch,
                                 onCheckedChange = onForceSyncOnAccountSwitchChange,
-                                index = 2,
-                                count = 3,
                             )
                         }
                     }
                 }
 
-                item {
-                    ExpressiveSectionCard(title = integrationLabel) {
-                        ExpressiveActionRow(
-                            icon = painterResource(R.drawable.integration),
-                            title = integrationLabel,
-                            subtitle = stringResource(R.string.account_integrations_summary),
-                            onClick = { navController.navigate("settings/integration") },
-                            index = 0,
-                            count = 2,
-                        )
 
-                        ExpressiveActionRow(
-                            icon = painterResource(R.drawable.fire),
-                            title = stringResource(R.string.music_together),
-                            onClick = { navController.navigate("settings/music_together") },
-                            index = 1,
-                            count = 2,
-                        )
-                    }
-                }
 
-                item {
-                    ExpressiveSectionCard(title = miscLabel) {
-                        ExpressiveActionRow(
-                            icon = painterResource(R.drawable.visibility_off),
-                            title = stringResource(R.string.hidden_playlists),
-                            subtitle = stringResource(R.string.hidden_playlists_description),
-                            onClick = { navController.navigate("settings/hidden_playlists") },
-                            index = 0,
-                            count = 2,
-                        )
-
-                        ExpressiveActionRow(
-                            icon = painterResource(R.drawable.token),
-                            title = tokenActionTitle,
-                            subtitle = tokenDescription,
-                            accent = if (isLoggedIn && showToken) MaterialTheme.colorScheme.tertiary else null,
-                            onClick = {
-                                if (!isLoggedIn) {
-                                    showTokenEditor = true
-                                } else if (!showToken) {
-                                    showToken = true
-                                } else {
-                                    showTokenEditor = true
-                                }
-                            },
-                            index = 1,
-                            count = 2,
-                        )
-                    }
-                }
 
                 item {
                     VersionStamp()
@@ -489,24 +382,7 @@ fun AccountSettings(
         )
     }
 
-    if (showTokenEditor) {
-        TokenEditorDialog(
-            innerTubeCookie = innerTubeCookie,
-            visitorData = visitorData,
-            dataSyncId = dataSyncId,
-            accountNamePref = accountNamePref,
-            accountEmail = accountEmail,
-            accountChannelHandle = accountChannelHandle,
-            onInnerTubeCookieChange = onInnerTubeCookieChange,
-            onPoTokenChange = onLegacyPoTokenChange,
-            onVisitorDataChange = onVisitorDataChange,
-            onDataSyncIdChange = onDataSyncIdChange,
-            onAccountNameChange = onAccountNameChange,
-            onAccountEmailChange = onAccountEmailChange,
-            onAccountChannelHandleChange = onAccountChannelHandleChange,
-            onDismiss = { showTokenEditor = false },
-        )
-    }
+
 
     if (showUnsavedAccountDialog) {
         AlertDialog(
@@ -708,6 +584,7 @@ private fun AccountSummaryCard(
                     },
                 )
 
+                if (isLoggedIn) {
                 TextButton(
                     onClick = onSecondaryAction,
                     colors =
@@ -722,8 +599,9 @@ private fun AccountSummaryCard(
                     shapes = ButtonDefaults.shapes(),
                 ) {
                     Text(
-                        text = if (isLoggedIn) stringResource(R.string.action_logout) else stringResource(R.string.advanced_login),
+                        text = stringResource(R.string.action_logout),
                     )
+                }
                 }
             }
         }
@@ -1160,51 +1038,15 @@ private fun ExpressiveSwitchRow(
     subtitle: String? = null,
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
-    index: Int,
-    count: Int,
 ) {
-    SegmentedListItem(
+    SwitchPreference(
+        title = { Text(title) },
+        description = subtitle,
+        icon = { Icon(painter = icon, contentDescription = null) },
         checked = checked,
         onCheckedChange = onCheckedChange,
-        modifier = Modifier.fillMaxWidth(),
-        shapes = ListItemDefaults.segmentedShapes(index = index, count = count),
-        colors =
-            ListItemDefaults.segmentedColors(
-                containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-            ),
-        leadingContent = {
-            ExpressiveRowIcon(
-                icon = icon,
-                tint = MaterialTheme.colorScheme.primary,
-                emphasized = checked,
-            )
-        },
-        trailingContent = {
-            Switch(
-                checked = checked,
-                onCheckedChange = null,
-            )
-        },
-        supportingContent =
-            subtitle?.let { supportingText ->
-                {
-                    Text(
-                        text = supportingText,
-                        maxLines = 3,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            },
-    ) {
-        Text(
-            text = title,
-            fontWeight = FontWeight.SemiBold,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-    }
+    )
 }
-
 @Composable
 private fun ExpressiveRowIcon(
     icon: Painter,
@@ -1254,67 +1096,4 @@ private fun VersionStamp() {
             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.40f),
         )
     }
-}
-
-@Composable
-private fun TokenEditorDialog(
-    innerTubeCookie: String,
-    visitorData: String,
-    dataSyncId: String,
-    accountNamePref: String,
-    accountEmail: String,
-    accountChannelHandle: String,
-    onInnerTubeCookieChange: (String) -> Unit,
-    onPoTokenChange: (String) -> Unit,
-    onVisitorDataChange: (String) -> Unit,
-    onDataSyncIdChange: (String) -> Unit,
-    onAccountNameChange: (String) -> Unit,
-    onAccountEmailChange: (String) -> Unit,
-    onAccountChannelHandleChange: (String) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    val text =
-        """
-        ***INNERTUBE COOKIE*** =$innerTubeCookie
-        ***VISITOR DATA*** =$visitorData
-        ***DATASYNC ID*** =$dataSyncId
-        ***PO TOKEN*** =${YouTube.poToken.orEmpty()}
-        ***ACCOUNT NAME*** =$accountNamePref
-        ***ACCOUNT EMAIL*** =$accountEmail
-        ***ACCOUNT CHANNEL HANDLE*** =$accountChannelHandle
-        """.trimIndent()
-
-    TextFieldDialog(
-        initialTextFieldValue = TextFieldValue(text),
-        onDone = { data ->
-            data.split("\n").forEach {
-                when {
-                    it.startsWith("***INNERTUBE COOKIE*** =") -> onInnerTubeCookieChange(it.substringAfter("="))
-                    it.startsWith("***VISITOR DATA*** =") -> onVisitorDataChange(it.substringAfter("="))
-                    it.startsWith("***DATASYNC ID*** =") -> onDataSyncIdChange(it.substringAfter("="))
-                    it.startsWith("***PO TOKEN*** =") -> onPoTokenChange(it.substringAfter("="))
-                    it.startsWith("***ACCOUNT NAME*** =") -> onAccountNameChange(it.substringAfter("="))
-                    it.startsWith("***ACCOUNT EMAIL*** =") -> onAccountEmailChange(it.substringAfter("="))
-                    it.startsWith("***ACCOUNT CHANNEL HANDLE*** =") -> onAccountChannelHandleChange(it.substringAfter("="))
-                }
-            }
-        },
-        onDismiss = onDismiss,
-        singleLine = false,
-        maxLines = 20,
-        isInputValid = {
-            hasYouTubeLoginCookie(it)
-        },
-        extraContent = {
-            InfoLabel(text = stringResource(R.string.token_adv_login_description))
-        },
-    )
-}
-
-private fun previewSecureValue(value: String): String {
-    val normalized = value.replace("\n", " ").replace("\r", " ").trim()
-    if (normalized.length <= 76) {
-        return normalized
-    }
-    return normalized.take(52) + "\u2025" + normalized.takeLast(18)
 }

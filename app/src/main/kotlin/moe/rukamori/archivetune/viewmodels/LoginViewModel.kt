@@ -93,6 +93,21 @@ class LoginViewModel
             startLogin(normalizedCookie, replaceActive = false)
         }
 
+        fun retryLogin() {
+            val cookie = activeCookie
+            if (cookie == null) {
+                _screenState.value = LoginScreenState.Empty
+            } else {
+                startLogin(cookie, replaceActive = true)
+            }
+        }
+
+        fun dismissError() {
+            if (_screenState.value is LoginScreenState.Error) {
+                _screenState.value = LoginScreenState.Empty
+            }
+        }
+
         private fun startLogin(
             normalizedCookie: String,
             replaceActive: Boolean,
@@ -123,7 +138,7 @@ class LoginViewModel
                                 ),
                             )
                     }.onFailure { throwable ->
-                        Timber.e(throwable, "Failed to complete YouTube login")
+                        Timber.w("YouTube login completion failed (%s)", throwable.javaClass.simpleName)
                         _screenState.value =
                             LoginScreenState.Error(
                                 if (throwable is MissingYouTubeDataSyncIdException) {

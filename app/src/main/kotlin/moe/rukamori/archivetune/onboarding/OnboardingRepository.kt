@@ -47,7 +47,9 @@ class OnboardingRepository
                     add(installGrantedData(OnboardingPermissionId.AUDIO_SETTINGS))
 
                     if (BuildConfig.DISTRIBUTION == DISTRIBUTION_GMS) {
-                        add(appInstallationData())
+                        // Vibra: APK self-updates are off (no release channel), so the
+                        // install-packages permission is neither requested nor shown.
+                        if (BuildConfig.UPDATER_AVAILABLE) add(appInstallationData())
                         add(runtimePermissionData(OnboardingPermissionId.BLUETOOTH_SCAN, bluetoothScanPermission()))
                     }
                 },

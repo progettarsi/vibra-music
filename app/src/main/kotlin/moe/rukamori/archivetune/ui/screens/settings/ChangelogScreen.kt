@@ -9,6 +9,9 @@
 
 package moe.rukamori.archivetune.ui.screens.settings
 
+import androidx.compose.ui.res.painterResource
+import moe.rukamori.archivetune.ui.component.IconButton
+import moe.rukamori.archivetune.ui.utils.backToMain
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -17,7 +20,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -26,9 +28,7 @@ import kotlinx.coroutines.launch
 import moe.rukamori.archivetune.LocalPlayerAwareWindowInsets
 import moe.rukamori.archivetune.R
 import moe.rukamori.archivetune.constants.UpdateChannel
-import moe.rukamori.archivetune.ui.component.IconButton
 import moe.rukamori.archivetune.ui.component.MarkdownText
-import moe.rukamori.archivetune.ui.utils.backToMain
 import moe.rukamori.archivetune.utils.ReleaseInfo
 import moe.rukamori.archivetune.utils.Updater
 import java.text.SimpleDateFormat
@@ -76,11 +76,9 @@ fun ChangelogScreen(
         loadReleases(forceRefresh = true)
     }
 
-    Scaffold(
+    Scaffold(containerColor = androidx.compose.material3.MaterialTheme.colorScheme.background,
         topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.changelog)) },
-                navigationIcon = {
+            moe.rukamori.archivetune.ui.component.EnginePageTopBar(title = stringResource(R.string.changelog), navigationIcon = {
                     IconButton(
                         onClick = navController::navigateUp,
                         onLongClick = navController::backToMain,
@@ -90,8 +88,7 @@ fun ChangelogScreen(
                             contentDescription = null,
                         )
                     }
-                },
-            )
+                })
         },
     ) { paddingValues ->
         Box(

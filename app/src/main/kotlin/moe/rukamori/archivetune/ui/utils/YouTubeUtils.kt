@@ -7,7 +7,6 @@
 
 package moe.rukamori.archivetune.ui.utils
 
-private const val PlayerArtworkHighResPx = 1080
 private const val YtimgFourThreeAspectRatio = 4f / 3f
 
 enum class YTThumbQuality(
@@ -151,13 +150,6 @@ fun String.resize(
 
     return this
 }
-
-fun String.highRes(): String =
-    resize(
-        width = PlayerArtworkHighResPx,
-        height = PlayerArtworkHighResPx,
-        ytimgResizePolicy = YtimgResizePolicy.PreserveOriginal,
-    )
 
 fun getMusicVideoYTThumbnail(
     videoId: String?,

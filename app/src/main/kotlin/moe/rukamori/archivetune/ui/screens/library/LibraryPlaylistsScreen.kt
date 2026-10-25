@@ -142,16 +142,13 @@ fun LibraryPlaylistsScreen(
             if (selectedTagIds.isEmpty()) emptyList() else selectedTagIds.toList(),
         ).collectAsStateWithLifecycle(initialValue = emptyList())
 
-    var showHidden by rememberSaveable { mutableStateOf(false) }
-
     val visiblePlaylists =
-        remember(playlists, selectedTagIds, filteredPlaylistIds, showHidden) {
+        remember(playlists, selectedTagIds, filteredPlaylistIds) {
             playlists.filter { playlist ->
                 val name = playlist.playlist.name
                 val matchesName = !name.contains("episode", ignoreCase = true)
                 val matchesTags = selectedTagIds.isEmpty() || playlist.id in filteredPlaylistIds
-                val matchesVisibility = showHidden || !playlist.playlist.isHidden
-                matchesName && matchesTags && matchesVisibility
+                matchesName && matchesTags
             }
         }
     val mutablePlaylists = remember { mutableStateListOf<Playlist>() }
@@ -314,27 +311,7 @@ fun LibraryPlaylistsScreen(
                                     },
                                 )
                             }
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.hidden_playlists)) },
-                                onClick = {
-                                    showHidden = !showHidden
-                                    showSortMenu = false
-                                },
-                                leadingIcon = {
-                                    Icon(
-                                        painter = painterResource(R.drawable.visibility_off),
-                                        contentDescription = null,
-                                    )
-                                },
-                                trailingIcon = {
-                                    if (showHidden) {
-                                        Icon(
-                                            painter = painterResource(R.drawable.check),
-                                            contentDescription = null,
-                                        )
-                                    }
-                                },
-                            )
+
                         }
                     }
 
@@ -779,7 +756,7 @@ fun PlaylistListCard(
             null
         }
     val metadataTrailingContent: (@Composable RowScope.() -> Unit)? =
-        if (isDownloaded || playlist.playlist.isHidden) {
+        if (isDownloaded) {
             {
                 if (isDownloaded) {
                     Icon(
@@ -789,15 +766,7 @@ fun PlaylistListCard(
                         tint = MaterialTheme.colorScheme.primary,
                     )
                 }
-                if (playlist.playlist.isHidden) {
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Icon(
-                        painter = painterResource(R.drawable.visibility_off),
-                        contentDescription = stringResource(R.string.hide_playlist),
-                        modifier = Modifier.size(12.dp),
-                        tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f),
-                    )
-                }
+
             }
         } else {
             null
@@ -812,7 +781,7 @@ fun PlaylistListCard(
         onClick = onClick,
         onPlay = onPlay,
         onMenuClick = onMenuClick,
-        contentAlpha = if (playlist.playlist.isHidden) 0.45f else 1f,
+        contentAlpha = 1f,
         metadataTrailingContent = metadataTrailingContent,
         additionalAction = additionalAction,
     )
@@ -841,7 +810,7 @@ fun PlaylistGridCard(
         label = "PlaylistGridCardScale",
     )
 
-    val hiddenAlpha = if (playlist.playlist.isHidden) 0.45f else 1f
+    val hiddenAlpha = 1f
 
     Column(
         modifier =
@@ -914,18 +883,6 @@ fun PlaylistGridCard(
                 )
             }
 
-            if (playlist.playlist.isHidden) {
-                Icon(
-                    painter = painterResource(id = R.drawable.visibility_off),
-                    contentDescription = stringResource(R.string.hide_playlist),
-                    modifier =
-                        Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(8.dp)
-                            .size(16.dp),
-                    tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f),
-                )
-            }
         }
 
         Spacer(modifier = Modifier.height(8.dp))

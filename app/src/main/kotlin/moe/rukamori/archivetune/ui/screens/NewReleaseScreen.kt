@@ -45,7 +45,6 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LargeFlexibleTopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -112,12 +111,10 @@ fun NewReleaseScreen(
     val coroutineScope = rememberCoroutineScope()
     var selectedTab by rememberSaveable { mutableStateOf(NewReleaseTab.All) }
 
-    Scaffold(
+    Scaffold(containerColor = androidx.compose.material3.MaterialTheme.colorScheme.background,
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
-            LargeFlexibleTopAppBar(
-                title = { Text(stringResource(R.string.new_releases)) },
-                navigationIcon = {
+            moe.rukamori.archivetune.ui.component.EnginePageTopBar(title = stringResource(R.string.new_releases), navigationIcon = {
                     IconButton(
                         onClick = navController::navigateUp,
                         onLongClick = navController::backToMain,
@@ -127,9 +124,7 @@ fun NewReleaseScreen(
                             contentDescription = null,
                         )
                     }
-                },
-                scrollBehavior = scrollBehavior,
-            )
+                }, scrollBehavior = scrollBehavior)
         },
         contentWindowInsets = LocalPlayerAwareWindowInsets.current,
     ) { paddingValues ->

@@ -25,7 +25,8 @@ fun String.asBuildConfigString(): String =
             .replace("\t", "\\t")
     }\""
 
-val fallbackDataServerUrl = "archive-tune-admin-remote.vercel.app"
+// Vibra: no hosted data server is operated for this fork; the gatekeeper feature stays disabled.
+val fallbackDataServerUrl = ""
 val dataServerUrl =
     rootProject
         .file("DataServer.txt")
@@ -38,25 +39,16 @@ val apiBearerToken = System.getenv("API_BEARER_TOKEN")?.trim()
     ?: localProperties.getProperty("API_BEARER_TOKEN")?.trim()
     ?: ""
 
-val discordApplicationId =
-    (
-        localProperties.getProperty("DISCORD_APPLICATION_ID")
-            ?: System.getenv("DISCORD_APPLICATION_ID")
-            ?: "1165706613961789445"
-        ).trim()
-val discordApplicationIdLong = discordApplicationId.toLongOrNull() ?: 1165706613961789445L
-val discordRedirectScheme = "discord-$discordApplicationId"
-val releaseKeystoreFile = file("keystore/release.keystore")
-val releaseStorePassword =
-    System.getenv("STORE_PASSWORD")?.takeIf { it.isNotBlank() }
-        ?: System.getenv("KEYSTORE_PASSWORD")?.takeIf { it.isNotBlank() }
-val releaseKeyAlias = System.getenv("KEY_ALIAS")?.takeIf { it.isNotBlank() }
-val releaseKeyPassword = System.getenv("KEY_PASSWORD")?.takeIf { it.isNotBlank() }
-val hasReleaseSigningConfig =
-    releaseKeystoreFile.isFile &&
-        releaseStorePassword != null &&
-        releaseKeyAlias != null &&
-        releaseKeyPassword != null
+// Vibra: signing material belongs to the user and never lives in versioned configuration.
+fun signingValue(environment: String, property: String): String? =
+    System.getenv(environment)?.takeIf { it.isNotBlank() }
+        ?: localProperties.getProperty(property)?.takeIf { it.isNotBlank() }
+val releaseKeystoreFile = signingValue("VIBRA_KEYSTORE_PATH", "signing.storeFile")?.let(rootProject::file)
+val releaseStorePassword = signingValue("VIBRA_STORE_PASSWORD", "signing.storePassword")
+val releaseKeyAlias = signingValue("VIBRA_KEY_ALIAS", "signing.keyAlias")
+val releaseKeyPassword = signingValue("VIBRA_KEY_PASSWORD", "signing.keyPassword")
+val hasReleaseSigningConfig = releaseKeystoreFile?.isFile == true &&
+    releaseStorePassword != null && releaseKeyAlias != null && releaseKeyPassword != null
 android {
     namespace = "moe.rukamori.archivetune"
     compileSdk = 37
@@ -64,11 +56,11 @@ android {
     compileSdkMinor = 2
 
     defaultConfig {
-    applicationId = "moe.rukamori.archivetune"
+        applicationId = "vibra.music.com"
         minSdk = 26
         targetSdk = 37
-        versionCode = 142
-        versionName = "15.1.0"
+        versionCode = 2
+        versionName = "1.0.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
@@ -83,12 +75,6 @@ android {
                 ?: ""
         buildConfigField("String", "LASTFM_API_KEY", "\"$lastfmApiKey\"")
         buildConfigField("String", "LASTFM_SECRET", "\"$lastfmSecret\"")
-
-        val togetherBearerToken =
-            localProperties.getProperty("TOGETHER_BEARER_TOKEN")
-                ?: System.getenv("TOGETHER_BEARER_TOKEN")
-                ?: ""
-        buildConfigField("String", "TOGETHER_BEARER_TOKEN", "\"$togetherBearerToken\"")
 
         buildConfigField("String", "DATA_SERVER_URL", dataServerUrl.asBuildConfigString())
         buildConfigField("String", "API_BEARER_TOKEN", apiBearerToken.asBuildConfigString())
@@ -109,16 +95,16 @@ android {
             versionName = nightlyVersionName
         }
         buildConfigField("String", "DISTRIBUTION", "\"gms\"")
-        buildConfigField("boolean", "UPDATER_AVAILABLE", "true")
+        buildConfigField("boolean", "UPDATER_AVAILABLE", "false")
 
         val githubOwner =
             System.getenv("GITHUB_OWNER")?.trim()
                 ?: localProperties.getProperty("GITHUB_OWNER")?.trim()
-                ?: "rukamori"
+                ?: ""
         val githubRepo =
             System.getenv("GITHUB_REPO")?.trim()
                 ?: localProperties.getProperty("GITHUB_REPO")?.trim()
-                ?: "ArchiveTune"
+                ?: ""
         buildConfigField("String", "GITHUB_OWNER", githubOwner.asBuildConfigString())
         buildConfigField("String", "GITHUB_REPO", githubRepo.asBuildConfigString())
         buildConfigField("boolean", "IS_NIGHTLY_BUILD", "false")
@@ -141,20 +127,12 @@ android {
             dimension = "distribution"
             isDefault = true
             buildConfigField("String", "DISTRIBUTION", "\"gms\"")
-            buildConfigField("boolean", "UPDATER_AVAILABLE", "true")
-            buildConfigField("String", "DISCORD_APPLICATION_ID", "\"$discordApplicationId\"")
-            buildConfigField("long", "DISCORD_APPLICATION_ID_LONG", "${discordApplicationIdLong}L")
-            buildConfigField("String", "DISCORD_REDIRECT_SCHEME", "\"$discordRedirectScheme\"")
-            manifestPlaceholders["discordRedirectScheme"] = discordRedirectScheme
+            buildConfigField("boolean", "UPDATER_AVAILABLE", "false")
         }
         create("foss") {
             dimension = "distribution"
             buildConfigField("String", "DISTRIBUTION", "\"foss\"")
-            buildConfigField("boolean", "UPDATER_AVAILABLE", "true")
-            buildConfigField("String", "DISCORD_APPLICATION_ID", "\"$discordApplicationId\"")
-            buildConfigField("long", "DISCORD_APPLICATION_ID_LONG", "${discordApplicationIdLong}L")
-            buildConfigField("String", "DISCORD_REDIRECT_SCHEME", "\"$discordRedirectScheme\"")
-            manifestPlaceholders["discordRedirectScheme"] = discordRedirectScheme
+            buildConfigField("boolean", "UPDATER_AVAILABLE", "false")
         }
         create("mobile") {
             dimension = "device"
@@ -211,9 +189,7 @@ android {
 
     buildTypes {
         release {
-            if (hasReleaseSigningConfig) {
-                signingConfig = signingConfigs.getByName("release")
-            }
+            signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
@@ -225,6 +201,19 @@ android {
             buildConfigField("boolean", "GATEKEEPER_ENABLED", "false")
             applicationIdSuffix = ".debug"
             isDebuggable = true
+        }
+        create("benchmark") {
+            initWith(getByName("release"))
+            applicationIdSuffix = ".benchmark"
+            signingConfig = signingConfigs.getByName("debug")
+            isDebuggable = false
+            matchingFallbacks += listOf("release")
+        }
+        create("nonMinifiedBenchmark") {
+            initWith(getByName("benchmark"))
+            isMinifyEnabled = false
+            isShrinkResources = false
+            matchingFallbacks += listOf("release")
         }
         create("nightly") {
             applicationIdSuffix = ".nightly"
@@ -242,11 +231,11 @@ android {
             val nightlyReleaseOwner =
                 System.getenv("NIGHTLY_RELEASE_GITHUB_OWNER")?.trim()
                     ?: localProperties.getProperty("NIGHTLY_RELEASE_GITHUB_OWNER")?.trim()
-                    ?: "rukamori"
+                    ?: ""
             val nightlyReleaseRepo =
                 System.getenv("NIGHTLY_RELEASE_GITHUB_REPO")?.trim()
                     ?: localProperties.getProperty("NIGHTLY_RELEASE_GITHUB_REPO")?.trim()
-                    ?: "canary"
+                    ?: ""
             buildConfigField("String", "RELEASE_GITHUB_OWNER", nightlyReleaseOwner.asBuildConfigString())
             buildConfigField("String", "RELEASE_GITHUB_REPO", nightlyReleaseRepo.asBuildConfigString())
         }
@@ -307,6 +296,7 @@ ksp {
 }
 
 dependencies {
+    implementation("androidx.profileinstaller:profileinstaller:1.4.1")
     implementation(libs.guava)
     implementation(libs.coroutines.guava)
     implementation(libs.concurrent.futures)
@@ -396,21 +386,19 @@ dependencies {
     implementation(project(":lyrics:unison"))
     implementation(project(":lyrics:youlyplus"))
     implementation(project(":lastfm"))
-    implementation(project(":canvas"))
     implementation(project(":shazamkit"))
     implementation(project(":spotifycore"))
     implementation(project(":morideobfuscator"))
     implementation("com.materialkolor:material-kolor:5.0.1")
 
     implementation(libs.webkit)
+    // Cast serves local media through a small embedded server.
+    implementation(libs.ktor.server.core)
+    implementation(libs.ktor.server.cio)
     implementation(libs.ktor.client.core)
     implementation(libs.ktor.client.okhttp)
     implementation(libs.ktor.serialization.json)
     implementation(libs.ktor.client.websockets)
-    implementation(libs.ktor.server.core)
-    implementation(libs.ktor.server.cio)
-    implementation(libs.ktor.server.websockets)
-    implementation(libs.ktor.server.content.negotiation)
 
     coreLibraryDesugaring(libs.desugaring)
 
@@ -433,8 +421,8 @@ androidComponents {
             }
         val generateIconPack =
             tasks.register<GenerateIconPackTask>("generate${capitalizedVariantName}IconPack") {
-                metadataFile.set(rootProject.layout.projectDirectory.file("IconPack/metadata.json"))
-                svgDirectory.set(rootProject.layout.projectDirectory.dir("IconPack/svg"))
+                metadataFile.set(rootProject.layout.projectDirectory.file("branding/iconpack/metadata.json"))
+                svgDirectory.set(rootProject.layout.projectDirectory.dir("branding/iconpack/svg"))
                 applicationId.set(variant.applicationId)
                 targetActivityClassName.set("moe.rukamori.archivetune.MainActivity")
                 resourceOutputDirectory.set(
@@ -493,4 +481,16 @@ configurations.configureEach {
     resolutionStrategy.force(
         "org.jetbrains.kotlin:kotlin-metadata-jvm:${libs.versions.kotlinMetadata.get()}",
     )
+}
+
+// Fail explicitly, including for implicit release packaging requested by another task.
+tasks.configureEach {
+    if (name.startsWith("validateSigning") && name.endsWith("Release")) {
+        doFirst {
+            check(hasReleaseSigningConfig) {
+                "Vibra release signing is missing. Configure VIBRA_KEYSTORE_PATH, VIBRA_STORE_PASSWORD, " +
+                    "VIBRA_KEY_ALIAS and VIBRA_KEY_PASSWORD, or signing.* in local.properties. See docs/SETUP.md."
+            }
+        }
+    }
 }

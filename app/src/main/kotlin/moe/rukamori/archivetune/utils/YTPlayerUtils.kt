@@ -411,11 +411,6 @@ object YTPlayerUtils {
         return resolvedAuthState.withGeneratedPoTokens(videoId, tokenResult)
     }
 
-    suspend fun preWarmYoutubeiPoTokens(authState: PlaybackAuthState) {
-        val contentBinding = authState.youtubeiContentBinding() ?: return
-        BotGuardTokenGenerator.preWarm(contentBinding)
-    }
-
     private fun PlaybackAuthState.withGeneratedPoTokens(
         videoId: String,
         tokenResult: PoTokenResult,

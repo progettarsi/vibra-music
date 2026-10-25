@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Strings introduced by the Vibra presentation layer. -->
+<resources>
+    <string name="pause">Pause</string>
+    <string name="vibra_open_player">Open player</string>
+    <string name="vibra_close_player">Close player</string>
+    <string name="vibra_search_hint">Search songs, artists, albums</string>
+    <string name="vibra_clear_search">Clear search</string>
+    <string name="vibra_from_source">From: %1$s</string>
+    <string name="vibra_now_playing">Now playing</string>
+    <string name="vibra_close_queue">Close queue</string>
+    <string name="vibra_repeat_off">Repeat off</string>
+    <string name="vibra_repeat_all">Repeat all</string>
+    <string name="vibra_repeat_one">Repeat one</string>
+    <string name="vibra_seek">Playback position</string>
+    <string name="vibra_like">Like</string>
+    <string name="vibra_unlike">Remove like</string>
+    <string name="vibra_lyrics">Lyrics</string>
+    <string name="vibra_sleep_timer_active">Sleep timer on</string>
+    <string name="vibra_downloaded">Downloaded</string>
+    <string name="vibra_for_you">For You</string>
+    <string name="vibra_for_you_subtitle">Picked from what you listen to</string>
+    <string name="vibra_keep_listening">Keep listening</string>
+    <string name="vibra_by_you">by You</string>
+    <string name="vibra_your_number_one">Your N°1</string>
+    <string name="vibra_your_playlists">Your playlists</string>
+    <string name="vibra_guest">Listener</string>
+    <string name="vibra_home_empty_title">Your music starts here</string>
+    <string name="vibra_home_empty_body">Search for something you love, or sign in to YouTube Music to bring your library.</string>
+    <string name="vibra_home_error_title">Couldn\'t load your home</string>
+    <string name="vibra_more">More options</string>
+    <string name="vibra_skip_previous">Previous track</string>
+    <string name="vibra_skip_next">Next track</string>
+    <string name="vibra_shuffle_on">Shuffle on</string>
+    <string name="vibra_shuffle_off">Shuffle off</string>
+    <string name="vibra_reorder">Drag to reorder</string>
+    <string name="vibra_removed_from_queue">Removed %1$s</string>
+    <string name="vibra_device_music">On this device</string>
+    <string name="vibra_back">Back</string>
+    <string name="vibra_more_results">More results</string>
+    <string name="vibra_open_profile">Open your profile</string>
+    <string name="vibra_for_you_explore">Explore moods and genres</string>
+    <string name="vibra_on_repeat">On repeat this week</string>
+    <string name="vibra_liked_songs_count">Liked songs · %1$d</string>
+    <string name="vibra_library_empty">Your library is empty for now. Like songs, save albums or create a playlist and they will show up here, arranged around what you play most.</string>
+    <string name="vibra_listening_summary">Listening</string>
+    <string name="vibra_minutes_this_week">minutes this week</string>
+    <string name="vibra_songs_this_week">different songs this week</string>
+    <string name="vibra_edit_profile">Edit profile</string>
+    <string name="vibra_no_favourite_yet">Play some music to find out</string>
+    <string name="vibra_profile_shape">Shape</string>
+    <string name="vibra_profile_colour">Main colour</string>
+    <string name="vibra_shape_flower">Flower</string>
+    <string name="vibra_shape_cookie">Cookie</string>
+    <string name="vibra_shape_sunny">Sun</string>
+    <string name="vibra_shape_clover">Clover</string>
+    <string name="vibra_shape_puffy">Cloud</string>
+    <string name="vibra_shape_gem">Gem</string>
+    <string name="vibra_shape_heart">Heart</string>
+    <string name="vibra_shape_star">Star</string>
+    <string name="vibra_shape_burst">Burst</string>
+    <string name="vibra_period_week">Week</string>
+    <string name="vibra_period_month">Month</string>
+    <string name="vibra_period_year">Year</string>
+    <string name="vibra_period_all">All time</string>
+    <string name="vibra_stats_empty">Nothing played in this period yet. Your stats grow as you listen.</string>
+    <string name="vibra_top_artists">Top artists</string>
+    <string name="vibra_top_songs">Top songs</string>
+    <string name="vibra_top_albums">Top albums</string>
+    <string name="vibra_your_stats">Your stats</string>
+    <plurals name="vibra_minutes_count">
+        <item quantity="one">%1$d minute this week</item>
+        <item quantity="other">%1$d minutes this week</item>
+    </plurals>
+    <plurals name="vibra_minutes_listened">
+        <item quantity="one">minutes listened · %1$d song</item>
+        <item quantity="other">minutes listened · %1$d songs</item>
+    </plurals>
+    <plurals name="vibra_minutes_total">
+        <item quantity="one">%1$d minute</item>
+        <item quantity="other">%1$d minutes</item>
+    </plurals>
+    <plurals name="vibra_play_count">
+        <item quantity="one">%1$d play</item>
+        <item quantity="other">%1$d plays</item>
+    </plurals>
+    <string name="vibra_cast_connected">Connected</string>
+    <string name="vibra_about_tagline">Music that moves like liquid.</string>
+</resources>

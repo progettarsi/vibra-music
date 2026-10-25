@@ -3,7 +3,7 @@
     <bool name="leak_canary_watcher_auto_install">false</bool>
     <bool name="leak_canary_allow_in_non_debuggable_build">true</bool>
 
-    <!-- LeakCanary remains available through the ArchiveTune launcher long-press menu. -->
+    <!-- LeakCanary remains available through the Vibra launcher long-press menu. -->
     <bool name="leak_canary_add_launcher_icon">false</bool>
     <bool name="leak_canary_add_dynamic_shortcut">true</bool>
 </resources>

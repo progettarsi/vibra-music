@@ -110,7 +110,6 @@ class ArtistViewModel
         val artistId = savedStateHandle.get<String>("artistId")!!
         private val _artistPage = MutableStateFlow<ArtistPage?>(null)
         val artistPage = _artistPage.asStateFlow()
-        private val showLibrary = MutableStateFlow(false)
         private var fetchJob: Job? = null
         private val eventChannel = Channel<ArtistEvent>(capacity = Channel.BUFFERED)
         val events = eventChannel.receiveAsFlow()
@@ -150,14 +149,9 @@ class ArtistViewModel
                     database.artistAlbumsPreview(artistId).map { it.filterExplicitAlbums(hideExplicit) }
                 }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
-        val showLocal = combine(libraryArtist, librarySongs, artistPage, showLibrary) { artist, songs, page, selected ->
-            artist?.artist?.isLocal == true || selected || (page == null && songs.isNotEmpty())
+        val showLocal: kotlinx.coroutines.flow.StateFlow<Boolean> = combine(libraryArtist, librarySongs, artistPage) { artist, songs, page ->
+            artist?.artist?.isLocal == true || (page == null && songs.isNotEmpty())
         }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
-
-        fun toggleLibrary() {
-            showLibrary.value = !showLocal.value
-            if (!showLibrary.value && artistPage.value == null) fetchArtistsFromYTM()
-        }
 
         init {
             viewModelScope.launch {

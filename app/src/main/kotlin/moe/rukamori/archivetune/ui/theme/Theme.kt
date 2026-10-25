@@ -51,7 +51,9 @@ import moe.rukamori.archivetune.constants.AppFontPreference
 import kotlin.math.abs
 import kotlin.math.min
 
-val DefaultThemeColor = Color(0xFFED5564)
+// Vibra: the default theme is the exact Figma scheme (see app.vibra.ui.theme.VibraColors).
+// This seed is the sentinel meaning "use the Vibra scheme" rather than a generated one.
+val DefaultThemeColor = app.vibra.ui.theme.VibraPalette.Seed
 val LocalArchiveTuneFontPreference = staticCompositionLocalOf { AppFontPreference.DEFAULT }
 val LocalArchiveTuneFontFamily = staticCompositionLocalOf { AppFontFamily }
 
@@ -69,7 +71,12 @@ data class ThemeSeedPalette(
     val secondary: Color,
     val tertiary: Color,
     val neutral: Color,
-)
+) {
+    /** True for the built-in "Default" palette, which renders the exact Vibra scheme. */
+    fun isVibraDefault(): Boolean =
+        primary == DefaultThemeColor && secondary == DefaultThemeColor &&
+            tertiary == DefaultThemeColor && neutral == DefaultThemeColor
+}
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -84,8 +91,10 @@ fun ArchiveTuneTheme(
     content: @Composable () -> Unit,
 ) {
     val context = LocalContext.current
-    val useSystemDynamicColor =
-        (seedPalette == null && themeColor == DefaultThemeColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
+    // Vibra: the hand-tuned Figma scheme replaces wallpaper-based Material You colours by
+    // default; generated schemes are still used for album-art theming and custom palettes.
+    val useVibraScheme =
+        (seedPalette == null && themeColor == DefaultThemeColor) || seedPalette?.isVibraDefault() == true
 
     val customFontFamily =
         produceState<FontFamily?>(
@@ -143,8 +152,8 @@ fun ArchiveTuneTheme(
         }
 
     val baseColorScheme =
-        if (useSystemDynamicColor) {
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+        if (useVibraScheme) {
+            app.vibra.ui.theme.vibraColorScheme(darkTheme)
         } else {
             appColorScheme
         }

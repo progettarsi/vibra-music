@@ -22,14 +22,12 @@ import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
 import okhttp3.Call
 import okhttp3.Callback
@@ -59,16 +57,15 @@ import kotlin.coroutines.resumeWithException
  * ## Lifecycle
  *
  * 1. [initialize] — called once from `Application.onCreate()` with the app context.
- * 2. [preWarm] — optional, boots the WebView at startup to avoid first-call delay.
- * 3. [mintToken] — suspend function, called per video. Reuses the engine until
+ * 2. [mintToken] — suspend function, called per video. Reuses the engine until
  *    it expires (~50 min) or the session changes.
- * 4. [onAppBackgrounded] — releases the WebView to free ~50 MB of memory.
+ * 3. [onAppBackgrounded] — releases the WebView to free ~50 MB of memory.
  *
  * ## Optimizations
  *
  * - **Suspend API** — [mintToken] is a suspend function, never blocks the calling thread.
- * - **Pre-warm** — [preWarm] bootstraps the engine at app startup so the first
- *   real mint is instant.
+ * - **Lazy startup** — the WebView is created only for an actual token request,
+ *   avoiding WebView initialization on the main thread during application startup.
  * - **Player token cache** — Caches per-video tokens (LRU, max 200) to avoid
  *   redundant mints when the same video is played multiple times.
  * - **Session token reuse** — The session token is minted once per engine and
@@ -128,32 +125,6 @@ object BotGuardTokenGenerator {
     fun initialize(context: Context) {
         appContext = context.applicationContext
         Timber.tag(TAG).d("Initialized")
-    }
-
-    /**
-     * Pre-warm the BotGuard engine at app startup.
-     * This bootstraps the WebView and generates the session token so that
-     * the first real [mintToken] call is instant.
-     *
-     * Safe to call from a background coroutine. No-op if already warmed.
-     */
-    suspend fun preWarm(sessionId: String) {
-        val ctx = appContext ?: return
-        if (permanentlyBroken) return
-        if (sessionId.isBlank()) return
-
-        try {
-            withTimeout(COLD_START_TIMEOUT_MS) {
-                ensureEngineReady(ctx, sessionId)
-            }
-            Timber.tag(TAG).d("Pre-warm complete")
-        } catch (timeout: TimeoutCancellationException) {
-            Timber.tag(TAG).w("Pre-warm timed out after ${COLD_START_TIMEOUT_MS}ms")
-        } catch (cancellation: CancellationException) {
-            throw cancellation
-        } catch (e: Exception) {
-            Timber.tag(TAG).w(e, "Pre-warm failed (non-fatal)")
-        }
     }
 
     /**
@@ -260,6 +231,14 @@ object BotGuardTokenGenerator {
                 destroyEngineLocked()
             }
         }
+    }
+
+    /**
+     * Vibra: drops the cached player token for [videoId] so the next mint is fresh. Used
+     * when YouTube rejected a stream request made with that token.
+     */
+    suspend fun invalidateVideo(videoId: String) {
+        mutex.withLock { playerTokenCache.remove(videoId) }
     }
 
     /**

@@ -15,7 +15,10 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import app.vibra.ui.motion.reorderWobble
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
@@ -90,9 +93,9 @@ import moe.rukamori.archivetune.LocalDatabase
 import moe.rukamori.archivetune.LocalDownloadUtil
 import moe.rukamori.archivetune.LocalPlayerAwareWindowInsets
 import moe.rukamori.archivetune.LocalPlayerConnection
+import moe.rukamori.archivetune.playback.queues.LocalMixQueue
 import moe.rukamori.archivetune.R
 import moe.rukamori.archivetune.constants.AppBarHeight
-import moe.rukamori.archivetune.constants.PlaylistEditLockKey
 import moe.rukamori.archivetune.constants.PlaylistSongSortType
 import moe.rukamori.archivetune.constants.SwipeToSongKey
 import moe.rukamori.archivetune.db.entities.PlaylistSong
@@ -103,12 +106,10 @@ import moe.rukamori.archivetune.innertube.YouTube
 import moe.rukamori.archivetune.innertube.models.WatchEndpoint
 import moe.rukamori.archivetune.models.toMediaMetadata
 import moe.rukamori.archivetune.playback.queues.ListQueue
-import moe.rukamori.archivetune.playback.queues.LocalMixQueue
 import moe.rukamori.archivetune.playback.queues.YouTubeQueue
 import moe.rukamori.archivetune.playlistimport.replaceSongSource
 import moe.rukamori.archivetune.ui.component.AssignTagsDialog
 import moe.rukamori.archivetune.ui.component.DefaultDialog
-import moe.rukamori.archivetune.ui.component.DraggableScrollbar
 import moe.rukamori.archivetune.ui.component.EditPlaylistDialog
 import moe.rukamori.archivetune.ui.component.EmptyPlaceholder
 import moe.rukamori.archivetune.ui.component.ExpressivePullToRefreshBox
@@ -173,7 +174,6 @@ fun LocalPlaylistScreen(
     val sortDescending by viewModel.sortDescending.collectAsStateWithLifecycle()
     val onSortTypeChange: (PlaylistSongSortType) -> Unit = { viewModel.updateSortPreference(it, sortDescending) }
     val onSortDescendingChange: (Boolean) -> Unit = { viewModel.updateSortPreference(sortType, it) }
-    var locked by rememberPreference(PlaylistEditLockKey, defaultValue = true)
     val swipeToSongEnabled by rememberPreference(SwipeToSongKey, defaultValue = true)
     var showAssignTagsDialog by remember { mutableStateOf(false) }
 
@@ -303,46 +303,15 @@ fun LocalPlaylistScreen(
     val downloadUtil = LocalDownloadUtil.current
     var downloads by remember { mutableStateOf<Map<String, Download>>(emptyMap()) }
     var downloadState by remember { mutableStateOf<HeaderDownloadState>(HeaderDownloadState.None) }
-    val globalDownloadState = remember(downloads) {
-        val activeDownloads = downloads.values.filter {
-            it.state == Download.STATE_DOWNLOADING ||
-            it.state == Download.STATE_QUEUED ||
-            it.state == Download.STATE_RESTARTING ||
-            it.state == Download.STATE_STOPPED
-        }
-        if (activeDownloads.isEmpty()) {
-            HeaderDownloadState.None
-        } else {
-            var progressTotal = 0f
-            var hasRunning = false
-            var hasPaused = false
-            activeDownloads.forEach { download ->
-                val progress = download.percentDownloaded.takeIf { it >= 0f }?.div(100f) ?: 0f
-                progressTotal += progress.coerceIn(0f, 1f)
-                if (download.state == Download.STATE_STOPPED) {
-                    hasPaused = hasPaused || download.stopReason == 1
-                } else {
-                    hasRunning = true
-                }
-            }
-            HeaderDownloadState.Partial(
-                progress = progressTotal / activeDownloads.size,
-                paused = hasPaused && !hasRunning,
-            )
-        }
-    }
-
     val editable: Boolean = playlist?.playlist?.isEditable == true
     val canChangeSongSource = editable && playlist?.playlist?.browseId == null
     val isReorderingEnabled =
         editable &&
             sortType == PlaylistSongSortType.CUSTOM &&
-            !locked &&
             !selection &&
             !isSearching
     val isSwipeToDeleteEnabled =
         editable &&
-            !locked &&
             !selection &&
             !swipeToSongEnabled &&
             !isReorderingEnabled
@@ -484,13 +453,16 @@ fun LocalPlaylistScreen(
         }
     }
     val lazyListState = rememberLazyListState()
+    val reorderHaptics = app.vibra.ui.haptics.rememberVibraHaptics()
     var dragInfo by remember { mutableStateOf<Pair<Int, Int>?>(null) }
     val reorderableState =
         rememberReorderableLazyListState(
             lazyListState = lazyListState,
             scrollThresholdPadding = LocalPlayerAwareWindowInsets.current.asPaddingValues(),
         ) { from, to ->
-            if (to.index >= headerItems && from.index >= headerItems) {
+            val fromIndex = from.index - headerItems
+            val toIndex = to.index - headerItems
+            if (isReorderingEnabled && fromIndex in mutableSongs.indices && toIndex in mutableSongs.indices && fromIndex != toIndex) {
                 val currentDragInfo = dragInfo
                 dragInfo =
                     if (currentDragInfo == null) {
@@ -499,6 +471,7 @@ fun LocalPlaylistScreen(
                         currentDragInfo.first to (to.index - headerItems)
                     }
                 mutableSongs.move(from.index - headerItems, to.index - headerItems)
+                reorderHaptics.tick()
             }
         }
 
@@ -731,39 +704,6 @@ fun LocalPlaylistScreen(
                                             }
                                         }
 
-                                        MediaDetailAction(
-                                            contentDescription = R.string.download,
-                                            contentColor = contentColor,
-                                            onClick = {
-                                                navController.navigate(
-                                                    "auto_playlist/downloaded?tab=progress",
-                                                )
-                                            },
-                                        ) {
-                                            val globalProgress = (globalDownloadState as? HeaderDownloadState.Partial)?.progress ?: 0f
-                                            val globalPaused = (globalDownloadState as? HeaderDownloadState.Partial)?.paused ?: false
-                                            HeaderDownloadProgressIndicator(
-                                                progress = globalProgress,
-                                                paused = globalPaused,
-                                                icon = R.drawable.list,
-                                            )
-                                        }
-
-                                        MediaDetailIconAction(
-                                            icon = R.drawable.mix,
-                                            contentDescription = R.string.start_mix,
-                                            contentColor = contentColor,
-                                            onClick = {
-                                                playerConnection.playQueue(
-                                                    LocalMixQueue(
-                                                        database = database,
-                                                        playlistId = playlist.id,
-                                                        maxMixSize = 50,
-                                                    ),
-                                                )
-                                            },
-                                        )
-
                                         MediaDetailIconAction(
                                             icon = R.drawable.radio,
                                             contentDescription = R.string.start_radio,
@@ -831,18 +771,6 @@ fun LocalPlaylistScreen(
                                     },
                                     modifier = Modifier.weight(1f),
                                 )
-                                if (editable && sortType == PlaylistSongSortType.CUSTOM) {
-                                    IconButton(
-                                        onClick = { locked = !locked },
-                                        onLongClick = {},
-                                        modifier = Modifier.padding(horizontal = 6.dp),
-                                    ) {
-                                        Icon(
-                                            painter = painterResource(if (locked) R.drawable.lock else R.drawable.lock_open),
-                                            contentDescription = null,
-                                        )
-                                    }
-                                }
                             }
                         }
                     }
@@ -862,7 +790,7 @@ fun LocalPlaylistScreen(
                             Modifier.graphicsLayer {
                                 compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen
                             },
-                    ) {
+                    ) { isDragging ->
                         val currentItem by rememberUpdatedState(song)
 
                         fun deleteFromPlaylist() {
@@ -911,7 +839,25 @@ fun LocalPlaylistScreen(
                             }
                         }
 
+                        val playSong: () -> Unit = {
+                                                if (song.song.id == mediaMetadata?.id) {
+                                                    playerConnection.player.togglePlayPause()
+                                                } else {
+                                                    playerConnection.playQueue(
+                                                        ListQueue(
+                                                            title = playlist!!.playlist.name,
+                                                            items = songs.map { it.song.toMediaItem() },
+                                                            startIndex = songs.indexOfFirst { it.map.id == song.map.id },
+                                                        ),
+                                                    )
+                                                }
+                                            }
+
                         val content: @Composable () -> Unit = {
+                            Box(Modifier.reorderWobble(
+                                active = reorderableState.isAnyItemDragging && !isDragging,
+                                seed = index,
+                            )) {
                             SongListItem(
                                 song = song.song,
                                 showSourceIcon = true,
@@ -950,39 +896,12 @@ fun LocalPlaylistScreen(
                                         )
                                     }
 
-                                    if (isReorderingEnabled) {
-                                        IconButton(
-                                            onClick = { },
-                                            onLongClick = {},
-                                            modifier =
-                                                Modifier
-                                                    .draggableHandle()
-                                                    .graphicsLayer { alpha = 0.99f },
-                                        ) {
-                                            Icon(
-                                                painter = painterResource(R.drawable.drag_handle),
-                                                contentDescription = null,
-                                            )
-                                        }
-                                    }
                                 },
                                 modifier =
                                     Modifier
                                         .fillMaxWidth()
                                         .combinedClickable(
-                                            onClick = {
-                                                if (song.song.id == mediaMetadata?.id) {
-                                                    playerConnection.player.togglePlayPause()
-                                                } else {
-                                                    playerConnection.playQueue(
-                                                        ListQueue(
-                                                            title = playlist!!.playlist.name,
-                                                            items = songs.map { it.song.toMediaItem() },
-                                                            startIndex = songs.indexOfFirst { it.map.id == song.map.id },
-                                                        ),
-                                                    )
-                                                }
-                                            },
+                                            onClick = playSong,
                                             onLongClick = {
                                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                                 if (!selection) {
@@ -992,6 +911,18 @@ fun LocalPlaylistScreen(
                                             },
                                         ),
                             )
+                                // The shared row's artwork starts at Gutter and uses RowThumbnail.
+                                // A hit target delegates to the same row without modifying Items.kt.
+                                if (isReorderingEnabled) {
+                                    Box(
+                                        Modifier.align(Alignment.CenterStart)
+                                            .padding(start = app.vibra.ui.theme.VibraDimens.Gutter)
+                                            .size(app.vibra.ui.theme.VibraDimens.RowThumbnail)
+                                            .clickable(onClick = playSong)
+                                            .longPressDraggableHandle(onDragStarted = { reorderHaptics.longPress() }),
+                                    )
+                                }
+                            }
                         }
 
                         if (isSwipeToDeleteEnabled) {
@@ -1109,18 +1040,6 @@ fun LocalPlaylistScreen(
                 }
             }
         }
-
-        DraggableScrollbar(
-            modifier =
-                Modifier
-                    .padding(
-                        LocalPlayerAwareWindowInsets.current
-                            .union(WindowInsets.ime)
-                            .asPaddingValues(),
-                    ).align(Alignment.CenterEnd),
-            scrollState = lazyListState,
-            headerItems = headerItems,
-        )
 
         // Top App Bar
         val topAppBarColors =

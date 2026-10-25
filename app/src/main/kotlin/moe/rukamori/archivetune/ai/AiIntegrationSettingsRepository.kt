@@ -19,10 +19,8 @@ import moe.rukamori.archivetune.constants.AiApiValidationStatus
 import moe.rukamori.archivetune.constants.AiApiValidationStatusKey
 import moe.rukamori.archivetune.constants.AiCustomEndpointKey
 import moe.rukamori.archivetune.constants.AiCustomModelKey
-import moe.rukamori.archivetune.constants.AiCustomPromptKey
 import moe.rukamori.archivetune.constants.AiProvider
 import moe.rukamori.archivetune.constants.AiProviderKey
-import moe.rukamori.archivetune.constants.AiRequestParametersKey
 import moe.rukamori.archivetune.constants.AiSelectedModelKey
 import moe.rukamori.archivetune.extensions.toEnum
 import moe.rukamori.archivetune.utils.dataStore
@@ -100,20 +98,6 @@ class AiIntegrationSettingsRepository
             }
         }
 
-        suspend fun setCustomPrompt(prompt: String) {
-            context.dataStore.edit { preferences ->
-                preferences[AiCustomPromptKey] = prompt.trim()
-            }
-        }
-
-        suspend fun setRequestParameters(value: String) {
-            val normalized = AiRequestParameters.normalize(value)
-            context.dataStore.edit { preferences ->
-                preferences[AiRequestParametersKey] = normalized
-                preferences[AiApiValidationStatusKey] = AiApiValidationStatus.UNKNOWN.name
-            }
-        }
-
         suspend fun setValidationStatus(status: AiApiValidationStatus, config: AiServiceConfig): Boolean {
             var updated = false
             context.dataStore.edit { preferences ->
@@ -141,7 +125,7 @@ class AiIntegrationSettingsRepository
                     preferences[AiApiValidationStatusKey].toEnum(AiApiValidationStatus.UNKNOWN),
                 selectedModel = preferences[AiSelectedModelKey].orEmpty(),
                 customModel = preferences[AiCustomModelKey].orEmpty(),
-                customPrompt = preferences[AiCustomPromptKey].orEmpty(),
-                requestParameters = preferences[AiRequestParametersKey].orEmpty(),
+                customPrompt = "",
+                requestParameters = "",
             )
     }

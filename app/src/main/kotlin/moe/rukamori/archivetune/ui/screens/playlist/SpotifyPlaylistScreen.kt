@@ -58,7 +58,6 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
-import androidx.media3.exoplayer.offline.Download
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
@@ -85,7 +84,6 @@ import moe.rukamori.archivetune.spotify.SpotifyPlaylistEvent
 import moe.rukamori.archivetune.spotify.SpotifyPlaylistQueue
 import moe.rukamori.archivetune.spotify.SpotifyPlaylistViewModel
 import moe.rukamori.archivetune.spotify.models.SpotifyTrack
-import moe.rukamori.archivetune.ui.component.DraggableScrollbar
 import moe.rukamori.archivetune.ui.component.EmptyPlaceholder
 import moe.rukamori.archivetune.ui.component.ExpressivePullToRefreshBox
 import moe.rukamori.archivetune.ui.component.IconButton
@@ -135,35 +133,6 @@ fun SpotifyPlaylistScreen(
                 downloads = downloads,
             )
         }
-
-    val globalDownloadState = remember(downloads) {
-        val activeDownloads = downloads.values.filter {
-            it.state == Download.STATE_DOWNLOADING ||
-            it.state == Download.STATE_QUEUED ||
-            it.state == Download.STATE_RESTARTING ||
-            it.state == Download.STATE_STOPPED
-        }
-        if (activeDownloads.isEmpty()) {
-            HeaderDownloadState.None
-        } else {
-            var progressTotal = 0f
-            var hasRunning = false
-            var hasPaused = false
-            activeDownloads.forEach { download ->
-                val progress = download.percentDownloaded.takeIf { it >= 0f }?.div(100f) ?: 0f
-                progressTotal += progress.coerceIn(0f, 1f)
-                if (download.state == Download.STATE_STOPPED) {
-                    hasPaused = hasPaused || download.stopReason == 1
-                } else {
-                    hasRunning = true
-                }
-            }
-            HeaderDownloadState.Partial(
-                progress = progressTotal / activeDownloads.size,
-                paused = hasPaused && !hasRunning,
-            )
-        }
-    }
 
     fun handleDownloadAction(
         items: ImmutableList<SpotifyDownloadItem>,
@@ -433,24 +402,6 @@ fun SpotifyPlaylistScreen(
                                             }
                                         }
                                     }
-
-                                    MediaDetailAction(
-                                        contentDescription = R.string.download,
-                                        contentColor = contentColor,
-                                        onClick = {
-                                            navController.navigate(
-                                                "auto_playlist/downloaded?tab=progress",
-                                            )
-                                        },
-                                    ) {
-                                        val globalProgress = (globalDownloadState as? HeaderDownloadState.Partial)?.progress ?: 0f
-                                        val globalPaused = (globalDownloadState as? HeaderDownloadState.Partial)?.paused ?: false
-                                        HeaderDownloadProgressIndicator(
-                                            progress = globalProgress,
-                                            paused = globalPaused,
-                                            icon = R.drawable.list,
-                                        )
-                                    }
                                 }
                                 MediaDetailIconAction(
                                     icon = R.drawable.sync,
@@ -460,8 +411,8 @@ fun SpotifyPlaylistScreen(
                                 )
                                 if (tracks.isNotEmpty()) {
                                     MediaDetailIconAction(
-                                        icon = R.drawable.mix,
-                                        contentDescription = R.string.start_mix,
+                                        icon = R.drawable.shuffle,
+                                        contentDescription = R.string.shuffle,
                                         contentColor = contentColor,
                                         onClick = { playPlaylist(shuffled = true) },
                                     )
@@ -551,16 +502,6 @@ fun SpotifyPlaylistScreen(
                 )
             }
         }
-
-        DraggableScrollbar(
-            modifier =
-                Modifier
-                    .padding(
-                        LocalPlayerAwareWindowInsets.current.union(WindowInsets.ime).asPaddingValues(),
-                    ).align(Alignment.CenterEnd),
-            scrollState = lazyListState,
-            headerItems = if (!isSearching && playlist != null) 1 else 0,
-        )
 
         TopAppBar(
             colors = topAppBarColors,

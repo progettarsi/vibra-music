@@ -9,7 +9,6 @@
 
 package moe.rukamori.archivetune.ui.component
 
-import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -68,7 +67,7 @@ fun NewActionButton(
                 containerColor = containerColor,
                 contentColor = actionContentColor,
             ),
-        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 14.dp),
+        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 12.dp),
     ) {
         Column(
             modifier = Modifier.fillMaxWidth(),
@@ -82,14 +81,17 @@ fun NewActionButton(
                 icon()
             }
 
+            // Vibra: labels wrap onto two lines instead of marquee-scrolling inside a
+            // single cut-off line, so every action is readable at a glance.
             Text(
                 text = text,
-                style = MaterialTheme.typography.labelLarge,
+                style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.SemiBold,
                 textAlign = TextAlign.Center,
                 maxLines = 2,
+                minLines = 2,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.basicMarquee(),
+                color = MaterialTheme.colorScheme.onSurface,
             )
         }
     }

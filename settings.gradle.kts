@@ -55,7 +55,6 @@ include(":lyrics:betterlyrics")
 include(":lyrics:unison")
 include(":lyrics:youlyplus")
 include(":lastfm")
-include(":canvas")
 include(":shazamkit")
 include(":spotifycore")
 include(":morideobfuscator")
@@ -75,3 +74,8 @@ include(":morideobfuscator")
 //        substitute(module("com.github.TeamNewPipe:NewPipeExtractor")).using(project(":extractor"))
 //    }
 // }
+
+// Keep the device-only toolchain optional for offline app development.
+if (providers.gradleProperty("enableBaselineProfiles").orNull == "true") {
+    include(":baselineprofile")
+}

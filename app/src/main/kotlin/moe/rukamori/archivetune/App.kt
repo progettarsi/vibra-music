@@ -35,7 +35,6 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import moe.rukamori.archivetune.appicon.RestoreLauncherEntryUseCase
-import moe.rukamori.archivetune.canvas.StartCanvasPolicyUseCase
 import moe.rukamori.archivetune.constants.*
 import moe.rukamori.archivetune.downloads.DownloadedArtworkRepository
 import moe.rukamori.archivetune.extensions.*
@@ -50,9 +49,6 @@ import moe.rukamori.archivetune.playback.stream.YoutubeiStreamRepository
 import moe.rukamori.archivetune.scrobbling.LastFmServiceConfig
 import moe.rukamori.archivetune.storage.StorageFolderKind
 import moe.rukamori.archivetune.storage.StorageLocationRepository
-import moe.rukamori.archivetune.ui.screens.settings.ThemePalettes
-import moe.rukamori.archivetune.ui.theme.ThemeSeedPalette
-import moe.rukamori.archivetune.ui.theme.ThemeSeedPaletteCodec
 import moe.rukamori.archivetune.utils.PlaylistCoverInterceptor
 import moe.rukamori.archivetune.utils.PreferenceStore
 import moe.rukamori.archivetune.utils.ProxyUtils
@@ -90,8 +86,6 @@ class App :
     @Inject
     lateinit var youtubeiStreamRepository: YoutubeiStreamRepository
 
-    @Inject
-    lateinit var startCanvasPolicy: StartCanvasPolicyUseCase
 
     @Inject
     lateinit var restoreLauncherEntry: RestoreLauncherEntryUseCase
@@ -173,7 +167,6 @@ class App :
     }
 
     private fun initializeCriticalSync() {
-        startCanvasPolicy.start(applicationScope)
         PaxsenixLyrics.setUserAgent("ArchiveTune", BuildConfig.VERSION_NAME)
 
         val locale = Locale.getDefault()
@@ -234,22 +227,6 @@ class App :
                     YouTube.useLoginForBrowse = true
                 }
 
-                // Apply random theme on startup if enabled
-                if (prefs[RandomThemeOnStartupKey] == true) {
-                    val randomPalette = ThemePalettes.generateRandomPalette()
-                    val seedPalette =
-                        ThemeSeedPalette(
-                            primary = randomPalette.primary,
-                            secondary = randomPalette.secondary,
-                            tertiary = randomPalette.tertiary,
-                            neutral = randomPalette.neutral,
-                        )
-                    val encodedPalette = ThemeSeedPaletteCodec.encodeForPreference(seedPalette, "Random")
-                    dataStore.edit { settings ->
-                        settings[CustomThemeColorKey] = encodedPalette
-                    }
-                }
-
                 isInitialized = true
             } catch (e: Exception) {
                 Timber.e(e, "Error during deferred initialization")
@@ -299,7 +276,6 @@ class App :
                     if (previousFingerprint != authState.fingerprint) {
                         YTPlayerUtils.clearPlaybackAuthCaches()
                         youtubeiStreamRepository.invalidateSessions()
-                        YTPlayerUtils.preWarmYoutubeiPoTokens(authState)
                     }
                 }
         }

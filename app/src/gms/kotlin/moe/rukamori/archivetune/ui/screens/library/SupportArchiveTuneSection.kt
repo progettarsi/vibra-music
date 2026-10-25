@@ -42,7 +42,9 @@ import moe.rukamori.archivetune.ads.presentation.SupportArchiveTuneScreenState
 import moe.rukamori.archivetune.ads.presentation.SupportArchiveTuneUiEvent
 import moe.rukamori.archivetune.ads.presentation.SupportArchiveTuneViewModel
 
-internal const val supportArchiveTuneAvailable = true
+// Vibra: disabled — this card opened ArchiveTune's ad-supported donation page, which funds the
+// upstream project, not this independent fork.
+internal const val supportArchiveTuneAvailable = false
 
 @Composable
 internal fun SupportArchiveTuneSection(

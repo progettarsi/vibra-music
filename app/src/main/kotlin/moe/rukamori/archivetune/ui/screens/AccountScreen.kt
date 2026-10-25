@@ -19,8 +19,6 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -199,9 +197,7 @@ fun AccountScreen(
         }
     }
 
-    TopAppBar(
-        title = { Text(stringResource(R.string.account)) },
-        navigationIcon = {
+    moe.rukamori.archivetune.ui.component.EnginePageTopBar(title = stringResource(R.string.account), navigationIcon = {
             IconButton(
                 onClick = navController::navigateUp,
                 onLongClick = navController::backToMain,
@@ -211,6 +207,5 @@ fun AccountScreen(
                     contentDescription = null,
                 )
             }
-        },
-    )
+        })
 }

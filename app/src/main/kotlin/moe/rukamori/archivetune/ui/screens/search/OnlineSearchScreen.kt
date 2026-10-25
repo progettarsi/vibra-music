@@ -12,6 +12,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -62,6 +63,9 @@ fun OnlineSearchScreen(
     onDismiss: () -> Unit,
     pureBlack: Boolean,
     viewModel: OnlineSearchSuggestionViewModel = hiltViewModel(),
+    // Vibra: the dock's search field floats above this list (and the keyboard), so the
+    // shell passes the space it occupies; null keeps the original system-bar padding.
+    bottomContentPadding: androidx.compose.ui.unit.Dp? = null,
 ) {
     val keyboardController = LocalSoftwareKeyboardController.current
     val menuState = LocalMenuState.current
@@ -90,128 +94,11 @@ fun OnlineSearchScreen(
 
     val backgroundColor = if (pureBlack) Color.Black else MaterialTheme.colorScheme.background
     val distinctResultItems = remember(viewState.items) { viewState.items.distinctBy { it.id } }
-
-    Box(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .background(backgroundColor),
-        contentAlignment = Alignment.TopCenter,
-    ) {
-        LazyColumn(
-            state = lazyListState,
-            contentPadding =
-                PaddingValues(
-                    top = 12.dp,
-                    bottom =
-                        WindowInsets.systemBars
-                            .only(WindowInsetsSides.Bottom)
-                            .asPaddingValues()
-                            .calculateBottomPadding(),
-                ),
-            verticalArrangement = Arrangement.spacedBy(SearchRowSpacing),
-            modifier =
-                Modifier
-                    .widthIn(max = SearchContentMaxWidth)
-                    .fillMaxSize(),
-        ) {
-            if (viewState.history.isNotEmpty()) {
-                item(
-                    key = "history_header",
-                    contentType = "section_header",
-                ) {
-                    SearchSectionHeader(
-                        title = stringResource(R.string.search_history),
-                        pureBlack = pureBlack,
-                        modifier = Modifier.animateItem(),
-                    )
-                }
-
-                itemsIndexed(
-                    items = viewState.history,
-                    key = { _, history -> "history_${history.query}" },
-                    contentType = { _, _ -> "history" },
-                ) { index, history ->
-                    val itemShape =
-                        remember(index, viewState.history.size) {
-                            segmentedSearchItemShape(index, viewState.history.size)
-                        }
-                    SuggestionItem(
-                        query = history.query,
-                        online = false,
-                        onClick = {
-                            onSearch(history.query)
-                            onDismiss()
-                        },
-                        onDelete = {
-                            viewModel.deleteHistory(history)
-                        },
-                        onFillTextField = {
-                            onQueryChange(TextFieldValue(history.query, TextRange(history.query.length)))
-                        },
-                        shape = itemShape,
-                        modifier = Modifier.animateItem(),
-                        pureBlack = pureBlack,
-                    )
-                }
-            }
-
-            if (viewState.suggestions.isNotEmpty()) {
-                item(
-                    key = "suggestions_header",
-                    contentType = "section_header",
-                ) {
-                    SearchSectionHeader(
-                        title = stringResource(R.string.suggestions),
-                        pureBlack = pureBlack,
-                        modifier = Modifier.animateItem(),
-                    )
-                }
-
-                itemsIndexed(
-                    items = viewState.suggestions,
-                    key = { _, suggestion -> "suggestion_$suggestion" },
-                    contentType = { _, _ -> "suggestion" },
-                ) { index, suggestion ->
-                    val itemShape =
-                        remember(index, viewState.suggestions.size) {
-                            segmentedSearchItemShape(index, viewState.suggestions.size)
-                        }
-                    SuggestionItem(
-                        query = suggestion,
-                        online = true,
-                        onClick = {
-                            onSearch(suggestion)
-                            onDismiss()
-                        },
-                        onFillTextField = {
-                            onQueryChange(TextFieldValue(suggestion, TextRange(suggestion.length)))
-                        },
-                        shape = itemShape,
-                        modifier = Modifier.animateItem(),
-                        pureBlack = pureBlack,
-                    )
-                }
-            }
-
-            if (viewState.items.isNotEmpty()) {
-                item(
-                    key = "top_results_header",
-                    contentType = "section_header",
-                ) {
-                    SearchSectionHeader(
-                        title = stringResource(R.string.top_results),
-                        pureBlack = pureBlack,
-                        modifier = Modifier.animateItem(),
-                    )
-                }
-            }
-
-            items(
-                items = distinctResultItems,
-                key = { item -> "item_${item.id}" },
-                contentType = { item -> item::class },
-            ) { item ->
+    // While results are on screen, keep the text rows short so results stay in reach.
+    val typing = distinctResultItems.isNotEmpty()
+    val shownSuggestions = if (typing) viewState.suggestions.take(MaxSuggestionsWithResults) else viewState.suggestions
+    val shownHistory = if (typing) viewState.history.take(MaxHistoryWithResults) else viewState.history
+    val resultRow: @Composable LazyItemScope.(YTItem) -> Unit = { item ->
                 YouTubeListItem(
                     item = item,
                     isActive =
@@ -387,6 +274,147 @@ fun OnlineSearchScreen(
                                     },
                             ).animateItem(),
                 )
+            }
+
+    Box(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(backgroundColor),
+        contentAlignment = Alignment.TopCenter,
+    ) {
+        LazyColumn(
+            state = lazyListState,
+            contentPadding =
+                PaddingValues(
+                    top = 12.dp,
+                    bottom =
+                        bottomContentPadding ?: WindowInsets.systemBars
+                            .only(WindowInsetsSides.Bottom)
+                            .asPaddingValues()
+                            .calculateBottomPadding(),
+                ),
+            verticalArrangement = Arrangement.spacedBy(SearchRowSpacing),
+            modifier =
+                Modifier
+                    .widthIn(max = SearchContentMaxWidth)
+                    .fillMaxSize(),
+        ) {
+            // Vibra: the best matches come first so results are reachable without
+            // scrolling; then a short list of history/suggestions; then everything else.
+            if (distinctResultItems.isNotEmpty()) {
+                item(
+                    key = "top_results_header",
+                    contentType = "section_header",
+                ) {
+                    SearchSectionHeader(
+                        title = stringResource(R.string.top_results),
+                        pureBlack = pureBlack,
+                        modifier = Modifier.animateItem(),
+                    )
+                }
+                items(
+                    items = distinctResultItems.take(TopResultCount),
+                    key = { item -> "item_${item.id}" },
+                    contentType = { item -> item::class },
+                ) { item -> resultRow(item) }
+            }
+
+            if (viewState.history.isNotEmpty()) {
+                item(
+                    key = "history_header",
+                    contentType = "section_header",
+                ) {
+                    SearchSectionHeader(
+                        title = stringResource(R.string.search_history),
+                        pureBlack = pureBlack,
+                        modifier = Modifier.animateItem(),
+                    )
+                }
+
+                itemsIndexed(
+                    items = shownHistory,
+                    key = { _, history -> "history_${history.query}" },
+                    contentType = { _, _ -> "history" },
+                ) { index, history ->
+                    val itemShape =
+                        remember(index, shownHistory.size) {
+                            segmentedSearchItemShape(index, shownHistory.size)
+                        }
+                    SuggestionItem(
+                        query = history.query,
+                        online = false,
+                        onClick = {
+                            onSearch(history.query)
+                            onDismiss()
+                        },
+                        onDelete = {
+                            viewModel.deleteHistory(history)
+                        },
+                        onFillTextField = {
+                            onQueryChange(TextFieldValue(history.query, TextRange(history.query.length)))
+                        },
+                        shape = itemShape,
+                        modifier = Modifier.animateItem(),
+                        pureBlack = pureBlack,
+                    )
+                }
+            }
+
+            if (viewState.suggestions.isNotEmpty()) {
+                item(
+                    key = "suggestions_header",
+                    contentType = "section_header",
+                ) {
+                    SearchSectionHeader(
+                        title = stringResource(R.string.suggestions),
+                        pureBlack = pureBlack,
+                        modifier = Modifier.animateItem(),
+                    )
+                }
+
+                itemsIndexed(
+                    items = shownSuggestions,
+                    key = { _, suggestion -> "suggestion_$suggestion" },
+                    contentType = { _, _ -> "suggestion" },
+                ) { index, suggestion ->
+                    val itemShape =
+                        remember(index, shownSuggestions.size) {
+                            segmentedSearchItemShape(index, shownSuggestions.size)
+                        }
+                    SuggestionItem(
+                        query = suggestion,
+                        online = true,
+                        onClick = {
+                            onSearch(suggestion)
+                            onDismiss()
+                        },
+                        onFillTextField = {
+                            onQueryChange(TextFieldValue(suggestion, TextRange(suggestion.length)))
+                        },
+                        shape = itemShape,
+                        modifier = Modifier.animateItem(),
+                        pureBlack = pureBlack,
+                    )
+                }
+            }
+
+            if (distinctResultItems.size > TopResultCount) {
+                item(
+                    key = "more_results_header",
+                    contentType = "section_header",
+                ) {
+                    SearchSectionHeader(
+                        title = stringResource(R.string.vibra_more_results),
+                        pureBlack = pureBlack,
+                        modifier = Modifier.animateItem(),
+                    )
+                }
+                items(
+                    items = distinctResultItems.drop(TopResultCount),
+                    key = { item -> "item_${item.id}" },
+                    contentType = { item -> item::class },
+                ) { item -> resultRow(item) }
             }
         }
     }
@@ -568,3 +596,8 @@ private val SearchRowMinHeight = 64.dp
 private val SearchRowSpacing = 2.dp
 private val SearchGroupOuterCorner = 24.dp
 private val SearchGroupInnerCorner = 6.dp
+
+/** Vibra search layout: results shown above history/suggestions, and how many text rows. */
+private const val TopResultCount = 2
+private const val MaxSuggestionsWithResults = 4
+private const val MaxHistoryWithResults = 2

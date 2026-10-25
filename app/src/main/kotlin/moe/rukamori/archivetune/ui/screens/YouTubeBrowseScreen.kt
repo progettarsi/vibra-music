@@ -35,8 +35,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -295,9 +293,7 @@ fun YouTubeBrowseScreen(
         }
     }
 
-    TopAppBar(
-        title = { Text(browseResult?.title.orEmpty()) },
-        navigationIcon = {
+    moe.rukamori.archivetune.ui.component.EnginePageTopBar(title = browseResult?.title.orEmpty(), navigationIcon = {
             IconButton(
                 onClick = navController::navigateUp,
                 onLongClick = navController::backToMain,
@@ -307,6 +303,5 @@ fun YouTubeBrowseScreen(
                     contentDescription = null,
                 )
             }
-        },
-    )
+        })
 }

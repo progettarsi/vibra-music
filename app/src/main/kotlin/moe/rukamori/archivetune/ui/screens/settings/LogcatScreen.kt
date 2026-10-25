@@ -48,7 +48,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MediumFlexibleTopAppBar
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedListItem
@@ -212,7 +211,7 @@ private fun LogcatScreenContent(
             }
         }
 
-    Scaffold(
+    Scaffold(containerColor = androidx.compose.material3.MaterialTheme.colorScheme.background,
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             LogcatTopBar(
@@ -330,22 +329,7 @@ private fun LogcatTopBar(
     onExport: () -> Unit,
     scrollBehavior: androidx.compose.material3.TopAppBarScrollBehavior,
 ) {
-    MediumFlexibleTopAppBar(
-        title = {
-            Text(
-                text = stringResource(R.string.debug_logs),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        },
-        subtitle = {
-            Text(
-                text = stringResource(R.string.filter_all_logs),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        },
-        navigationIcon = {
+    moe.rukamori.archivetune.ui.component.EnginePageTopBar(title = stringResource(R.string.debug_logs), navigationIcon = {
             ArchiveTuneIconButton(
                 onClick = onNavigateBack,
                 onLongClick = onNavigateBackLongClick,
@@ -355,8 +339,7 @@ private fun LogcatTopBar(
                     contentDescription = null,
                 )
             }
-        },
-        actions = {
+        }, actions = {
             IconButton(
                 onClick = onTogglePaused,
                 enabled = model != null,
@@ -424,9 +407,13 @@ private fun LogcatTopBar(
                     )
                 }
             }
-        },
-        scrollBehavior = scrollBehavior,
-    )
+        }, subtitle = {
+            Text(
+                text = stringResource(R.string.filter_all_logs),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }, scrollBehavior = scrollBehavior)
 }
 
 @Composable

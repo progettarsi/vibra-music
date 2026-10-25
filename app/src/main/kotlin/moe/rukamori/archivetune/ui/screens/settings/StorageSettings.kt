@@ -9,6 +9,8 @@
 
 package moe.rukamori.archivetune.ui.screens.settings
 
+import moe.rukamori.archivetune.ui.component.IconButton
+import moe.rukamori.archivetune.ui.utils.backToMain
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -44,7 +46,6 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -81,12 +82,10 @@ import moe.rukamori.archivetune.storage.StorageFolderKind
 import moe.rukamori.archivetune.storage.StorageLocationKind
 import moe.rukamori.archivetune.storage.StorageLocationRepository
 import moe.rukamori.archivetune.ui.component.ActionPromptDialog
-import moe.rukamori.archivetune.ui.component.IconButton
 import moe.rukamori.archivetune.ui.component.ListPreference
 import moe.rukamori.archivetune.ui.component.PreferenceEntry
 import moe.rukamori.archivetune.ui.component.PreferenceGroup
 import moe.rukamori.archivetune.ui.component.SwitchPreference
-import moe.rukamori.archivetune.ui.utils.backToMain
 import moe.rukamori.archivetune.ui.utils.formatFileSize
 import moe.rukamori.archivetune.utils.rememberPreference
 import moe.rukamori.archivetune.viewmodels.StorageCacheClearUiKind
@@ -246,11 +245,9 @@ fun StorageSettings(
             delay(StorageRefreshIntervalMillis)
         }
     }
-    Scaffold(
+    Scaffold(containerColor = androidx.compose.material3.MaterialTheme.colorScheme.background,
         topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.storage)) },
-                navigationIcon = {
+            moe.rukamori.archivetune.ui.component.EnginePageTopBar(title = stringResource(R.string.storage), navigationIcon = {
                     IconButton(
                         onClick = navController::navigateUp,
                         onLongClick = navController::backToMain,
@@ -260,8 +257,7 @@ fun StorageSettings(
                             contentDescription = null,
                         )
                     }
-                },
-            )
+                })
         },
         snackbarHost = {
             SnackbarHost(
@@ -615,7 +611,6 @@ private fun StorageCacheClearProgressDialog(cacheClear: StorageCacheClearUiModel
             StorageCacheClearUiKind.SONGS -> stringResource(R.string.storage_clear_song_cache_progress, cacheClear.percent)
             StorageCacheClearUiKind.DOWNLOADS -> stringResource(R.string.storage_clear_downloads_progress, cacheClear.percent)
             StorageCacheClearUiKind.IMAGES -> stringResource(R.string.storage_clear_image_cache_progress, cacheClear.percent)
-            StorageCacheClearUiKind.CANVAS -> stringResource(R.string.storage_clear_canvas_cache_progress, cacheClear.percent)
         }
 
     BasicAlertDialog(

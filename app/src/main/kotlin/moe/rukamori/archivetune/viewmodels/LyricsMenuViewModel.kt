@@ -10,7 +10,6 @@ package moe.rukamori.archivetune.viewmodels
 import android.content.Context
 import androidx.annotation.StringRes
 import androidx.compose.runtime.Immutable
-import androidx.datastore.preferences.core.edit
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.common.collect.ImmutableList
@@ -31,14 +30,10 @@ import moe.rukamori.archivetune.R
 import moe.rukamori.archivetune.ai.AiLyricsTranslator
 import moe.rukamori.archivetune.ai.AiServiceConfig
 import moe.rukamori.archivetune.constants.AiApiKeyKey
-import moe.rukamori.archivetune.constants.AiApiValidationStatus
-import moe.rukamori.archivetune.constants.AiApiValidationStatusKey
 import moe.rukamori.archivetune.constants.AiCustomEndpointKey
 import moe.rukamori.archivetune.constants.AiCustomModelKey
-import moe.rukamori.archivetune.constants.AiCustomPromptKey
 import moe.rukamori.archivetune.constants.AiProvider
 import moe.rukamori.archivetune.constants.AiProviderKey
-import moe.rukamori.archivetune.constants.AiRequestParametersKey
 import moe.rukamori.archivetune.constants.AiSelectedModelKey
 import moe.rukamori.archivetune.db.MusicDatabase
 import moe.rukamori.archivetune.db.entities.LyricsEntity
@@ -348,7 +343,7 @@ class LyricsMenuViewModel
                                         provider = prefs[AiProviderKey].toEnum(AiProvider.NONE),
                                         apiKey = prefs[AiApiKeyKey].orEmpty(),
                                         customEndpoint = prefs[AiCustomEndpointKey].orEmpty(),
-                                        requestParameters = prefs[AiRequestParametersKey].orEmpty(),
+                                        requestParameters = "",
                                         model =
                                             if (prefs[AiProviderKey].toEnum(AiProvider.NONE) == AiProvider.CUSTOM) {
                                                 prefs[AiCustomModelKey].orEmpty()
@@ -358,7 +353,7 @@ class LyricsMenuViewModel
                                     ),
                                 lyrics = lyrics,
                                 targetLanguage = targetLanguage.ifBlank { "ENGLISH" },
-                                customPrompt = prefs[AiCustomPromptKey].orEmpty(),
+                                customPrompt = "",
                             )
                         val usableLyrics = usableTranslatedLyrics(translatedLyrics)
                         if (usableLyrics == null) {

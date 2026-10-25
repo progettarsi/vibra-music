@@ -100,6 +100,10 @@ fun ExploreScreen(
         }
     }
 
+    androidx.compose.material3.Scaffold(
+        containerColor = androidx.compose.material3.MaterialTheme.colorScheme.background,
+        topBar = { moe.rukamori.archivetune.ui.component.EnginePageTopBar(stringResource(R.string.explore), onBack = { navController.navigateUp() }) },
+    ) { pagePadding ->
     Box(
         modifier = Modifier.fillMaxSize(),
     ) {
@@ -108,7 +112,7 @@ fun ExploreScreen(
         ) {
             Spacer(
                 Modifier.height(
-                    LocalPlayerAwareWindowInsets.current.asPaddingValues().calculateTopPadding(),
+                    pagePadding.calculateTopPadding(),
                 ),
             )
 
@@ -421,5 +425,6 @@ fun ExploreScreen(
                 ),
             )
         }
+    }
     }
 }

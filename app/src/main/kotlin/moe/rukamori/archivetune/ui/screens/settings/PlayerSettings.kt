@@ -19,8 +19,11 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.saveable.rememberSaveable
+import moe.rukamori.archivetune.LocalPlayerConnection
+import moe.rukamori.archivetune.ui.menu.EqualizerDialog
+import moe.rukamori.archivetune.ui.menu.TempoPitchDialog
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -37,31 +40,21 @@ import androidx.navigation.NavController
 import com.google.common.collect.ImmutableList
 import moe.rukamori.archivetune.LocalPlayerAwareWindowInsets
 import moe.rukamori.archivetune.R
-import moe.rukamori.archivetune.constants.ArtistSeparatorsKey
 import moe.rukamori.archivetune.constants.AudioNormalizationKey
-import moe.rukamori.archivetune.constants.AudioOffload
 import moe.rukamori.archivetune.constants.AudioQuality
 import moe.rukamori.archivetune.constants.AudioQualityKey
-import moe.rukamori.archivetune.constants.AutoDownloadOnLikeKey
-import moe.rukamori.archivetune.constants.AutoSkipNextOnErrorKey
 import moe.rukamori.archivetune.constants.AutoStartOnBluetoothKey
 import moe.rukamori.archivetune.constants.CrossfadeDurationKey
 import moe.rukamori.archivetune.constants.CrossfadeEnabledKey
 import moe.rukamori.archivetune.constants.CrossfadeGaplessKey
 import moe.rukamori.archivetune.constants.DeviceMutePlaybackRecoveryVolumeKey
-import moe.rukamori.archivetune.constants.ExternalDownloaderEnabledKey
-import moe.rukamori.archivetune.constants.ExternalDownloaderPackageKey
 import moe.rukamori.archivetune.constants.HISTORY_DURATION_DEFAULT
 import moe.rukamori.archivetune.constants.HistoryDuration
 import moe.rukamori.archivetune.constants.PauseOnDeviceMuteKey
-import moe.rukamori.archivetune.constants.PermanentShuffleKey
-import moe.rukamori.archivetune.constants.PersistentQueueKey
 import moe.rukamori.archivetune.constants.SeekExtraSeconds
 import moe.rukamori.archivetune.constants.SkipSilenceKey
 import moe.rukamori.archivetune.constants.StopMusicOnTaskClearKey
-import moe.rukamori.archivetune.constants.WakelockKey
 import moe.rukamori.archivetune.sponsorblock.DEFAULT_SPONSOR_BLOCK_API_URL
-import moe.rukamori.archivetune.ui.component.ArtistSeparatorsDialog
 import moe.rukamori.archivetune.ui.component.CrossfadeSliderPreference
 import moe.rukamori.archivetune.ui.component.EnumListPreference
 import moe.rukamori.archivetune.ui.component.IconButton
@@ -84,7 +77,7 @@ import moe.rukamori.archivetune.viewmodels.SponsorBlockSettingsViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PlayerSettings(navController: NavController) {
+fun PlayerSettings(navController: NavController, advanced: Boolean = false) {
     val playbackPerformanceSettingsViewModel: PlaybackPerformanceSettingsViewModel =
         hiltViewModel()
     val playbackPerformanceSettingsState by
@@ -149,16 +142,7 @@ fun PlayerSettings(navController: NavController) {
             AudioQualityKey,
             defaultValue = AudioQuality.AUTO,
         )
-    val (persistentQueue, onPersistentQueueChange) =
-        rememberPreference(
-            PersistentQueueKey,
-            defaultValue = true,
-        )
-    val (permanentShuffle, onPermanentShuffleChange) =
-        rememberPreference(
-            PermanentShuffleKey,
-            defaultValue = false,
-        )
+
     val (skipSilence, onSkipSilenceChange) =
         rememberPreference(
             SkipSilenceKey,
@@ -169,11 +153,6 @@ fun PlayerSettings(navController: NavController) {
             AudioNormalizationKey,
             defaultValue = true,
         )
-    val (audioOffload, onAudioOffloadChange) =
-        rememberPreference(
-            AudioOffload,
-            defaultValue = false,
-        )
 
     val (seekExtraSeconds, onSeekExtraSeconds) =
         rememberPreference(
@@ -181,16 +160,6 @@ fun PlayerSettings(navController: NavController) {
             defaultValue = false,
         )
 
-    val (autoDownloadOnLike, onAutoDownloadOnLikeChange) =
-        rememberPreference(
-            AutoDownloadOnLikeKey,
-            defaultValue = false,
-        )
-    val (autoSkipNextOnError, onAutoSkipNextOnErrorChange) =
-        rememberPreference(
-            AutoSkipNextOnErrorKey,
-            defaultValue = false,
-        )
     val (pauseOnDeviceMute, onPauseOnDeviceMuteChange) =
         rememberPreference(
             PauseOnDeviceMuteKey,
@@ -236,56 +205,6 @@ fun PlayerSettings(navController: NavController) {
             defaultValue = true,
         )
 
-    val (artistSeparators, onArtistSeparatorsChange) =
-        rememberPreference(
-            ArtistSeparatorsKey,
-            defaultValue = ",;/&",
-        )
-    val (externalDownloaderEnabled, onExternalDownloaderEnabledChange) =
-        rememberPreference(
-            ExternalDownloaderEnabledKey,
-            defaultValue = false,
-        )
-    val (externalDownloaderPackage, onExternalDownloaderPackageChange) =
-        rememberPreference(
-            ExternalDownloaderPackageKey,
-            defaultValue = "",
-        )
-
-    val (wakelockEnabled, onWakelockChange) =
-        rememberPreference(
-            WakelockKey,
-            defaultValue = false,
-        )
-    var showArtistSeparatorsDialog by remember { mutableStateOf(false) }
-    var showExternalDownloaderPackageDialog by remember { mutableStateOf(false) }
-
-    if (showArtistSeparatorsDialog) {
-        ArtistSeparatorsDialog(
-            currentSeparators = artistSeparators,
-            onDismiss = { showArtistSeparatorsDialog = false },
-            onSave = { newSeparators ->
-                onArtistSeparatorsChange(newSeparators)
-                showArtistSeparatorsDialog = false
-            },
-        )
-    }
-
-    if (showExternalDownloaderPackageDialog) {
-        TextFieldDialog(
-            initialTextFieldValue =
-                androidx.compose.ui.text.input
-                    .TextFieldValue(externalDownloaderPackage),
-            onDone = { pkg ->
-                onExternalDownloaderPackageChange(pkg.trim())
-                showExternalDownloaderPackageDialog = false
-            },
-            onDismiss = { showExternalDownloaderPackageDialog = false },
-            singleLine = true,
-            maxLines = 1,
-        )
-    }
-
     SponsorBlockApiUrlDialog(
         state = sponsorBlockSettingsState,
         onValueChange = onSponsorBlockApiUrlDraftChange,
@@ -293,11 +212,23 @@ fun PlayerSettings(navController: NavController) {
         onDismiss = onSponsorBlockApiUrlEditorDismiss,
     )
 
-    Scaffold(
+    val connection = LocalPlayerConnection.current
+    val context = LocalContext.current
+    var showEqualizer by rememberSaveable { mutableStateOf(false) }
+    var showSpeed by rememberSaveable { mutableStateOf(false) }
+    if (showSpeed) TempoPitchDialog(onDismiss = { showSpeed = false })
+    if (showEqualizer) EqualizerDialog(onDismiss = { showEqualizer = false }, openSystemEqualizer = {
+        val intent = android.content.Intent(android.media.audiofx.AudioEffect.ACTION_DISPLAY_AUDIO_EFFECT_CONTROL_PANEL).apply {
+            putExtra(android.media.audiofx.AudioEffect.EXTRA_AUDIO_SESSION, connection?.localPlayer?.audioSessionId ?: 0)
+            putExtra(android.media.audiofx.AudioEffect.EXTRA_PACKAGE_NAME, context.packageName)
+            putExtra(android.media.audiofx.AudioEffect.EXTRA_CONTENT_TYPE, android.media.audiofx.AudioEffect.CONTENT_TYPE_MUSIC)
+        }
+        if (intent.resolveActivity(context.packageManager) != null) context.startActivity(intent)
+    })
+
+    Scaffold(containerColor = androidx.compose.material3.MaterialTheme.colorScheme.background,
         topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.player_and_audio)) },
-                navigationIcon = {
+            moe.rukamori.archivetune.ui.component.EnginePageTopBar(title = stringResource(if (advanced) R.string.settings_advanced else R.string.settings_playback_audio), navigationIcon = {
                     IconButton(
                         onClick = navController::navigateUp,
                         onLongClick = navController::backToMain,
@@ -307,8 +238,7 @@ fun PlayerSettings(navController: NavController) {
                             contentDescription = null,
                         )
                     }
-                },
-            )
+                })
         },
     ) { innerPadding ->
         val topPadding = innerPadding.calculateTopPadding()
@@ -321,7 +251,16 @@ fun PlayerSettings(navController: NavController) {
                 .padding(bottom = SettingsDimensions.ScreenBottomPadding),
         ) {
             PreferenceGroup(title = stringResource(R.string.player)) {
-                item {
+                item(visible = !advanced) {
+                    PreferenceEntry(title = { Text(stringResource(R.string.equalizer)) },
+                        onClick = { showEqualizer = true })
+                }
+                item(visible = !advanced) {
+                    PreferenceEntry(title = { Text(stringResource(R.string.settings_playback_speed)) },
+                        isEnabled = connection != null, onClick = { showSpeed = true })
+                }
+
+                item(visible = !advanced) {
                     EnumListPreference(
                         title = { Text(stringResource(R.string.audio_quality)) },
                         icon = { Icon(painterResource(R.drawable.graphic_eq), null) },
@@ -338,14 +277,16 @@ fun PlayerSettings(navController: NavController) {
                     )
                 }
 
+                if (advanced) {
                 playbackPerformancePreferences(
                     state = playbackPerformanceSettingsState,
                     onLowDataModeChange = onLowDataModeChange,
                     onPreloadNextSongChange = onPreloadNextSongChange,
                     onRetry = onPlaybackPerformanceRetry,
                 )
+                }
 
-                item {
+                item(visible = advanced) {
                     SliderPreference(
                         title = { Text(stringResource(R.string.history_duration)) },
                         icon = { Icon(painterResource(R.drawable.history), null) },
@@ -354,22 +295,19 @@ fun PlayerSettings(navController: NavController) {
                     )
                 }
 
-                item {
+                item(visible = !advanced) {
                     SwitchPreference(
                         title = { Text(stringResource(R.string.audio_crossfade_title)) },
                         description = stringResource(R.string.audio_crossfade_description),
                         icon = { Icon(painterResource(R.drawable.animation), null) },
                         checked = crossfadeEnabled,
                         onCheckedChange = { enabled ->
-                            if (enabled) {
-                                onAudioOffloadChange(false)
-                            }
                             onCrossfadeEnabledChange(enabled)
                         },
                     )
                 }
 
-                item {
+                item(visible = !advanced) {
                     CrossfadeSliderPreference(
                         valueSeconds = crossfadeDurationSeconds,
                         onValueChange = onCrossfadeDurationSecondsChange,
@@ -377,7 +315,7 @@ fun PlayerSettings(navController: NavController) {
                     )
                 }
 
-                item {
+                item(visible = !advanced) {
                     SwitchPreference(
                         title = { Text(stringResource(R.string.crossfade_gapless_title)) },
                         description = stringResource(R.string.crossfade_gapless_description),
@@ -388,17 +326,16 @@ fun PlayerSettings(navController: NavController) {
                     )
                 }
 
-                item {
+                item(visible = !advanced) {
                     SwitchPreference(
                         title = { Text(stringResource(R.string.skip_silence)) },
                         icon = { Icon(painterResource(R.drawable.fast_forward), null) },
                         checked = skipSilence,
                         onCheckedChange = onSkipSilenceChange,
-                        isEnabled = !audioOffload,
                     )
                 }
 
-                item {
+                item(visible = !advanced) {
                     SwitchPreference(
                         title = { Text(stringResource(R.string.audio_normalization)) },
                         icon = { Icon(painterResource(R.drawable.volume_up), null) },
@@ -407,23 +344,7 @@ fun PlayerSettings(navController: NavController) {
                     )
                 }
 
-                item {
-                    SwitchPreference(
-                        title = { Text(stringResource(R.string.audio_offload)) },
-                        description = stringResource(R.string.audio_offload_desc),
-                        icon = { Icon(painterResource(R.drawable.speed), null) },
-                        checked = audioOffload,
-                        onCheckedChange = { enabled ->
-                            onAudioOffloadChange(enabled)
-                            if (enabled) {
-                                onSkipSilenceChange(false)
-                                onCrossfadeEnabledChange(false)
-                            }
-                        },
-                    )
-                }
-
-                item {
+                item(visible = advanced) {
                     SwitchPreference(
                         title = { Text(stringResource(R.string.seek_seconds_addup)) },
                         description = stringResource(R.string.seek_seconds_addup_description),
@@ -433,7 +354,7 @@ fun PlayerSettings(navController: NavController) {
                     )
                 }
 
-                item {
+                item(visible = advanced) {
                     SwitchPreference(
                         title = { Text(stringResource(R.string.pause_on_device_mute)) },
                         description = stringResource(R.string.pause_on_device_mute_desc),
@@ -443,7 +364,7 @@ fun PlayerSettings(navController: NavController) {
                     )
                 }
 
-                item(visible = pauseOnDeviceMute) {
+                item(visible = advanced && pauseOnDeviceMute) {
                     val context = LocalContext.current
                     val disabledLabel = stringResource(R.string.device_mute_recovery_volume_disabled)
                     val recoveryVolumeText =
@@ -468,7 +389,7 @@ fun PlayerSettings(navController: NavController) {
                     )
                 }
 
-                item {
+                item(visible = advanced) {
                     SwitchPreference(
                         title = { Text(stringResource(R.string.auto_start_on_bluetooth)) },
                         description = stringResource(R.string.auto_start_on_bluetooth_desc),
@@ -479,6 +400,7 @@ fun PlayerSettings(navController: NavController) {
                 }
             }
 
+            if (advanced) {
             PreferenceGroup(title = stringResource(R.string.sponsor_block_group)) {
                 sponsorBlockPreferences(
                     state = sponsorBlockSettingsState,
@@ -491,49 +413,9 @@ fun PlayerSettings(navController: NavController) {
                     onRetry = onSponsorBlockRetry,
                 )
             }
-
-            PreferenceGroup(title = stringResource(R.string.queue)) {
-                item {
-                    SwitchPreference(
-                        title = { Text(stringResource(R.string.persistent_queue)) },
-                        description = stringResource(R.string.persistent_queue_desc),
-                        icon = { Icon(painterResource(R.drawable.queue_music), null) },
-                        checked = persistentQueue,
-                        onCheckedChange = onPersistentQueueChange,
-                    )
-                }
-
-                item {
-                    SwitchPreference(
-                        title = { Text(stringResource(R.string.permanent_shuffle)) },
-                        description = stringResource(R.string.permanent_shuffle_desc),
-                        icon = { Icon(painterResource(R.drawable.shuffle), null) },
-                        checked = permanentShuffle,
-                        onCheckedChange = onPermanentShuffleChange,
-                    )
-                }
-
-                item {
-                    SwitchPreference(
-                        title = { Text(stringResource(R.string.auto_download_on_like)) },
-                        description = stringResource(R.string.auto_download_on_like_desc),
-                        icon = { Icon(painterResource(R.drawable.download), null) },
-                        checked = autoDownloadOnLike,
-                        onCheckedChange = onAutoDownloadOnLikeChange,
-                    )
-                }
-
-                item {
-                    SwitchPreference(
-                        title = { Text(stringResource(R.string.auto_skip_next_on_error)) },
-                        description = stringResource(R.string.auto_skip_next_on_error_desc),
-                        icon = { Icon(painterResource(R.drawable.skip_next), null) },
-                        checked = autoSkipNextOnError,
-                        onCheckedChange = onAutoSkipNextOnErrorChange,
-                    )
-                }
             }
 
+            if (advanced) {
             PreferenceGroup(title = stringResource(R.string.misc)) {
                 item {
                     SwitchPreference(
@@ -544,44 +426,7 @@ fun PlayerSettings(navController: NavController) {
                     )
                 }
 
-                item {
-                    SwitchPreference(
-                        title = { Text(stringResource(R.string.wakelock)) },
-                        description = stringResource(R.string.wakelock_desc),
-                        icon = { Icon(painterResource(R.drawable.bolt), null) },
-                        checked = wakelockEnabled,
-                        onCheckedChange = onWakelockChange,
-                    )
-                }
-
-                item {
-                    PreferenceEntry(
-                        title = { Text(stringResource(R.string.artist_separators)) },
-                        description = artistSeparators.map { "\"$it\"" }.joinToString("  "),
-                        icon = { Icon(painterResource(R.drawable.artist), null) },
-                        onClick = { showArtistSeparatorsDialog = true },
-                    )
-                }
-
-                item {
-                    SwitchPreference(
-                        title = { Text(stringResource(R.string.external_downloader)) },
-                        description = stringResource(R.string.external_downloader_desc),
-                        icon = { Icon(painterResource(R.drawable.download), null) },
-                        checked = externalDownloaderEnabled,
-                        onCheckedChange = onExternalDownloaderEnabledChange,
-                    )
-                }
-
-                item {
-                    PreferenceEntry(
-                        title = { Text(stringResource(R.string.external_downloader_package)) },
-                        description = externalDownloaderPackage.ifEmpty { stringResource(R.string.external_downloader_package_desc) },
-                        icon = { Icon(painterResource(R.drawable.integration), null) },
-                        onClick = { showExternalDownloaderPackageDialog = true },
-                        isEnabled = externalDownloaderEnabled,
-                    )
-                }
+            }
             }
         }
     }
