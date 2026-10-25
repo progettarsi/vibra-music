@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -19,8 +20,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalButton
@@ -33,9 +36,11 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
@@ -131,6 +136,9 @@ fun VibraHomeScreen(
         isRefreshing = success?.uiState?.isRefreshing == true,
         onRefresh = { viewModel.onAction(HomeAction.Refresh) },
     ) { travel, logo ->
+        // The logo heads the feed and scrolls away with it, but a pull lowers the feed only:
+        // the logo stays where it is and shows the refresh.
+        VibraLogo(state = logo, listState = listState, top = topPadding + 16.dp)
         BoxWithConstraints(modifier = travel.fillMaxSize()) {
             val columns = blockColumnsFor(maxWidth - VibraDimens.Gutter * 2)
             val blocks =
@@ -153,7 +161,8 @@ fun VibraHomeScreen(
                 verticalArrangement = Arrangement.spacedBy(VibraDimens.CardGap),
                 modifier = Modifier.fillMaxSize(),
             ) {
-                item(key = "logo") { VibraLogo(logo) }
+                // Room for the logo, which is drawn outside the list (see above).
+                item(key = LogoKey) { Spacer(Modifier.fillMaxWidth().height(LogoRowHeight)) }
 
                 when (val current = state) {
                     HomeScreenState.Loading -> homeSkeleton()
@@ -202,20 +211,48 @@ fun VibraHomeScreen(
     }
 }
 
-/** Figma 63:354 — the Vibra wave, centred above the first block; it is also the refresh indicator. */
+/**
+ * Figma 63:354 — the Vibra wave, centred above the first block; it is also the refresh
+ * indicator. It sits on the list's first row ([LogoKey]) and scrolls with it,
+ * but is not part of the list, so pulling the feed down leaves it in place.
+ *
+ * @param top where the list's content starts (its top padding).
+ */
 @Composable
-private fun VibraLogo(state: RefreshLogoState) {
+private fun VibraLogo(
+    state: RefreshLogoState,
+    listState: LazyListState,
+    top: Dp,
+) {
     val appName = stringResource(R.string.app_name)
-    Box(
+    VibraLogoMark(
+        state = state,
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(top = 8.dp, bottom = 12.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        VibraLogoMark(state = state, modifier = Modifier.semantics { contentDescription = appName })
-    }
+                .padding(top = top + LogoTopGap)
+                .wrapContentWidth(Alignment.CenterHorizontally)
+                .graphicsLayer {
+                    // Read in the layer: follows the scroll without recomposing.
+                    val info = listState.layoutInfo
+                    val row = info.visibleItemsInfo.firstOrNull { it.key == LogoKey }
+                    if (row == null) {
+                        alpha = 0f
+                    } else {
+                        alpha = 1f
+                        translationY = (row.offset - info.viewportStartOffset - top.toPx()).toFloat()
+                    }
+                }.semantics { contentDescription = appName },
+    )
 }
+
+private const val LogoKey = "logo"
+
+/** Space above the logo, inside its row. */
+private val LogoTopGap = 8.dp
+
+/** The logo's row: gap above, the wave, gap below. */
+private val LogoRowHeight = LogoTopGap + 35.dp + 12.dp
 
 /** Turns the home pipeline's data into relevance-weighted blocks. */
 @Composable

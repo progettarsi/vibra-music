@@ -19,18 +19,23 @@ import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
@@ -41,26 +46,39 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.PathParser
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.input.pointer.util.VelocityTracker
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import app.vibra.ui.haptics.rememberVibraHaptics
 import app.vibra.ui.motion.Liquid
 import app.vibra.ui.motion.LiquidSpeed
+import kotlin.math.exp
+import kotlin.math.ln
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import moe.rukamori.archivetune.LocalAnimationsDisabled
 
 /**
  * Pull-to-refresh where the VIBRA wave itself is the indicator (no stock spinner).
  *
- *  - Pulling lowers the whole screen (iOS-style), the logo a little more than the rest, and
- *    the logo's fill *drains away* to the right in proportion to the pull; a haptic marks
- *    the point of no return.
- *  - Release: the screen drops into the refreshing position on a bouncy spring (a small
- *    dip below it), and a bright band of fill flows through the wave in a loop.
- *  - Done: the wave fills back up from the left, the screen springs home overshooting a
+ *  - Pulling lowers the content (iOS-style) against a growing resistance: it follows the
+ *    finger closely at first and ever less after, like a rubber band, never stopping dead.
+ *    The logo stays where it is and its fill *drains away* to the right in proportion to
+ *    the pull; a haptic marks the point of no return.
+ *  - Release: the content leaves the finger on a bouncy spring that keeps the finger's
+ *    speed, into the refreshing position (a small dip below it) or, short of the
+ *    threshold, back home (a small rise above it). While refreshing a bright band of fill
+ *    flows through the wave in a loop.
+ *  - Done: the wave fills back up from the left, the content springs home overshooting a
  *    touch upwards, and a haptic says it is finished.
  *
  * [content] receives the modifier that applies the downward travel (put it on the root of
- * the scrolling content) and the [RefreshLogoState] to hand to [VibraLogoMark].
+ * the content that moves, not around the logo) and the [RefreshLogoState] to hand to
+ * [VibraLogoMark].
  */
 @Composable
 fun VibraPullToRefresh(
@@ -72,6 +90,9 @@ fun VibraPullToRefresh(
     val state = rememberPullToRefreshState()
     val haptics = rememberVibraHaptics()
     val animationsDisabled = LocalAnimationsDisabled.current
+    val scope = rememberCoroutineScope()
+    val density = LocalDensity.current
+    val refreshing by rememberUpdatedState(isRefreshing)
 
     // Refill after a refresh completes.
     val refill = remember { Animatable(1f) }
@@ -84,39 +105,54 @@ fun VibraPullToRefresh(
         }
     }
 
-    // How far the screen is lowered (0 = home, 1 = refreshing position). It follows the
+    // How far the content is lowered (0 = home, 1 = refreshing position). It follows the
     // finger while pulling and runs its own bouncy springs on release and on completion
     // (the stock indicator's motion is a plain, non-elastic one).
     val travel = remember { Animatable(0f) }
     val bounce: AnimationSpec<Float> =
         if (animationsDisabled) snap() else spring(dampingRatio = BounceDamping, stiffness = Spring.StiffnessMediumLow)
     var following by remember { mutableStateOf(true) }
-    // The logo has a bounce of its own on top of the screen's: it drops (and springs back
-    // up past its rest) a beat after the screen, so it reads as its own object.
-    val logoDrop = remember { Animatable(0f) }
-    val logoSpring: AnimationSpec<Float> =
-        if (animationsDisabled) snap() else spring(dampingRatio = LogoBounceDamping, stiffness = Spring.StiffnessLow)
-    LaunchedEffect(isRefreshing) {
-        logoDrop.animateTo(if (isRefreshing) 1f else 0f, logoSpring)
-    }
+    // The spring a release started; a new pull takes the content back from it.
+    var settling by remember { mutableStateOf<Job?>(null) }
     LaunchedEffect(isRefreshing) {
         if (isRefreshing) {
             following = false
+            // Interrupts a release spring heading here, keeping its speed.
             travel.animateTo(1f, bounce)
         } else if (!following) {
             haptics.confirm()
             travel.animateTo(0f, bounce)
             // The stock state is still easing back on its own; take over the finger again
-            // only once it is home, so the screen never jumps to its leftover distance.
+            // only once it is home, so the content never jumps to its leftover distance.
             snapshotFlow { state.distanceFraction }.first { it <= 0.001f }
             following = true
         }
     }
     LaunchedEffect(state) {
         snapshotFlow { state.distanceFraction }.collect { fraction ->
-            if (following) travel.snapTo(fraction.coerceIn(0f, MaxPull))
+            if (following) travel.snapTo(rubberBand(fraction))
         }
     }
+    // The finger lifted while the content was pulled: it leaves the finger at the finger's
+    // speed (scaled like the pull), into the refreshing position or back home.
+    val release: (Float) -> Unit = { fingerVelocityY ->
+        if (following && !refreshing && travel.value > 0.001f) {
+            val fraction = state.distanceFraction
+            val armed = fraction > 1f
+            val pullPerPx = StockDragMultiplier / with(density) { PullToRefreshDefaults.PositionalThreshold.toPx() }
+            val speed = (fingerVelocityY * pullPerPx * rubberBandSlope(fraction)).coerceIn(-MaxReleaseSpeed, MaxReleaseSpeed)
+            following = false
+            settling =
+                scope.launch {
+                    travel.animateTo(if (armed) 1f else 0f, bounce, initialVelocity = speed)
+                    // No refresh came of it (one was already running, say): fold back home.
+                    if (armed && !refreshing) travel.animateTo(0f, bounce)
+                    snapshotFlow { state.distanceFraction }.first { it <= 0.001f }
+                    following = true
+                }
+        }
+    }
+    val latestRelease by rememberUpdatedState(release)
     val flow =
         if (isRefreshing && !animationsDisabled) {
             rememberInfiniteTransition(label = "refreshFlow")
@@ -135,8 +171,6 @@ fun VibraPullToRefresh(
             pull = { state.distanceFraction.coerceIn(0f, 1f) },
             refill = { refill.value },
             flow = flow?.let { phase -> { phase.value } },
-            travel = { travel.value },
-            drop = { logoDrop.value },
         )
 
     PullToRefreshBox(
@@ -146,7 +180,31 @@ fun VibraPullToRefresh(
             onRefresh()
         },
         state = state,
-        modifier = modifier.fillMaxSize(),
+        modifier =
+            modifier
+                .fillMaxSize()
+                // Watches the finger without taking it (the stock modifier and the list keep
+                // handling the gesture): a new pull takes the content back from a release
+                // spring, and a lift starts one at once (the stock release only ends after
+                // its own easing).
+                .pointerInput(Unit) {
+                    awaitEachGesture {
+                        val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                        val tracker = VelocityTracker()
+                        tracker.addPosition(down.uptimeMillis, down.position)
+                        while (true) {
+                            val event = awaitPointerEvent(PointerEventPass.Initial)
+                            val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                            tracker.addPosition(change.uptimeMillis, change.position)
+                            if (!change.pressed) break
+                            if (change.positionChange().y != 0f && settling?.isActive == true && !refreshing) {
+                                settling?.cancel()
+                                following = true
+                            }
+                        }
+                        latestRelease(tracker.calculateVelocity().y)
+                    }
+                },
         indicator = {},
     ) {
         content(
@@ -156,16 +214,22 @@ fun VibraPullToRefresh(
     }
 }
 
+/**
+ * Pull (stock fraction of the refresh threshold) → travel: follows the finger closely at
+ * first, then ever less, approaching [MaxPull]; exactly the refreshing position (1) at the
+ * threshold, so releasing there neither jumps nor drops.
+ */
+private fun rubberBand(fraction: Float): Float = MaxPull * (1f - exp(-fraction.coerceAtLeast(0f) * PullStretch / MaxPull))
+
+/** How much travel one more unit of pull gives at [fraction] (the rubber band's slope). */
+private fun rubberBandSlope(fraction: Float): Float = PullStretch * exp(-fraction.coerceAtLeast(0f) * PullStretch / MaxPull)
+
 /** Frame-time inputs of the animated logo (read in draw only). */
 class RefreshLogoState(
     val isRefreshing: Boolean,
     val pull: () -> Float,
     val refill: () -> Float,
     val flow: (() -> Float)?,
-    /** The screen's lowering (may dip below 0 or above 1 while bouncing). */
-    val travel: () -> Float,
-    /** The logo's own bounce: 0 at rest, 1 while refreshing (overshoots on both ends). */
-    val drop: () -> Float,
 )
 
 /** The VIBRA wave; with a [state] it drains, flows and refills with the refresh. */
@@ -176,20 +240,7 @@ fun VibraLogoMark(
     color: Color = MaterialTheme.colorScheme.onBackground,
 ) {
     val logo = remember { logoPath() }
-    Canvas(
-        modifier =
-            modifier
-                .size(LogoWidth, LogoHeight)
-                .graphicsLayer {
-                    // The logo leads the pull: it drops a little further and grows slightly.
-                    val travel = state?.travel?.invoke() ?: 0f
-                    val drop = state?.drop?.invoke() ?: 0f
-                    translationY = travel.coerceAtLeast(0f) * LogoLead.toPx() + drop * LogoBounce.toPx()
-                    val scale = 1f + 0.12f * travel.coerceIn(0f, 1f) + 0.1f * drop
-                    scaleX = scale
-                    scaleY = scale
-                },
-    ) {
+    Canvas(modifier = modifier.size(LogoWidth, LogoHeight)) {
         val path = logo.scaledTo(size)
         if (state == null) {
             drawPath(path, color)
@@ -228,21 +279,23 @@ private fun Path.scaledTo(size: Size): Path {
     return copy
 }
 
+/** How far the content is lowered while refreshing. */
 private val RefreshTravel = 88.dp
-/** Extra drop of the logo, on top of the screen's own travel, at the refreshing position. */
-private val LogoLead = 14.dp
-
-/** How far the logo's own bounce carries it (it overshoots about a third beyond). */
-private val LogoBounce = 18.dp
 
 /** Damping of the release/finish springs: visibly elastic, still calm. */
 private const val BounceDamping = 0.55f
 
-/** The logo bounces more than the screen does. */
-private const val LogoBounceDamping = 0.38f
+/** What the content approaches on an endless pull (fraction of the refreshing position). */
+private const val MaxPull = 1.6f
 
-/** Furthest the screen follows an over-pull (fraction of the refreshing position). */
-private const val MaxPull = 1.4f
+/** Initial slope of the rubber band, chosen so that the threshold maps to exactly 1. */
+private val PullStretch = -MaxPull * ln(1f - 1f / MaxPull)
+
+/** The stock pull-to-refresh counts half of the finger's travel. */
+private const val StockDragMultiplier = 0.5f
+
+/** Cap on the speed a release hands to the spring (refreshing positions per second). */
+private const val MaxReleaseSpeed = 8f
 
 private val LogoWidth = 51.dp
 private val LogoHeight = 35.dp
