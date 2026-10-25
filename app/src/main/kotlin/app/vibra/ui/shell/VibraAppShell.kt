@@ -8,19 +8,18 @@
 package app.vibra.ui.shell
 
 import android.app.Activity
+import android.os.SystemClock
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
-import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
@@ -48,12 +47,19 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onPlaced
+import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.node.RootForTest
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.dp
@@ -62,7 +68,6 @@ import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import app.vibra.ui.components.MarqueeScroll
 import app.vibra.ui.dock.DockLeading
@@ -145,17 +150,15 @@ fun VibraAppShell(
     val playerSheet = rememberLiquidSheetState()
     var miniPlayerBounds by remember { mutableStateOf<Rect?>(null) }
     val miniTitleScroll = remember { MarqueeScroll() }
-    // The profile opens out of (and folds back into) the dock's leading button.
-    var leadingBounds by remember { mutableStateOf<Rect?>(null) }
-    val windowSize = LocalWindowInfo.current.containerSize
-    val profileOrigin = {
-        leadingBounds?.let { b ->
-            TransformOrigin(
-                (b.center.x / windowSize.width.coerceAtLeast(1)).coerceIn(0f, 1f),
-                (b.center.y / windowSize.height.coerceAtLeast(1)).coerceIn(0f, 1f),
-            )
-        } ?: TransformOrigin(0.1f, 0.95f)
-    }
+    // Every page goes back the way it came: into the element it was opened from, or to
+    // the right (see PageMotion). Taps on the player or the search overlay never count.
+    val pageMotion = remember { PageMotion() }
+    val view = LocalView.current
+    pageMotion.window = LocalWindowInfo.current.containerSize
+    pageMotion.maxOriginCornerPx = with(LocalDensity.current) { MaxOriginCorner.toPx() }
+    pageMotion.semantics = { (view as? RootForTest)?.semanticsOwner }
+    var dockBounds by remember { mutableStateOf<Rect?>(null) }
+    var shellOffset by remember { mutableStateOf(Offset.Zero) }
     val nowPlaying = connection?.collectNowPlaying() ?: NoMedia
     val backStackEntry by navController.currentBackStackEntryAsState()
     val route = backStackEntry?.destination?.route
@@ -180,8 +183,7 @@ fun VibraAppShell(
 
     SystemBarsForPlayer(playerSheet)
 
-    // Closing search with back, and folding the search away on navigation.
-    BackHandler(enabled = dock.mode == DockMode.Search) { dock.closeSearch() }
+    // Folding the search away on navigation (back closes it from inside the overlay).
     LaunchedEffect(route) { if (dock.mode == DockMode.Search && route?.startsWith("search/") == true) dock.closeSearch() }
 
     val submitSearch: (String) -> Unit = { raw ->
@@ -195,17 +197,40 @@ fun VibraAppShell(
     }
 
     CompositionLocalProvider(LocalPlaybackSpin provides spin) {
-    Box(modifier = modifier.fillMaxSize().background(if (pureBlack) Color.Black else MaterialTheme.colorScheme.background)) {
+    Box(
+        modifier =
+            modifier
+                .fillMaxSize()
+                .onPlaced { shellOffset = it.positionInWindow() }
+                .pointerInput(pageMotion, playerSheet, dock) {
+                    // Watches (never consumes) where each tap lands, so a page opened by it
+                    // can grow out of the element under the finger.
+                    awaitEachGesture {
+                        val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                        val position = down.position + shellOffset
+                        val onOverlay =
+                            playerSheet.isOpenOrOpening ||
+                                dock.mode == DockMode.Search && dockBounds?.contains(position) != true
+                        pageMotion.onPress(position, excluded = onOverlay)
+                        do {
+                            val event = awaitPointerEvent(PointerEventPass.Initial)
+                        } while (event.changes.any { it.pressed })
+                        pageMotion.onRelease(SystemClock.uptimeMillis())
+                    }
+                }.background(if (pureBlack) Color.Black else MaterialTheme.colorScheme.background),
+    ) {
         // ── Content ────────────────────────────────────────────────────────────────
-        CompositionLocalProvider(LocalPlayerAwareWindowInsets provides contentInsets) {
+        CompositionLocalProvider(
+            LocalPlayerAwareWindowInsets provides contentInsets,
+            LocalPageMotion provides pageMotion,
+        ) {
             VibraNavHost(
                 navController = navController,
                 homeViewModel = homeViewModel,
                 startDestination = startDestination,
                 latestVersionName = latestVersionName,
                 onClearUpdateBadge = onClearUpdateBadge,
-                disableAnimations = disableAnimations,
-                profileOrigin = profileOrigin,
+                pageMotion = pageMotion.takeUnless { disableAnimations },
             )
         }
 
@@ -217,6 +242,9 @@ fun VibraAppShell(
             exit = fadeOut(Liquid.effects(LiquidSpeed.Fast)) + slideOutVertically(Liquid.effects()) { it / 32 },
             modifier = Modifier.fillMaxSize(),
         ) {
+            // Registered when the overlay appears, so it comes after the NavHost's own back
+            // handling and wins: back closes the search, not the page beneath it.
+            BackHandler(enabled = dock.mode == DockMode.Search) { dock.closeSearch() }
             Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).statusBarsPadding()) {
                 OnlineSearchScreen(
                     query = dock.query.text,
@@ -251,7 +279,8 @@ fun VibraAppShell(
                     .align(Alignment.BottomCenter)
                     .windowInsetsPadding(WindowInsets.ime.union(WindowInsets.navigationBars))
                     .padding(horizontal = VibraDimens.Gutter)
-                    .padding(bottom = VibraDimens.DockBottomMargin),
+                    .padding(bottom = VibraDimens.DockBottomMargin)
+                    .onPlaced { dockBounds = it.boundsInWindow() },
         ) {
             VibraDock(
                 state = dock,
@@ -279,7 +308,6 @@ fun VibraAppShell(
                 onSearch = submitSearch,
                 onMiniPlayerBounds = { miniPlayerBounds = it },
                 miniTitleScroll = miniTitleScroll,
-                onLeadingBounds = { leadingBounds = it },
                 modifier =
                     Modifier.graphicsLayer {
                         // The other pills step back while the player grows out of its pill.
@@ -328,7 +356,11 @@ private fun DockScrim(color: Color) {
 
 private val DockScrimReach = 40.dp
 
-/** The engine navigation graph with Vibra's routes and liquid screen transitions. */
+/**
+ * The engine navigation graph with Vibra's routes. The NavHost plays no transition itself:
+ * it tells [pageMotion] which page moves and how, and every page draws that in its
+ * PageFrame (null [pageMotion]: animations are off, pages switch at once).
+ */
 @Composable
 private fun VibraNavHost(
     navController: NavHostController,
@@ -336,50 +368,40 @@ private fun VibraNavHost(
     startDestination: String,
     latestVersionName: () -> String,
     onClearUpdateBadge: () -> Unit,
-    disableAnimations: Boolean,
-    profileOrigin: () -> TransformOrigin,
+    pageMotion: PageMotion?,
 ) {
     // The engine screens expect collapsing app-bar behaviours; Vibra keeps them so every
     // inherited screen scrolls exactly as before.
     val topAppBarScrollBehavior = appBarScrollBehavior()
     val libraryScrollBehavior = appBarScrollBehavior()
-    val fadeSpec = Liquid.effects<Float>()
-    val containerSpec = Liquid.container<Float>()
-
-    // Depth, not a slide show: the new screen glides in from the right while the old one
-    // sinks back (shrinks a little). Many inherited pages have no opaque background, so a
-    // plain cross-fade showed two pages through each other: the page that leaves always
-    // fades fast and the one that arrives on back rises slowly (a "fade through"), so they
-    // barely overlap. Pages move on the container spring (a whole page must not bounce),
-    // opacity on effects springs.
-    val fastFade = Liquid.effects<Float>(LiquidSpeed.Fast)
-    val pageSpec = Liquid.container<androidx.compose.ui.unit.IntOffset>()
-    val enter: EnterTransition =
-        // Pages are opaque (see OpaquePage), so the new one can slide in as a solid sheet.
-        if (disableAnimations) EnterTransition.None else slideInHorizontally(pageSpec) { it / 4 } + fadeIn(fastFade, initialAlpha = 0.6f)
-    val exit: ExitTransition =
-        if (disableAnimations) {
-            ExitTransition.None
-        } else {
-            scaleOut(containerSpec, targetScale = RecededScale) + slideOutHorizontally(pageSpec) { -it / 20 } + fadeOut(fastFade)
-        }
-    val popEnter: EnterTransition =
-        if (disableAnimations) {
-            EnterTransition.None
-        } else {
-            scaleIn(containerSpec, initialScale = RecededScale) + slideInHorizontally(pageSpec) { -it / 20 } +
-                fadeIn(Liquid.effects(LiquidSpeed.Slow))
-        }
-    val popExit: ExitTransition =
-        if (disableAnimations) ExitTransition.None else slideOutHorizontally(pageSpec) { it / 3 } + fadeOut(fastFade)
 
     NavHost(
         navController = navController,
         startDestination = startDestination,
-        enterTransition = { enter },
-        exitTransition = { exit },
-        popEnterTransition = { popEnter },
-        popExitTransition = { popExit },
+        enterTransition = {
+            pageMotion?.forward(from = initialState, to = targetState)
+            EnterTransition.None
+        },
+        exitTransition = {
+            pageMotion?.forward(from = initialState, to = targetState)
+            ExitTransition.None
+        },
+        popEnterTransition = {
+            pageMotion?.pop(from = initialState, to = targetState, predictive = false)
+            EnterTransition.None
+        },
+        popExitTransition = {
+            pageMotion?.pop(from = initialState, to = targetState, predictive = false)
+            ExitTransition.None
+        },
+        predictivePopEnterTransition = {
+            pageMotion?.pop(from = initialState, to = targetState, predictive = true)
+            EnterTransition.None
+        },
+        predictivePopExitTransition = {
+            pageMotion?.pop(from = initialState, to = targetState, predictive = true)
+            ExitTransition.None
+        },
         // No size modifier on purpose: engine screens emit their TopAppBar as a sibling of
         // the content; under fixed (fillMaxSize) constraints that transparent bar would be
         // stretched over the whole screen and swallow every touch (the "dead" artist page).
@@ -391,23 +413,10 @@ private fun VibraNavHost(
             scrollBehavior = topAppBarScrollBehavior,
             homeViewModel = homeViewModel,
             latestVersionName = latestVersionName,
-            disableAnimations = disableAnimations,
             onClearUpdateBadge = onClearUpdateBadge,
             libraryScrollBehavior = libraryScrollBehavior,
         )
-        composable(
-            route = VibraRoutes.Profile,
-            // Grows out of the dock's profile button and folds back into it (like an app
-            // opening from the macOS dock, or the player from the mini-player).
-            enterTransition = {
-                if (disableAnimations) EnterTransition.None else scaleIn(containerSpec, 0.08f, profileOrigin()) + fadeIn(fadeSpec)
-            },
-            popExitTransition = {
-                // The fade shares the container spring: with the faster effects spring the
-                // page vanished before it had visibly shrunk into the button.
-                if (disableAnimations) ExitTransition.None else scaleOut(containerSpec, 0.08f, profileOrigin()) + fadeOut(containerSpec)
-            },
-        ) {
+        composable(route = VibraRoutes.Profile) {
             VibraProfileScreen(navController = navController, homeViewModel = homeViewModel)
         }
         composable(route = VibraRoutes.Stats) {
@@ -438,8 +447,8 @@ private fun SystemBarsForPlayer(sheet: LiquidSheetState) {
 
 private fun Color.luminanceIsDark(): Boolean = (0.2126f * red + 0.7152f * green + 0.0722f * blue) < 0.5f
 
-/** Scale of a page while another one sits on top of it during navigation. */
-private const val RecededScale = 0.94f
+/** Corner radius of a page shrunk into a row or card (pills and circles keep theirs). */
+private val MaxOriginCorner = 28.dp
 
 /** Root of the engine's settings graph (opened from the profile's dock button). */
 private const val SettingsRoute = "settings"

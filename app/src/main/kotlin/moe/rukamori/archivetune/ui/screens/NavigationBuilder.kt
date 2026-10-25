@@ -8,11 +8,6 @@
 package moe.rukamori.archivetune.ui.screens
 
 import android.net.Uri
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.getValue
@@ -51,7 +46,6 @@ import moe.rukamori.archivetune.ui.screens.search.OnlineSearchResult
 import moe.rukamori.archivetune.ui.screens.search.OnlineSearchResultArgument
 import moe.rukamori.archivetune.ui.screens.search.decodeOnlineSearchQuery
 import moe.rukamori.archivetune.ui.screens.search.OnlineSearchResultRoute
-import moe.rukamori.archivetune.ui.screens.search.OnlineSearchResultRoutePrefix
 import moe.rukamori.archivetune.ui.screens.search.SearchScreen
 import moe.rukamori.archivetune.ui.screens.settings.AboutScreen
 import moe.rukamori.archivetune.ui.screens.settings.ThirdPartyLicensesScreen
@@ -82,7 +76,6 @@ fun NavGraphBuilder.navigationBuilder(
     scrollBehavior: TopAppBarScrollBehavior,
     homeViewModel: HomeViewModel,
     latestVersionName: () -> String,
-    disableAnimations: Boolean = false,
     onClearUpdateBadge: () -> Unit = {},
     homeScrollConnection: NestedScrollConnection? = null,
     searchScrollConnection: NestedScrollConnection? = null,
@@ -210,6 +203,8 @@ fun NavGraphBuilder.navigationBuilder(
         )
             }
     }
+    // Vibra: results move like every other page (app.vibra.ui.shell.PageMotion: they
+    // appear and dissolve in place of the search overlay).
     composable(
         route = OnlineSearchResultRoute,
         arguments =
@@ -218,38 +213,6 @@ fun NavGraphBuilder.navigationBuilder(
                     type = NavType.StringType
                 },
             ),
-        enterTransition = {
-            if (disableAnimations) {
-                fadeIn(tween(0))
-            } else {
-                fadeIn(tween(250))
-            }
-        },
-        exitTransition = {
-            if (disableAnimations) {
-                fadeOut(tween(0))
-            } else if (targetState.destination.route?.startsWith(OnlineSearchResultRoutePrefix) == true) {
-                fadeOut(tween(200))
-            } else {
-                fadeOut(tween(200)) + slideOutHorizontally { -it / 2 }
-            }
-        },
-        popEnterTransition = {
-            if (disableAnimations) {
-                fadeIn(tween(0))
-            } else if (initialState.destination.route?.startsWith(OnlineSearchResultRoutePrefix) == true) {
-                fadeIn(tween(250))
-            } else {
-                fadeIn(tween(250)) + slideInHorizontally { -it / 2 }
-            }
-        },
-        popExitTransition = {
-            if (disableAnimations) {
-                fadeOut(tween(0))
-            } else {
-                fadeOut(tween(200))
-            }
-        },
     ) { backStackEntry ->
         // Vibra: results show their query in a Vibra top bar (the space ArchiveTune's
         // global search bar used to occupy).

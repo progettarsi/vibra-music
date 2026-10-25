@@ -21,13 +21,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -100,7 +98,7 @@ import sh.calvin.reorderable.rememberReorderableLazyListState
  *                        crossed); the other rows wobble lightly (Advanced setting)
  *  - swipe left ........ remove, with an Undo snackbar
  *  - pull down at top .. a further strong pull drags the whole sheet down and closes it
- *  - header ............ grabber and close (✕), as in Figma (shuffle is in the player)
+ *  - header ............ close (✕) only, no grabber (shuffle is in the player)
  *
  * Mutations go straight to the Media3 player through PlayerConnection, which also
  * persists the queue; the list is a projection of `queueWindows`.
@@ -173,7 +171,6 @@ fun VibraQueuePanel(
                 .background(sheetColor),
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            QueueGrabber()
             QueueHeader(onClose = queueSheet::collapse)
             LazyColumn(
                 state = listState,
@@ -267,20 +264,6 @@ fun VibraQueuePanel(
     }
 }
 
-/** Small handle that tells the queue is a sheet that can be dragged away. */
-@Composable
-private fun QueueGrabber() {
-    Box(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), contentAlignment = Alignment.Center) {
-        Box(
-            modifier =
-                Modifier
-                    .size(width = 36.dp, height = 4.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)),
-        )
-    }
-}
-
 /** Close (✕), the queue's only close control (Figma queueOpen). */
 @Composable
 private fun QueueHeader(onClose: () -> Unit) {
@@ -288,7 +271,8 @@ private fun QueueHeader(onClose: () -> Unit) {
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(horizontal = VibraDimens.Gutter - 6.dp, vertical = 4.dp),
+                // Clear of the sheet's rounded top corners.
+                .padding(start = VibraDimens.Gutter - 6.dp, end = VibraDimens.Gutter - 6.dp, top = 16.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         VibraGlyphButton(

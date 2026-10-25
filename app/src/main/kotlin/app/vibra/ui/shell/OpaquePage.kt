@@ -10,12 +10,7 @@ import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.SizeTransform
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
 import androidx.navigation.NamedNavArgument
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavDeepLink
@@ -23,13 +18,15 @@ import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable as navComposable
 
 /**
- * `composable` for Vibra's graph: the same destination, on an opaque page.
+ * `composable` for Vibra's graph: the same destination, on an opaque page that moves the
+ * Vibra way.
  *
  * Many screens inherited from the engine draw no background of their own, so while two
  * pages were on screen in a transition the old one showed through the new one (a ghost of
- * the profile behind the settings). Every page now sits on the theme background, and the
- * pages move as solid sheets. The wrapper is a plain `Box`, which also gives the page's
- * children loose constraints, like the engine's original (unsized) NavHost did.
+ * the profile behind the settings). Every page now sits on the theme background inside a
+ * [PageFrame], which also draws the page's part of every transition (see PageMotion). The
+ * frame is a plain `Box`, which gives the page's children loose constraints, like the
+ * engine's original (unsized) NavHost did.
  */
 fun NavGraphBuilder.composable(
     route: String,
@@ -52,8 +49,6 @@ fun NavGraphBuilder.composable(
         popExitTransition = popExitTransition,
         sizeTransform = sizeTransform,
     ) { entry ->
-        Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-            content(entry)
-        }
+        PageFrame(entry) { content(entry) }
     }
 }

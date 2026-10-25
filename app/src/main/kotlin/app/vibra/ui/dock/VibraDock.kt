@@ -230,7 +230,6 @@ fun MiniPlayerTrackText(
  *        the player surface grows out of it.
  * @param onMiniPlayerBounds reports where the mini-player pill sits (root coordinates);
  *        the player uses it as the origin of its morph.
- * @param onLeadingBounds reports the leading button's bounds (profile opens out of it).
  * @param miniTitleScroll the mini-player title's scroll, shared with the copy of it that the
  *        full player flies to its own title.
  */
@@ -249,7 +248,6 @@ fun VibraDock(
     onMiniPlayerBounds: (Rect) -> Unit,
     miniTitleScroll: MarqueeScroll,
     modifier: Modifier = Modifier,
-    onLeadingBounds: (Rect) -> Unit = {},
 ) {
     val haptics = rememberVibraHaptics()
     val searching = state.mode == DockMode.Search
@@ -286,8 +284,7 @@ fun VibraDock(
                                 .liquid(DockMorphSpeed)
                                 .gooBlob("leading")
                                 .fillMaxHeight()
-                                .width(VibraDimens.DockHeight)
-                                .onPlaced { onLeadingBounds(it.boundsInRoot()) },
+                                .width(VibraDimens.DockHeight),
                     ) {
                         DockLeadingButton(leading = leading, haptics = haptics, onClick = onLeadingClick)
                     }
