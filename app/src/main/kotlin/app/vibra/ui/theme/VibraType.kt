@@ -126,16 +126,6 @@ object VibraTextStyles {
             lineHeight = 24.sp,
         )
 
-    /** Secondary voice ("From: …", captions): the italic of the reading family. */
-    val Caption =
-        TextStyle(
-            fontFamily = VibraSans,
-            fontWeight = FontWeight.Medium,
-            fontStyle = FontStyle.Italic,
-            fontSize = 14.sp,
-            lineHeight = 20.sp,
-        )
-
     /** Large lyric lines share the expressive display family. */
     val Lyrics =
         TextStyle(

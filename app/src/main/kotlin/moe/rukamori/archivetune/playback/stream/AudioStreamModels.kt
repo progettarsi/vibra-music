@@ -28,6 +28,8 @@ data class AudioStreamRequest(
     val authState: PlaybackAuthState,
     val pinnedFormatId: Int? = null,
     val requiresSongMetadata: Boolean = false,
+    // Vibra: a music video — also resolve its picture for the player (see ArtworkVideoStreams).
+    val artworkVideo: Boolean = false,
 )
 
 data class ResolvedAudioStream(

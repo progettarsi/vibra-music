@@ -111,6 +111,7 @@ class YoutubeiStreamRepository
                                 authFingerprint = authState.streamCacheFingerprint,
                                 pinnedItag = request.pinnedFormatId,
                                 requiresSongMetadata = request.requiresSongMetadata,
+                                artworkVideo = request.artworkVideo,
                                 cookie = authState.cookie.takeIf { authState.hasLoginCookie },
                                 visitorData = authState.visitorData,
                                 dataSyncId = authState.dataSyncId.takeIf { authState.hasLoginCookie },
@@ -198,6 +199,19 @@ class YoutubeiStreamRepository
                 YouTube.proxy?.type()?.name ?: "DIRECT",
                 YouTube.streamOkHttpProxy.type().name,
             )
+            resolved.artworkVideo?.let { video ->
+                ArtworkVideoStreams.publish(
+                    ArtworkVideoStream(
+                        mediaId = request.mediaId,
+                        url = video.url,
+                        requestHeaders = resolved.requestHeaders,
+                        mimeType = video.mimeType,
+                        width = video.width,
+                        height = video.height,
+                        expiresAtMs = video.expiresAtMs,
+                    ),
+                )
+            }
             return ResolvedAudioStream(
                 url = resolved.url,
                 requestHeaders = resolved.requestHeaders,

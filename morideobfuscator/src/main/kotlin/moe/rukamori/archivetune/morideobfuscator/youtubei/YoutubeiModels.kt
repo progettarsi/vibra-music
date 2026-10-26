@@ -43,6 +43,8 @@ data class YoutubeiStreamRequest(
     val authFingerprint: String,
     val pinnedItag: Int? = null,
     val requiresSongMetadata: Boolean = false,
+    // Vibra: also resolve a light video-only stream (a music video shown in place of the cover).
+    val artworkVideo: Boolean = false,
     val cookie: String? = null,
     val visitorData: String? = null,
     val dataSyncId: String? = null,
@@ -70,6 +72,16 @@ data class YoutubeiResolvedStream(
     val loudnessDb: Double?,
     val perceptualLoudnessDb: Double?,
     val playbackTrackingUrl: String?,
+    val artworkVideo: YoutubeiArtworkVideo? = null,
+)
+
+/** Vibra: the video-only stream asked for with [YoutubeiStreamRequest.artworkVideo]. */
+data class YoutubeiArtworkVideo(
+    val url: String,
+    val mimeType: String,
+    val width: Int,
+    val height: Int,
+    val expiresAtMs: Long,
 )
 
 data class YoutubeiNetworkConfiguration(

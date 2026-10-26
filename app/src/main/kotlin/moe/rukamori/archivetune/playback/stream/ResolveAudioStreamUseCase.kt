@@ -42,6 +42,7 @@ class ResolveAudioStreamUseCase
             val authFingerprint: String,
             val pinnedFormatId: Int?,
             val requiresSongMetadata: Boolean,
+            val artworkVideo: Boolean,
         )
 
         private data class InFlightKey(
@@ -344,6 +345,7 @@ class ResolveAudioStreamUseCase
                 authFingerprint = authState.streamCacheFingerprint,
                 pinnedFormatId = pinnedFormatId,
                 requiresSongMetadata = requiresSongMetadata,
+                artworkVideo = artworkVideo,
             )
 
         private fun storeResolvedStream(

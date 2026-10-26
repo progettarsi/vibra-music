@@ -4484,6 +4484,7 @@ class MusicService :
                     purpose = StreamPurpose.PLAYBACK,
                     authState = configuration.authState,
                     pinnedFormatId = null,
+                    artworkVideo = nextMediaItem.metadata?.isMusicVideo == true && !isLowDataModeActive(),
                 ),
         )
     }
@@ -5047,6 +5048,34 @@ class MusicService :
     private fun ResolvedAudioStream.castMimeType(): String? =
         if (codecs.isBlank()) mimeType.toCastMimeType() else "$mimeType; codecs=\"$codecs\"".toCastMimeType()
 
+    /**
+     * Vibra: resolves [mediaId]'s music video picture for the player when no playback
+     * resolution has (audio served from the cache needs none). Low priority, best effort.
+     */
+    fun requestArtworkVideo(mediaId: String) {
+        if (isLowDataModeActive()) return
+        ioScope.launch {
+            runCatching {
+                resolveAudioStream.preload(
+                    AudioStreamRequest(
+                        mediaId = mediaId,
+                        quality = audioQuality,
+                        networkMetered = false,
+                        purpose = StreamPurpose.PLAYBACK,
+                        authState = YouTube.currentPlaybackAuthState(),
+                        artworkVideo = true,
+                    ),
+                )
+            }.onFailure { if (it is CancellationException) throw it }
+        }
+    }
+
+    // Vibra: whether [mediaId] is a music video, whose picture the player can show (loader thread).
+    private fun isMusicVideo(mediaId: String): Boolean =
+        currentMediaMetadata.value?.takeIf { it.id == mediaId }?.isMusicVideo
+            ?: database.getSongByIdBlocking(mediaId)?.song?.isMusicVideo
+            ?: false
+
     private fun resolvePlaybackDataSpec(dataSpec: DataSpec): DataSpec {
         if (dataSpec.uri.shouldBypassYouTubeResolver()) {
             return dataSpec
@@ -5081,6 +5110,7 @@ class MusicService :
                             purpose = StreamPurpose.PLAYBACK,
                             authState = YouTube.currentPlaybackAuthState(),
                             pinnedFormatId = pinnedFormatId,
+                            artworkVideo = !lowDataModeActive && isMusicVideo(mediaId),
                         ),
                     ).also { resolved ->
                         resolvedRequestHeaders = resolved.requestHeaders

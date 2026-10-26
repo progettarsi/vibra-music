@@ -246,7 +246,7 @@ private fun VibraLogo(
                         alpha = 0f
                     } else {
                         alpha = 1f
-                        translationY = (row.offset - info.viewportStartOffset - top.toPx()).toFloat()
+                        translationY = row.offset - info.viewportStartOffset - top.toPx()
                     }
                 }.semantics { contentDescription = appName },
     )

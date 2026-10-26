@@ -50,6 +50,7 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.C
@@ -378,10 +379,10 @@ class BackdropBaker internal constructor(
                     Brush.verticalGradient(
                         colorStops =
                             arrayOf(
-                                0f to Color.Black.copy(alpha = 0.28f),
+                                0f to Color.Black.copy(alpha = TopScrim),
                                 (slot.top / height).coerceIn(0f, 1f) to Color.Transparent,
                                 ((slot.bottom - slot.height * 0.25f) / height).coerceIn(0f, 1f) to Color.Transparent,
-                                1f to Color.Black.copy(alpha = 0.45f),
+                                1f to Color.Black.copy(alpha = BottomScrim),
                             ),
                     ),
                 )
@@ -451,31 +452,36 @@ private suspend fun loadCoverImage(
 private fun DrawScope.drawExtension(
     image: ImageBitmap,
     slot: Rect,
-    alpha: Float = 1f,
 ) {
-    // Centre square of the image (videos have 16:9 thumbnails; covers are cropped).
-    val side = min(image.width, image.height)
-    val srcLeft = (image.width - side) / 2
-    val srcTop = (image.height - side) / 2
+    extensionParts(image.width, image.height, slot, size.height).forEach { (source, target) ->
+        drawImage(image, source.topLeft, source.size, target.topLeft, target.size)
+    }
+}
+
+/**
+ * Where an image of [imageWidth] × [imageHeight] goes to continue the cover at [slot] on a
+ * canvas [canvasHeight] tall, as (source, target) rectangles: its centre square at the slot
+ * (videos have 16:9 pictures; covers are cropped), then its top and bottom rows stretched
+ * out to the canvas edges. Shared by the baked and the live backdrop.
+ */
+internal fun extensionParts(
+    imageWidth: Int,
+    imageHeight: Int,
+    slot: Rect,
+    canvasHeight: Float,
+): List<Pair<IntRect, IntRect>> {
+    val side = min(imageWidth, imageHeight)
+    val square = IntRect(IntOffset((imageWidth - side) / 2, (imageHeight - side) / 2), IntSize(side, side))
     val strip = (side * EdgeStrip).roundToInt().coerceAtLeast(1)
     val left = slot.left.roundToInt()
-    val width = slot.width.roundToInt()
+    val right = left + slot.width.roundToInt()
     val top = slot.top.roundToInt()
     val bottom = slot.bottom.roundToInt()
-    drawImage(image, IntOffset(srcLeft, srcTop), IntSize(side, side), IntOffset(left, top), IntSize(width, bottom - top), alpha)
-    if (top > 0) {
-        drawImage(image, IntOffset(srcLeft, srcTop), IntSize(side, strip), IntOffset(left, 0), IntSize(width, top), alpha)
-    }
-    val below = size.height.roundToInt() - bottom
-    if (below > 0) {
-        drawImage(
-            image,
-            IntOffset(srcLeft, srcTop + side - strip),
-            IntSize(side, strip),
-            IntOffset(left, bottom),
-            IntSize(width, below),
-            alpha,
-        )
+    val height = canvasHeight.roundToInt()
+    return buildList {
+        add(square to IntRect(left, top, right, bottom))
+        if (top > 0) add(IntRect(square.left, square.top, square.right, square.top + strip) to IntRect(left, 0, right, top))
+        if (height > bottom) add(IntRect(square.left, square.bottom - strip, square.right, square.bottom) to IntRect(left, bottom, right, height))
     }
 }
 
@@ -521,20 +527,24 @@ private fun relativeLuminance(argb: Int): Double {
 private const val TargetLuminance = 0.16
 private const val MaxContrastDim = 0.6f
 
+/** Darkening of the backdrop under the status bar and at the bottom, behind the controls. */
+internal const val TopScrim = 0.28f
+internal const val BottomScrim = 0.45f
+
 /** Longest wait for a new cover before the old one dissolves anyway. */
 private const val DrawnTimeoutMillis = 1_200L
 
 /** How long a track change takes to dissolve the backdrop: quick, but not a cut. */
-private const val DissolveMillis = 300
+internal const val DissolveMillis = 300
 
 /** Backdrops kept (current, neighbours, and a couple of recent ones). */
 private const val MaxBakes = 6
 
-private val HeavyBlur = 44.dp
-private val SoftBlur = 14.dp
+internal val HeavyBlur = 44.dp
+internal val SoftBlur = 14.dp
 
 /** How far beyond the cover (share of its height) the soft blur still shows. */
-private const val SoftReach = 0.3f
+internal const val SoftReach = 0.3f
 
 /** Share of the cover's height whose edge rows are stretched beyond it. */
 private const val EdgeStrip = 0.06f

@@ -193,6 +193,19 @@ class YoutubeiResolver(
             loudnessDb = value.optionalDouble("loudnessDb"),
             perceptualLoudnessDb = value.optionalDouble("perceptualLoudnessDb"),
             playbackTrackingUrl = value.optionalString("playbackTrackingUrl"),
+            artworkVideo = value.optJSONObject("artworkVideo")?.toArtworkVideo(now),
+        )
+    }
+
+    private fun JSONObject.toArtworkVideo(now: Long): YoutubeiArtworkVideo? {
+        val url = optString("url").trim()
+        if (Uri.parse(url).scheme?.lowercase() != "https") return null
+        return YoutubeiArtworkVideo(
+            url = url,
+            mimeType = optString("mimeType", "video/mp4"),
+            width = optInt("width").coerceAtLeast(0),
+            height = optInt("height").coerceAtLeast(0),
+            expiresAtMs = optLong("expiresAtMs").takeIf { it > now } ?: (now + DEFAULT_STREAM_LIFETIME_MS),
         )
     }
 
@@ -204,6 +217,7 @@ class YoutubeiResolver(
             .put("authFingerprint", authFingerprint)
             .put("pinnedItag", pinnedItag)
             .put("requiresSongMetadata", requiresSongMetadata)
+            .put("artworkVideo", artworkVideo)
             .put("cookie", cookie)
             .put("visitorData", visitorData)
             .put("dataSyncId", dataSyncId)

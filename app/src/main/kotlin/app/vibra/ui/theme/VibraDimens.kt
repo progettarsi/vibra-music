@@ -27,9 +27,6 @@ object VibraDimens {
     /** Vertical gap between home cards (homepageContent auto-layout gap = 10). */
     val CardGap = 10.dp
 
-    /** Inner padding of cards (song rows sit at 18 dp ≈ 4.98 % of 362). */
-    val CardPadding = 18.dp
-
     /** Gap between song rows inside cards and lists (Canzone stack: 67.5 → 77.7). */
     val RowGap = 10.dp
 
@@ -95,9 +92,6 @@ object VibraShapes {
 
     // ── M3 Expressive shape set (Figma "Shape Set" instances) ──────────────────────
     // MaterialShapes.toShape() is composable (it caches the outline per composition).
-
-    /** Dock / mini-player play button and the full player's play button. */
-    val Cookie12: Shape @Composable get() = MaterialShapes.Cookie12Sided.toShape()
 
     /** "For you" genre covers and favourites artwork. */
     val Cookie9: Shape @Composable get() = MaterialShapes.Cookie9Sided.toShape()

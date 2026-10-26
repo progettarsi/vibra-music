@@ -113,7 +113,10 @@ import androidx.graphics.shapes.CornerRounding
 import androidx.graphics.shapes.Morph
 import androidx.graphics.shapes.RoundedPolygon
 import androidx.graphics.shapes.rectangle
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.compose.currentStateAsState
 import androidx.media3.common.Player.REPEAT_MODE_ALL
 import androidx.media3.common.Player.REPEAT_MODE_OFF
 import androidx.media3.common.Player.REPEAT_MODE_ONE
@@ -159,6 +162,7 @@ import moe.rukamori.archivetune.extensions.toggleRepeatMode
 import moe.rukamori.archivetune.models.MediaMetadata
 import moe.rukamori.archivetune.playback.PlayerConnection
 import moe.rukamori.archivetune.playback.SleepTimer
+import moe.rukamori.archivetune.playback.stream.ArtworkVideoStream
 import moe.rukamori.archivetune.ui.component.LocalBottomSheetPageState
 import moe.rukamori.archivetune.ui.component.LocalMenuState
 import moe.rukamori.archivetune.ui.menu.PlayerMenu
@@ -355,6 +359,22 @@ fun VibraPlayerSheet(
             // The backdrops are baked once per cover (blurring them every frame made the
             // lyrics, which keep the player redrawing, crawl); neighbours are baked ahead.
             val backdropBaker = rememberBackdropBaker()
+            // A music video plays in place of the cover (see ArtworkVideo): only on the settled
+            // player, uncovered and in the foreground, and it gives way to the cover as soon as
+            // the player starts closing.
+            val artworkVideo =
+                rememberArtworkVideoStream(metadata, enabled = sheet.isOpenOrOpening, request = connection.service::requestArtworkVideo)
+            val videoFrames = remember { ArtworkVideoFrames() }
+            val lifecycleState by LocalLifecycleOwner.current.lifecycle.currentStateAsState()
+            val videoActive = {
+                sheet.progress >= 0.999f &&
+                    queueSheet.progress < 0.01f &&
+                    lyrics() < 0.99f &&
+                    lifecycleState.isAtLeast(Lifecycle.State.RESUMED)
+            }
+            val videoVisibility = { ((sheet.progress - VideoFadeStart) / (1f - VideoFadeStart)).coerceIn(0f, 1f) }
+            // A paused video shows the same frame: its backdrop need not follow it.
+            val isPlaying by rememberUpdatedState(nowPlaying.isPlaying)
             val swipeSide by remember { derivedStateOf { kotlin.math.sign(coverSwipe.value) } }
             // Captured when the swipe starts: the neighbours change as soon as the swipe has
             // switched track, but the page on screen must stay the one that slid in.
@@ -453,6 +473,14 @@ fun VibraPlayerSheet(
                         // After a completed swipe the new page is already on screen: no second fade.
                         dissolve = { coverCrossfade.fading != null },
                     )
+                    LiveCoverExtension(
+                        frames = videoFrames,
+                        slot = coverSlot,
+                        size = IntSize(fullWidthPx.toInt(), fullHeightPx.toInt()),
+                        running = { videoActive() && isPlaying },
+                        visibility = { backdropVisibility() * videoVisibility() },
+                        offsetX = { coverSwipe.value },
+                    )
                     revealed?.let { url ->
                         CoverExtension(url = url, baker = backdropBaker, visibility = backdropVisibility, offsetX = revealedOffset)
                     }
@@ -472,6 +500,17 @@ fun VibraPlayerSheet(
                     fadingUrl = coverCrossfade.fading,
                     fadingAlpha = coverCrossfade::fadingAlpha,
                     onCoverDrawn = coverCrossfade::onCoverDrawn,
+                    video = artworkVideo,
+                    videoLayer = { video, current ->
+                        ArtworkVideoSurface(
+                            stream = video,
+                            master = connection.player,
+                            active = { current && videoActive() },
+                            visibility = videoVisibility,
+                            frames = videoFrames.takeIf { current && !landscape },
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    },
                     contentDescription = metadata.title,
                 )
                 if (!landscape) {
@@ -704,9 +743,17 @@ private fun FlyingCover(
     fadingUrl: String?,
     fadingAlpha: () -> Float,
     onCoverDrawn: (String?) -> Unit,
+    video: ArtworkVideoStream?,
+    videoLayer: @Composable (video: ArtworkVideoStream, current: Boolean) -> Unit,
     contentDescription: String,
 ) {
     val density = LocalDensity.current
+    // The video each cover layer shows: the previous track's keeps its own and dissolves with it.
+    val layerVideos = remember { HashMap<String, ArtworkVideoStream>() }
+    if (url != null) {
+        if (video != null) layerVideos[url] = video else layerVideos.remove(url)
+    }
+    layerVideos.keys.retainAll(setOfNotNull(url, fadingUrl))
     val cornerPx = if (fullBleed) 0f else with(density) { CoverCorner.toPx() }
     val morph =
         remember(to.width, cornerPx) {
@@ -756,35 +803,40 @@ private fun FlyingCover(
                     if (fullBleed) Modifier.coverEdgeFade { 1f - progress() } else Modifier,
                 ),
     ) {
-        // One keyed layer per cover: after a track change the previous cover's layer keeps
-        // its loaded image and stays on top (fully opaque until the new one is drawn), then
-        // dissolves with a light blur. Keys keep each layer's state when the order changes.
+        // One keyed layer per cover (its image, and its video if any): after a track change the
+        // previous layer keeps what it shows and stays on top (fully opaque until the new cover
+        // is drawn), then dissolves with a light blur. Keys keep each layer's state when the
+        // order changes.
         listOfNotNull(url, fadingUrl?.takeIf { it != url }).forEach { layerUrl ->
             key(layerUrl) {
                 val isFading = layerUrl != url
-                VibraArtwork(
-                    url = layerUrl,
-                    shape = RectangleShape,
-                    sizePx = PlayerArtworkPx,
-                    placeholderSizePx = SmallArtworkPx,
-                    contentDescription = if (isFading) null else contentDescription,
-                    onLoaded = { if (!isFading) onCoverDrawn(layerUrl) },
-                    modifier =
-                        Modifier
-                            .fillMaxSize()
-                            .then(
-                                if (isFading) {
-                                    Modifier.graphicsLayer {
-                                        val a = fadingAlpha()
-                                        alpha = a
-                                        val radius = (1f - a) * CrossfadeBlur.toPx()
-                                        if (radius > 0.5f) renderEffect = BlurEffect(radius, radius)
-                                    }
-                                } else {
-                                    Modifier
-                                },
-                            ),
-                )
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .then(
+                            if (isFading) {
+                                Modifier.graphicsLayer {
+                                    val a = fadingAlpha()
+                                    alpha = a
+                                    val radius = (1f - a) * CrossfadeBlur.toPx()
+                                    if (radius > 0.5f) renderEffect = BlurEffect(radius, radius)
+                                }
+                            } else {
+                                Modifier
+                            },
+                        ),
+                ) {
+                    VibraArtwork(
+                        url = layerUrl,
+                        shape = RectangleShape,
+                        sizePx = PlayerArtworkPx,
+                        placeholderSizePx = SmallArtworkPx,
+                        contentDescription = if (isFading) null else contentDescription,
+                        onLoaded = { if (!isFading) onCoverDrawn(layerUrl) },
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                    layerVideos[layerUrl]?.let { layerVideo -> videoLayer(layerVideo, !isFading) }
+                }
             }
         }
         // The mini-player dims its cookie under the play glyph; clear that on the way up.
@@ -1638,4 +1690,8 @@ private const val WarmUpDelayMillis = 1_200L
 
 /** How long the player rests open before the neighbouring tracks' backdrops are baked. */
 private const val NeighbourBakeDelayMillis = 600L
+
 private const val TitleCrossfadeEnd = 0.55f
+
+/** Sheet progress below which a music video has given way to the cover again (closing). */
+private const val VideoFadeStart = 0.85f

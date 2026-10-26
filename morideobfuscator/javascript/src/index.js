@@ -31,6 +31,13 @@ const SUPPORTED_AUDIO_MIME_TYPES = new Set([
   "audio/mpeg",
   "audio/3gpp",
 ]);
+// Vibra: a music video can replace the player's cover. Its picture only fills the cover
+// slot (and feeds a heavily blurred backdrop), so a light video-only stream is enough;
+// codecs in order of how widely phones decode them in hardware.
+const ARTWORK_VIDEO_MIME_TYPES = new Set(["video/mp4", "video/webm"]);
+const ARTWORK_VIDEO_CODECS = ["avc1", "vp9", "vp09"];
+const ARTWORK_VIDEO_MAX_HEIGHT = 480;
+const ARTWORK_VIDEO_METERED_MAX_HEIGHT = 360;
 const ANONYMOUS_CLIENT = "MWEB";
 const AUTHENTICATED_CLIENT = "WEB_CREATOR";
 const AUTHENTICATED_CLIENT_VERSION = "1.20260708.06.00";
@@ -248,6 +255,63 @@ function selectedFormat(formats, request) {
   const original = sorted.filter((format) => format.is_original);
   const primary = original.length ? original : sorted;
   return preferredFormat(primary, request);
+}
+
+function artworkVideoCodecRank(format) {
+  const codecs = /codecs="([^"]+)"/.exec(String(format.mime_type || ""))?.[1] || "";
+  const rank = ARTWORK_VIDEO_CODECS.findIndex((codec) => codecs.startsWith(codec));
+  return rank < 0 ? ARTWORK_VIDEO_CODECS.length : rank;
+}
+
+function isEligibleArtworkVideoFormat(format, maxHeight) {
+  const mimeType = String(format.mime_type || "").split(";", 1)[0].toLowerCase();
+  const height = Number(format.height || 0);
+  return Boolean(format.has_video) &&
+    !format.has_audio &&
+    !format.is_type_otf &&
+    !format.drm_track_type &&
+    !(format.drm_families && format.drm_families.length) &&
+    ARTWORK_VIDEO_MIME_TYPES.has(mimeType) &&
+    artworkVideoCodecRank(format) < ARTWORK_VIDEO_CODECS.length &&
+    height > 0 &&
+    height <= maxHeight &&
+    Boolean(format.url || format.signature_cipher || format.cipher);
+}
+
+// The tallest eligible picture in the best-supported codec, the lightest at equal height.
+function selectedArtworkVideoFormat(info, request) {
+  const maxHeight = request.networkMetered ? ARTWORK_VIDEO_METERED_MAX_HEIGHT : ARTWORK_VIDEO_MAX_HEIGHT;
+  return (info.streaming_data?.adaptive_formats || [])
+    .filter((format) => isEligibleArtworkVideoFormat(format, maxHeight))
+    .sort((first, second) =>
+      artworkVideoCodecRank(first) - artworkVideoCodecRank(second) ||
+      Number(second.height) - Number(first.height) ||
+      bitrateOf(first) - bitrateOf(second))[0];
+}
+
+// Never fails the audio resolution: without a usable video the player keeps the cover.
+async function resolveArtworkVideo(youtube, request, info, supportsGvsPoToken) {
+  if (!request.artworkVideo) return null;
+  try {
+    const format = selectedArtworkVideoFormat(info, request);
+    if (!format) return null;
+    const player = formatNeedsPlayer(format) ? await getPlayer(youtube) : undefined;
+    const url = applyGvsPoToken(new URL(await format.decipher(player)), {
+      supportsGvsPoToken,
+      videoPoToken: request.videoPoToken,
+      sessionPoToken: request.sessionPoToken,
+    });
+    if (url.protocol !== "https:" || url.searchParams.get("sabr") === "1") return null;
+    return {
+      url: url.toString(),
+      mimeType: String(format.mime_type).split(";", 1)[0],
+      width: Number(format.width || 0),
+      height: Number(format.height || 0),
+      expiresAtMs: extractExpiry(url, info.streaming_data?.expires),
+    };
+  } catch {
+    return null;
+  }
 }
 
 function formatNeedsPlayer(format) {
@@ -701,6 +765,7 @@ async function resolveWithClient(youtube, request, client, preparedInfo) {
       ? audioConfig.perceptual_loudness_db
       : null,
     playbackTrackingUrl: playbackTrackingUrl(info),
+    artworkVideo: await resolveArtworkVideo(youtube, request, info, supportsGvsPoToken),
   };
 }
 
