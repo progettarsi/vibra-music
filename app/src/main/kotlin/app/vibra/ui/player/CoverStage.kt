@@ -345,47 +345,11 @@ class BackdropBaker internal constructor(
             heavy.record(density, direction, size) { drawExtension(image, slot) }
             // …and a soft one around the cover's edges, where the sharp cover dissolves.
             soft.renderEffect = BlurEffect(softRadius, softRadius, TileMode.Decal)
-            soft.record(density, direction, size) {
-                val width = this.size.width
-                val height = this.size.height
-                val reach = slot.height * SoftReach
-                drawContext.canvas.saveLayer(Rect(Offset.Zero, this.size), Paint())
-                drawExtension(image, slot)
-                drawRect(
-                    brush =
-                        Brush.verticalGradient(
-                            colorStops =
-                                arrayOf(
-                                    ((slot.top - reach) / height).coerceIn(0f, 1f) to Color.Transparent,
-                                    (slot.top / height).coerceIn(0f, 1f) to Color.Black,
-                                    (slot.bottom / height).coerceIn(0f, 1f) to Color.Black,
-                                    ((slot.bottom + reach) / height).coerceIn(0f, 1f) to Color.Transparent,
-                                ),
-                        ),
-                    size = Size(width, height),
-                    blendMode = BlendMode.DstIn,
-                )
-                drawContext.canvas.restore()
-            }
+            soft.record(density, direction, size) { softEdge(slot, this.size) { drawExtension(image, slot) } }
             root.record(density, direction, size) {
                 drawLayer(heavy)
                 drawLayer(soft)
-                // Contrast guard: a flat darkening only as strong as the cover needs, so the white
-                // text always has enough contrast (see contrastDim).
-                drawRect(Color.Black.copy(alpha = contrastDim(image)))
-                // Legibility only where text sits: the status bar and the controls below the cover.
-                val height = this.size.height
-                drawRect(
-                    Brush.verticalGradient(
-                        colorStops =
-                            arrayOf(
-                                0f to Color.Black.copy(alpha = TopScrim),
-                                (slot.top / height).coerceIn(0f, 1f) to Color.Transparent,
-                                ((slot.bottom - slot.height * 0.25f) / height).coerceIn(0f, 1f) to Color.Transparent,
-                                1f to Color.Black.copy(alpha = BottomScrim),
-                            ),
-                    ),
-                )
+                drawBackdropScrims(slot, contrastDim(image))
             }
             return root.toImageBitmap()
         } finally {
@@ -395,6 +359,67 @@ class BackdropBaker internal constructor(
         }
     }
 }
+
+/**
+ * Draws [extension] masked to the band around the cover where the soft blur shows (it fades
+ * out [SoftReach] of the cover's height beyond its top and bottom). [canvasSize] is the
+ * backdrop's full size, in the coordinates [extension] draws in.
+ */
+internal inline fun DrawScope.softEdge(
+    slot: Rect,
+    canvasSize: Size,
+    extension: DrawScope.() -> Unit,
+) {
+    val height = canvasSize.height
+    val reach = slot.height * SoftReach
+    drawContext.canvas.saveLayer(Rect(Offset.Zero, canvasSize), Paint())
+    extension()
+    drawRect(
+        brush =
+            Brush.verticalGradient(
+                colorStops =
+                    arrayOf(
+                        ((slot.top - reach) / height).coerceIn(0f, 1f) to Color.Transparent,
+                        (slot.top / height).coerceIn(0f, 1f) to Color.Black,
+                        (slot.bottom / height).coerceIn(0f, 1f) to Color.Black,
+                        ((slot.bottom + reach) / height).coerceIn(0f, 1f) to Color.Transparent,
+                    ),
+            ),
+        size = canvasSize,
+        blendMode = BlendMode.DstIn,
+    )
+    drawContext.canvas.restore()
+}
+
+/**
+ * Over the blurred backdrop: a flat darkening only as strong as the picture needs ([dim], see
+ * contrastDim), so the white text always has enough contrast, and legibility scrims only where
+ * text sits — the status bar and the controls below the cover.
+ */
+internal fun DrawScope.drawBackdropScrims(
+    slot: Rect,
+    dim: Float,
+) {
+    drawRect(Color.Black.copy(alpha = dim))
+    val height = size.height
+    drawRect(
+        Brush.verticalGradient(
+            colorStops =
+                arrayOf(
+                    0f to Color.Black.copy(alpha = TopScrim),
+                    (slot.top / height).coerceIn(0f, 1f) to Color.Transparent,
+                    ((slot.bottom - slot.height * 0.25f) / height).coerceIn(0f, 1f) to Color.Transparent,
+                    1f to Color.Black.copy(alpha = BottomScrim),
+                ),
+        ),
+    )
+}
+
+/** How much [url]'s backdrop is darkened for the text (see contrastDim); 0 if it can't load. */
+internal suspend fun coverContrastDim(
+    context: PlatformContext,
+    url: String,
+): Float = loadCoverImage(context, url)?.let(::contrastDim) ?: 0f
 
 @Composable
 fun rememberBackdropBaker(): BackdropBaker {
@@ -528,8 +553,8 @@ private const val TargetLuminance = 0.16
 private const val MaxContrastDim = 0.6f
 
 /** Darkening of the backdrop under the status bar and at the bottom, behind the controls. */
-internal const val TopScrim = 0.28f
-internal const val BottomScrim = 0.45f
+private const val TopScrim = 0.28f
+private const val BottomScrim = 0.45f
 
 /** Longest wait for a new cover before the old one dissolves anyway. */
 private const val DrawnTimeoutMillis = 1_200L

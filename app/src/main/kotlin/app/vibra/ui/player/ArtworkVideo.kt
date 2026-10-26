@@ -6,14 +6,10 @@
 package app.vibra.ui.player
 
 import android.content.Context
-import android.graphics.Bitmap
-import android.os.Handler
-import android.os.HandlerThread
-import android.view.PixelCopy
-import android.view.Surface
 import android.view.TextureView
 import androidx.annotation.OptIn
-import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -46,10 +42,9 @@ import java.util.concurrent.TimeUnit
 import kotlin.math.roundToInt
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
-import kotlin.coroutines.resume
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeoutOrNull
+import moe.rukamori.archivetune.LocalAnimationsDisabled
 import moe.rukamori.archivetune.innertube.YouTube
 import moe.rukamori.archivetune.models.MediaMetadata
 import moe.rukamori.archivetune.playback.ChunkedDataSource
@@ -74,9 +69,8 @@ import okhttp3.OkHttpClient
  *  released when the sheet closes. Until its first frame, or if anything fails, the cover
  *  image underneath simply stays.
  *
- *  The backdrop follows the video through ArtworkVideoFrames: a few times a second a tiny
- *  frame is copied and turned into a low-resolution blurred backdrop off the main thread
- *  (LiveBackdrop), instead of blurring the live video every frame.
+ *  The backdrop follows the video frame by frame: the cover's content, video included, is
+ *  drawn a second time, small and blurred, by LiveCoverExtension (no pixel is read back).
  * ─────────────────────────────────────────────────────────────────────────────────────
  */
 
@@ -101,10 +95,10 @@ fun rememberArtworkVideoStream(
     return stream
 }
 
-/** The current track's video surface, while it shows a picture — read by the live backdrop. */
+/** The current track's video while it shows a picture: the live backdrop shares its reveal. */
 @Stable
-class ArtworkVideoFrames {
-    internal var source by mutableStateOf<ArtworkVideoPlayback?>(null)
+class CurrentArtworkVideo {
+    internal var playback by mutableStateOf<ArtworkVideoPlayback?>(null)
 }
 
 /** One video stream played into one surface (see the file header). */
@@ -119,10 +113,9 @@ internal class ArtworkVideoPlayback(
         private set
     var failed by mutableStateOf(false)
         private set
-    internal var surface: TextureView? = null
 
-    // The video's buffers, read back for the live backdrop (see grab).
-    private var copySource: Surface? = null
+    /** 0 → 1 while the video, and the live backdrop with it, dissolve in over the cover. */
+    val reveal = Animatable(0f)
 
     // Wakes the sync loop early: the audio played, paused, jumped or changed speed, or the
     // video became ready after a seek.
@@ -138,7 +131,10 @@ internal class ArtworkVideoPlayback(
         active: () -> Boolean,
     ) {
         snapshotFlow(active).first { it }
-        val video = build()
+        // It starts where the audio will be once it is ready, so its first frame — the one
+        // the cover dissolves into — is already the right one (not the video's opening).
+        val video = build(startAt = master.currentPosition + if (master.isPlaying) seekLead else 0L)
+        seeking = master.isPlaying
         player = video
         val listener =
             object : Player.Listener {
@@ -168,33 +164,7 @@ internal class ArtworkVideoPlayback(
         }
     }
 
-    /**
-     * Copies the latest video frame into [into], scaled to its size; false without one. The
-     * copy runs on the render thread and answers on a background one: unlike
-     * TextureView.getBitmap it never waits on the main thread.
-     */
-    suspend fun grab(into: Bitmap): Boolean {
-        val texture = surface?.surfaceTexture ?: return false
-        if (!hasFrame || failed) return false
-        val source = copySource ?: Surface(texture).also { copySource = it }
-        return suspendCancellableCoroutine { continuation ->
-            runCatching {
-                PixelCopy.request(source, into, { result -> continuation.resume(result == PixelCopy.SUCCESS) }, FrameCopies.handler)
-            }.onFailure { continuation.resume(false) }
-        }
-    }
-
-    /** The surface is going away: forget the copy source made for it. */
-    fun detach(view: TextureView) {
-        if (surface !== view) return
-        surface = null
-        copySource?.release()
-        copySource = null
-    }
-
     fun release() {
-        copySource?.release()
-        copySource = null
         player?.release()
         player = null
     }
@@ -248,7 +218,7 @@ internal class ArtworkVideoPlayback(
     }
 
     @OptIn(UnstableApi::class)
-    private fun build(): ExoPlayer =
+    private fun build(startAt: Long): ExoPlayer =
         ExoPlayer
             .Builder(context)
             .setLoadControl(
@@ -275,8 +245,7 @@ internal class ArtworkVideoPlayback(
                         }
                     },
                 )
-                surface?.let(::setVideoTextureView)
-                setMediaSource(mediaSource(stream))
+                setMediaSource(mediaSource(stream), startAt)
                 prepare()
             }
 }
@@ -284,7 +253,7 @@ internal class ArtworkVideoPlayback(
 /**
  * [stream] playing over the cover image, centre-cropped to the layer's box. [active] says
  * when it may play (it is built the first time it holds); [visibility] fades it with the
- * sheet; [frames], for the current track only, lets the backdrop follow it.
+ * sheet; [current], for the current track only, lets the live backdrop dissolve with it.
  */
 @Composable
 internal fun ArtworkVideoSurface(
@@ -292,7 +261,7 @@ internal fun ArtworkVideoSurface(
     master: Player,
     active: () -> Boolean,
     visibility: () -> Float,
-    frames: ArtworkVideoFrames?,
+    current: CurrentArtworkVideo?,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current.applicationContext
@@ -302,29 +271,30 @@ internal fun ArtworkVideoSurface(
     val currentActive by rememberUpdatedState(active)
     LaunchedEffect(playback) { playback.follow(master) { currentActive() } }
     val shown = playback.hasFrame && !playback.failed
-    if (frames != null) {
-        DisposableEffect(frames, playback, shown) {
-            if (shown) frames.source = playback
-            onDispose { if (frames.source === playback) frames.source = null }
+    if (current != null) {
+        DisposableEffect(current, playback, shown) {
+            if (shown) current.playback = playback
+            onDispose { if (current.playback === playback) current.playback = null }
         }
     }
-    val reveal = animateFloatAsState(if (shown) 1f else 0f, tween(RevealMillis), label = "artworkVideo")
+    // The cover dissolves into the video once its first frame is on the surface.
+    val animationsDisabled = LocalAnimationsDisabled.current
+    LaunchedEffect(playback, shown) {
+        val target = if (shown) 1f else 0f
+        if (animationsDisabled) {
+            playback.reveal.snapTo(target)
+        } else {
+            playback.reveal.animateTo(target, tween(RevealMillis, easing = FastOutSlowInEasing))
+        }
+    }
     val video = playback.player ?: return
     AndroidView(
-        factory = { viewContext ->
-            TextureView(viewContext).also { view ->
-                playback.surface = view
-                video.setVideoTextureView(view)
-            }
-        },
-        onRelease = { view ->
-            video.clearVideoTextureView(view)
-            playback.detach(view)
-        },
+        factory = { viewContext -> TextureView(viewContext).also(video::setVideoTextureView) },
+        onRelease = video::clearVideoTextureView,
         modifier =
             modifier
                 .centreCrop(stream.aspectRatio)
-                .graphicsLayer { alpha = reveal.value * visibility() },
+                .graphicsLayer { alpha = playback.reveal.value * visibility() },
     )
 }
 
@@ -349,11 +319,6 @@ private fun mediaSource(stream: ArtworkVideoStream): ProgressiveMediaSource {
     // googlevideo throttles long open-ended reads: the same chunked requests as the audio.
     val chunked = DataSource.Factory { ChunkedDataSource(http.createDataSource(), MusicService.CHUNK_LENGTH) }
     return ProgressiveMediaSource.Factory(chunked).createMediaSource(MediaItem.fromUri(stream.url))
-}
-
-/** The thread frame copies for the live backdrop answer on. */
-private object FrameCopies {
-    val handler: Handler by lazy { Handler(HandlerThread("VibraVideoFrames").apply { start() }.looper) }
 }
 
 private object VideoHttp {
@@ -384,4 +349,5 @@ private const val MinBufferMillis = 4_000
 private const val MaxBufferMillis = 15_000
 private const val StartBufferMillis = 500
 
-private const val RevealMillis = 450
+/** The cover dissolving into the video (and the cover's backdrop into the live one). */
+private const val RevealMillis = 900

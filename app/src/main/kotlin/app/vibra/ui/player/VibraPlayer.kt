@@ -69,6 +69,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.rememberGraphicsLayer
+import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.graphics.layer.GraphicsLayer
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.RoundRect
@@ -364,7 +368,10 @@ fun VibraPlayerSheet(
             // the player starts closing.
             val artworkVideo =
                 rememberArtworkVideoStream(metadata, enabled = sheet.isOpenOrOpening, request = connection.service::requestArtworkVideo)
-            val videoFrames = remember { ArtworkVideoFrames() }
+            val currentVideo = remember { CurrentArtworkVideo() }
+            // The cover's content (image and video), drawn a second time, blurred, as the live
+            // backdrop (see LiveCoverExtension).
+            val coverContent = rememberGraphicsLayer()
             val lifecycleState by LocalLifecycleOwner.current.lifecycle.currentStateAsState()
             val videoActive = {
                 sheet.progress >= 0.999f &&
@@ -373,8 +380,6 @@ fun VibraPlayerSheet(
                     lifecycleState.isAtLeast(Lifecycle.State.RESUMED)
             }
             val videoVisibility = { ((sheet.progress - VideoFadeStart) / (1f - VideoFadeStart)).coerceIn(0f, 1f) }
-            // A paused video shows the same frame: its backdrop need not follow it.
-            val isPlaying by rememberUpdatedState(nowPlaying.isPlaying)
             val swipeSide by remember { derivedStateOf { kotlin.math.sign(coverSwipe.value) } }
             // Captured when the swipe starts: the neighbours change as soon as the swipe has
             // switched track, but the page on screen must stay the one that slid in.
@@ -474,10 +479,10 @@ fun VibraPlayerSheet(
                         dissolve = { coverCrossfade.fading != null },
                     )
                     LiveCoverExtension(
-                        frames = videoFrames,
+                        video = currentVideo,
+                        content = coverContent,
+                        url = metadata.thumbnailUrl,
                         slot = coverSlot,
-                        size = IntSize(fullWidthPx.toInt(), fullHeightPx.toInt()),
-                        running = { videoActive() && isPlaying },
                         visibility = { backdropVisibility() * videoVisibility() },
                         offsetX = { coverSwipe.value },
                     )
@@ -501,13 +506,14 @@ fun VibraPlayerSheet(
                     fadingAlpha = coverCrossfade::fadingAlpha,
                     onCoverDrawn = coverCrossfade::onCoverDrawn,
                     video = artworkVideo,
+                    contentLayer = coverContent,
                     videoLayer = { video, current ->
                         ArtworkVideoSurface(
                             stream = video,
                             master = connection.player,
                             active = { current && videoActive() },
                             visibility = videoVisibility,
-                            frames = videoFrames.takeIf { current && !landscape },
+                            current = currentVideo.takeIf { current },
                             modifier = Modifier.fillMaxSize(),
                         )
                     },
@@ -744,6 +750,7 @@ private fun FlyingCover(
     fadingAlpha: () -> Float,
     onCoverDrawn: (String?) -> Unit,
     video: ArtworkVideoStream?,
+    contentLayer: GraphicsLayer,
     videoLayer: @Composable (video: ArtworkVideoStream, current: Boolean) -> Unit,
     contentDescription: String,
 ) {
@@ -806,36 +813,46 @@ private fun FlyingCover(
         // One keyed layer per cover (its image, and its video if any): after a track change the
         // previous layer keeps what it shows and stays on top (fully opaque until the new cover
         // is drawn), then dissolves with a light blur. Keys keep each layer's state when the
-        // order changes.
-        listOfNotNull(url, fadingUrl?.takeIf { it != url }).forEach { layerUrl ->
-            key(layerUrl) {
-                val isFading = layerUrl != url
-                Box(
-                    Modifier
-                        .fillMaxSize()
-                        .then(
-                            if (isFading) {
-                                Modifier.graphicsLayer {
-                                    val a = fadingAlpha()
-                                    alpha = a
-                                    val radius = (1f - a) * CrossfadeBlur.toPx()
-                                    if (radius > 0.5f) renderEffect = BlurEffect(radius, radius)
-                                }
-                            } else {
-                                Modifier
-                            },
-                        ),
-                ) {
-                    VibraArtwork(
-                        url = layerUrl,
-                        shape = RectangleShape,
-                        sizePx = PlayerArtworkPx,
-                        placeholderSizePx = SmallArtworkPx,
-                        contentDescription = if (isFading) null else contentDescription,
-                        onLoaded = { if (!isFading) onCoverDrawn(layerUrl) },
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                    layerVideos[layerUrl]?.let { layerVideo -> videoLayer(layerVideo, !isFading) }
+        // order changes. They are recorded into [contentLayer], which the live backdrop draws
+        // again.
+        Box(
+            Modifier
+                .fillMaxSize()
+                .drawWithContent {
+                    contentLayer.record { this@drawWithContent.drawContent() }
+                    drawLayer(contentLayer)
+                },
+        ) {
+            listOfNotNull(url, fadingUrl?.takeIf { it != url }).forEach { layerUrl ->
+                key(layerUrl) {
+                    val isFading = layerUrl != url
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .then(
+                                if (isFading) {
+                                    Modifier.graphicsLayer {
+                                        val a = fadingAlpha()
+                                        alpha = a
+                                        val radius = (1f - a) * CrossfadeBlur.toPx()
+                                        if (radius > 0.5f) renderEffect = BlurEffect(radius, radius)
+                                    }
+                                } else {
+                                    Modifier
+                                },
+                            ),
+                    ) {
+                        VibraArtwork(
+                            url = layerUrl,
+                            shape = RectangleShape,
+                            sizePx = PlayerArtworkPx,
+                            placeholderSizePx = SmallArtworkPx,
+                            contentDescription = if (isFading) null else contentDescription,
+                            onLoaded = { if (!isFading) onCoverDrawn(layerUrl) },
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                        layerVideos[layerUrl]?.let { layerVideo -> videoLayer(layerVideo, !isFading) }
+                    }
                 }
             }
         }
