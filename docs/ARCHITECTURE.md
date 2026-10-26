@@ -1,8 +1,8 @@
 # Vibra — Architecture
 
-Vibra is an independent Android music client. It is a GPL-3.0 fork of
-[ArchiveTune](https://github.com/rukamori/ArchiveTune) (commit `cdf8d6c`, 2026-10-20) whose
-**music engine is kept intact** and whose **presentation layer is replaced** by a new UI
+Vibra is an independent Android music client built on top of
+[ArchiveTune](https://github.com/rukamori/ArchiveTune) (commit `cdf8d6c`, 2026-10-20): its
+**music engine is kept intact** and its **presentation layer is replaced** by a new UI
 implemented from the Vibra Figma file.
 
 ```
