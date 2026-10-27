@@ -34,6 +34,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.add
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -616,9 +617,19 @@ class MainActivity : ComponentActivity() {
                 val onboardingViewModel: OnboardingViewModel = hiltViewModel()
                 val onboardingState by onboardingViewModel.screenState.collectAsStateWithLifecycle()
                 var showOnboardingLogin by rememberSaveable { mutableStateOf(false) }
+                // Until the stored "onboarding done" flag is read, show only the background: deciding
+                // before that flashed the onboarding's first screen at every start.
+                if (onboardingState == OnboardingScreenState.Loading) {
+                    androidx.compose.foundation.layout.Box(
+                        androidx.compose.ui.Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.background),
+                    )
+                    return@ArchiveTuneTheme
+                }
                 val shouldShowOnboarding =
                     when (val state = onboardingState) {
-                        OnboardingScreenState.Loading -> true
+                        OnboardingScreenState.Loading -> false
                         OnboardingScreenState.Empty -> true
                         is OnboardingScreenState.Error -> false
                         is OnboardingScreenState.Success -> state.uiState.shouldShowOnboarding
