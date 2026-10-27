@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
@@ -39,6 +40,7 @@ import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalDensity
@@ -153,7 +155,7 @@ class PageMotion {
         releaseUptime = uptimeMillis
     }
 
-    internal fun role(id: String): PageRole? = roles[id]
+    internal fun role(entry: String): PageRole? = roles[entry]
 
     /** [to] is opened on top of [from]. */
     internal fun forward(
@@ -257,6 +259,54 @@ class PageMotion {
 val LocalPageMotion = staticCompositionLocalOf<PageMotion?> { null }
 
 /**
+ * What a page tells its own content about the transition it is in, so one element of the page
+ * can fly on its own between the page and the element the page grew out of (a shared element,
+ * e.g. the profile avatar landing in the dock's avatar button).
+ *
+ * Everything here is read in the draw phase: [progress] reads the page's animated value, so a
+ * layer that reads it redraws every frame without recomposing anything.
+ */
+@Stable
+class PageFlight internal constructor(
+    private val entryId: String,
+    private val motion: PageMotion?,
+    private val shown: () -> Float,
+    private val frame: FrameGeometry,
+) {
+    /** Layout coordinates of the page's content root (set by [PageFrame]). */
+    internal var contentCoordinates: LayoutCoordinates? = null
+
+    /**
+     * The page's pose progress while it grows out of / shrinks into an origin element as the page
+     * on top (1 = at rest, 0 = folded into the origin); null in any other situation (at rest,
+     * pushed, faded, or the page beneath).
+     */
+    fun progress(): Float? {
+        val role = motion?.role(entry = entryId) ?: return null
+        if (!role.top || role.style != PageStyle.Origin || role.origin == null) return null
+        val progress = PagePose.progress(shown(), role.predictive)
+        return progress.takeIf { it < 1f }
+    }
+
+    /** Window bounds of the element the page grew out of, while [progress] is not null. */
+    fun originBounds(): Rect? = motion?.role(entry = entryId)?.origin?.bounds
+
+    /**
+     * Where [coordinates] (something inside this page) sits in the window when the page is at
+     * rest — i.e. ignoring the page's own transition pose, which scales and moves the content
+     * while it opens or closes.
+     */
+    fun restBoundsInWindow(coordinates: LayoutCoordinates): Rect? {
+        val root = contentCoordinates?.takeIf { it.isAttached } ?: return null
+        if (!coordinates.isAttached) return null
+        return root.localBoundingBoxOf(coordinates, clipBounds = false).translate(frame.windowOffset)
+    }
+}
+
+/** The [PageFlight] of the page this content belongs to; null outside a Vibra page. */
+val LocalPageFlight = staticCompositionLocalOf<PageFlight?> { null }
+
+/**
  * Bounds (window coordinates) of the innermost clickable element under [point]. Later
  * siblings are visited later, so the element drawn on top wins, as it would for touches.
  */
@@ -293,6 +343,7 @@ internal fun AnimatedVisibilityScope.PageFrame(
         ) { state -> if (state == EnterExitState.Visible) 1f else 0f }
     val screenCornerPx = with(LocalDensity.current) { rememberScreenCornerRadius().toPx() }
     val frame = remember { FrameGeometry() }
+    val flight = remember(entry, motion) { PageFlight(entry.id, motion, { shown.value }, frame) }
     val background = MaterialTheme.colorScheme.background
     DisposableEffect(entry, motion) {
         motion?.watch(entry)
@@ -335,15 +386,15 @@ internal fun AnimatedVisibilityScope.PageFrame(
                         if (role.top && role.style == PageStyle.Origin && role.origin != null) {
                             poseOriginContent(role.origin, PagePose.progress(shown.value, role.predictive), frame.windowOffset)
                         }
-                    },
+                    }.onPlaced { flight.contentCoordinates = it },
         ) {
-            content()
+            CompositionLocalProvider(LocalPageFlight provides flight, content = content)
         }
     }
 }
 
 /** Where the frame sits in the window (origins are in window coordinates). */
-private class FrameGeometry {
+internal class FrameGeometry {
     var windowOffset: Offset = Offset.Zero
 }
 

@@ -96,7 +96,7 @@ fun VibraAboutHero(
                         },
                 )
                 Spacer(Modifier.height(36.dp))
-                Text(text = "Vibra", style = MaterialTheme.typography.displayMedium, color = scheme.onPrimary)
+                Text(text = "vibra", style = MaterialTheme.typography.displayMedium, color = scheme.onPrimary)
                 Text(
                     text = stringResource(R.string.vibra_about_tagline),
                     style = MaterialTheme.typography.bodyLarge,

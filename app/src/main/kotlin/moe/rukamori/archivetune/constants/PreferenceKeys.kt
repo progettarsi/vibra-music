@@ -17,6 +17,11 @@ import androidx.datastore.preferences.core.stringSetPreferencesKey
 import java.time.LocalDateTime
 import java.time.ZoneOffset
 
+// Vibra: an explicit option; the default behaviour does not change.
+val VibraPowerSaveAutoKey = booleanPreferencesKey("vibraPowerSaveAuto")
+val VibraPowerSaveThresholdKey = intPreferencesKey("vibraPowerSaveThreshold")
+val VibraPowerSaveModeKey = stringPreferencesKey("vibraPowerSaveMode")
+
 val DarkModeKey = stringPreferencesKey("darkMode")
 
 // Vibra is designed dark-first (the Figma file ships the dark scheme only).

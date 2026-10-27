@@ -65,7 +65,7 @@
     <string name="library_top_mixes_refresh">Refresh mixes</string>
     <string name="library_top_mixes_configure_ai">Configure AI</string>
     <string name="library_top_mixes_ai_not_configured_title">Configure AI to build mixes</string>
-    <string name="library_top_mixes_ai_not_configured_desc">AI integration is required before Vibra can build personal top mixes.</string>
+    <string name="library_top_mixes_ai_not_configured_desc">AI integration is required before vibra can build personal top mixes.</string>
     <string name="library_top_mixes_no_recent_history_title">No recent listening mix yet</string>
     <string name="library_top_mixes_no_recent_history">Listen to more songs, then refresh to build AI mixes from your recent history.</string>
     <string name="library_top_mixes_no_valid_mixes">AI did not return any playable mixes from your recent history.</string>
@@ -127,7 +127,7 @@
     <string name="retry">Retry</string>
     <string name="cast">Cast</string>
     <string name="cast_devices">Cast devices</string>
-    <string name="cast_sheet_subtitle">Choose where Vibra plays</string>
+    <string name="cast_sheet_subtitle">Choose where vibra plays</string>
     <string name="cast_available_devices">Available devices</string>
     <string name="cast_searching_devices">Searching for devices</string>
     <string name="cast_no_devices">No Cast devices found</string>
@@ -146,7 +146,7 @@
     <string name="play">Play</string>
     <string name="widget_pause">Pause</string>
     <string name="widget_previous">Previous</string>
-    <string name="widget_tap_to_open">Tap to open Vibra</string>
+    <string name="widget_tap_to_open">Tap to open vibra</string>
     <string name="widget_insights_title">Listening Insights</string>
     <string name="widget_recommendations">Recommendations</string>
     <string name="widget_listening_time_empty">No listening time yet</string>
@@ -316,9 +316,9 @@
     <string name="login">Login</string>
     <string name="not_logged_in">Not logged in</string>
     <string name="playback_confirmation_required" translatable="false">Playback confirmation required</string>
-    <string name="playback_requires_youtube_music_confirmation" translatable="false">Confirm playback in YouTube Music, then return to Vibra.</string>
+    <string name="playback_requires_youtube_music_confirmation" translatable="false">Confirm playback in YouTube Music, then return to vibra.</string>
     <string name="playback_login_refresh_required" translatable="false">Refresh YouTube Music login</string>
-    <string name="playback_requires_youtube_music_login_refresh" translatable="false">Refresh your YouTube Music login, then return to Vibra.</string>
+    <string name="playback_requires_youtube_music_login_refresh" translatable="false">Refresh your YouTube Music login, then return to vibra.</string>
     <string name="playback_error_unknown" translatable="false">Unknown error</string>
     <string name="playback_error_no_internet" translatable="false">No network connection</string>
     <string name="playback_error_details" translatable="false">Details</string>
@@ -403,7 +403,7 @@
     <string name="eq_screen_subtitle">Shape playback for your ears and equipment</string>
     <string name="eq_sound_shaping_on">Sound shaping is on</string>
     <string name="eq_sound_shaping_off">Sound shaping is off</string>
-    <string name="eq_enable_description">Applies these controls to Vibra playback</string>
+    <string name="eq_enable_description">Applies these controls to vibra playback</string>
     <string name="eq_control_mode">Control mode</string>
     <string name="eq_basic">Basic</string>
     <string name="eq_advanced">Advanced</string>
@@ -599,7 +599,7 @@
     <string name="channel_artifact">Artifact</string>
     <string name="recent_commits">Recent Commits</string>
     <string name="updates_artifact_hosting_description">Artifact builds are fetched directly from GitHub Actions workflow runs.</string>
-    <string name="updates_channel_warning_intro">Vibra provides two download channels for builds:</string>
+    <string name="updates_channel_warning_intro">vibra provides two download channels for builds:</string>
     <string name="updates_channel_warning_stable_title">Stable builds</string>
     <string name="updates_channel_warning_stable_source">Distributed via official GitHub Releases.</string>
     <string name="updates_channel_warning_stable_desc">These versions are tested and recommended for most users.</string>
@@ -619,7 +619,7 @@
     <string name="update_notification_channel_name">App Updates</string>
     <string name="update_notification_channel_desc">Notifications for new app updates</string>
     <string name="update_notification_title">Update Available</string>
-    <string name="update_notification_text">Vibra %s is now available</string>
+    <string name="update_notification_text">vibra %s is now available</string>
     <string name="download">Download</string>
     <string name="download_complete">Download complete</string>
     <string name="downloads">Downloads</string>
@@ -635,21 +635,21 @@
     <string name="download_failed_state">Download failed</string>
     <string name="search_downloads">Search downloads</string>
     <string name="no_matching_downloads">No matching downloads</string>
-    <string name="permissions_title">Allow Vibra to work best</string>
+    <string name="permissions_title">Allow vibra to work best</string>
     <string name="permissions_subtitle">We use a few permissions to play and manage your music reliably. You can change these anytime in system settings.</string>
     <string name="permission_storage_title">Storage access</string>
     <string name="permission_storage_desc">Required to read your downloaded and local audio files for playback.</string>
     <string name="permission_status_allowed">Allowed</string>
     <string name="next">Next</string>
     <string name="allow">Allow</string>
-    <string name="onboarding_welcome_title">Welcome to Vibra</string>
+    <string name="onboarding_welcome_title">Welcome to vibra</string>
     <string name="onboarding_welcome_subtitle">Set up playback and local music permissions before you start listening.</string>
     <string name="onboarding_permissions_title">Review permissions</string>
     <string name="onboarding_permissions_subtitle">Grant only what you want now. You can continue and allow permissions later.</string>
     <string name="onboarding_login_title">Sync your listening</string>
     <string name="onboarding_login_subtitle">Log in to sync your library and history across devices and get more reliable playback.</string>
     <string name="onboarding_login_optional">Optional. You can log in later from Settings.</string>
-    <string name="onboarding_login_benefits_title">Your account helps Vibra</string>
+    <string name="onboarding_login_benefits_title">Your account helps vibra</string>
     <string name="onboarding_login_library_title">Sync your library</string>
     <string name="onboarding_login_library_desc">Keep your saved music and playlists available wherever you listen.</string>
     <string name="onboarding_login_history_title">Keep your history</string>
@@ -662,24 +662,24 @@
     <string name="onboarding_foss_variant">FOSS edition</string>
     <string name="onboarding_version_label">Version %1$s</string>
     <string name="onboarding_empty_title">Setup unavailable</string>
-    <string name="onboarding_empty_subtitle">Continue to Vibra.</string>
+    <string name="onboarding_empty_subtitle">Continue to vibra.</string>
     <string name="onboarding_error_generic">Couldn\'t load setup</string>
     <string name="onboarding_permission_allowed_by_install">Allowed by install</string>
     <string name="onboarding_permission_unavailable">Unavailable</string>
     <string name="onboarding_permission_notifications_title">Notifications</string>
     <string name="onboarding_permission_notifications_desc">Show playback controls and music activity in the notification shade.</string>
     <string name="onboarding_permission_device_audio_capture_title">On-device audio recognition</string>
-    <string name="onboarding_permission_device_audio_capture_desc">Recognize music playing in other apps without using the microphone. Android asks for screen and audio capture approval each time, Vibra processes audio only.</string>
+    <string name="onboarding_permission_device_audio_capture_desc">Recognize music playing in other apps without using the microphone. Android asks for screen and audio capture approval each time, vibra processes audio only.</string>
     <string name="onboarding_permission_bluetooth_connect_title">Bluetooth audio connection</string>
     <string name="onboarding_permission_bluetooth_connect_desc">Connect to nearby Bluetooth audio devices for playback.</string>
     <string name="onboarding_permission_network_title">Network access</string>
     <string name="onboarding_permission_network_desc">Stream music and load artwork.</string>
     <string name="onboarding_permission_playback_service_title">Background playback</string>
-    <string name="onboarding_permission_playback_service_desc">Keep music playing reliably when Vibra is in the background.</string>
+    <string name="onboarding_permission_playback_service_desc">Keep music playing reliably when vibra is in the background.</string>
     <string name="onboarding_permission_audio_settings_title">Audio settings and vibration</string>
     <string name="onboarding_permission_audio_settings_desc">Adjust playback audio behavior and provide light touch feedback.</string>
     <string name="onboarding_permission_app_installation_title">App installation</string>
-    <string name="onboarding_permission_app_installation_desc">Install downloaded APK updates from Vibra.</string>
+    <string name="onboarding_permission_app_installation_desc">Install downloaded APK updates from vibra.</string>
     <string name="onboarding_permission_bluetooth_scan_title">Bluetooth scan</string>
     <string name="onboarding_permission_bluetooth_scan_desc">Discover Cast and nearby playback devices.</string>
     <string name="you_might_like">You might like</string>
@@ -711,7 +711,7 @@
     <string name="scheduled_backup_enabled_description">Backups run automatically using the schedule below.</string>
     <string name="scheduled_backup_disabled_description">Automatic backups are paused.</string>
     <string name="scheduled_backup_frequency">Backup schedule</string>
-    <string name="scheduled_backup_frequency_description">Choose how often Vibra creates a backup.</string>
+    <string name="scheduled_backup_frequency_description">Choose how often vibra creates a backup.</string>
     <string name="scheduled_backup_daily">Daily</string>
     <string name="scheduled_backup_weekly">Weekly</string>
     <string name="scheduled_backup_monthly">Monthly</string>

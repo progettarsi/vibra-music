@@ -76,6 +76,7 @@ class LocalPlaylistViewModel
     constructor(
         @ApplicationContext private val context: Context,
         private val database: MusicDatabase,
+        private val downloadUtil: moe.rukamori.archivetune.playback.DownloadUtil,
         private val syncUtils: SyncUtils,
         private val updatePlaylistCover: UpdatePlaylistCoverUseCase,
         private val removePlaylistCover: RemovePlaylistCoverUseCase,
@@ -515,6 +516,7 @@ class LocalPlaylistViewModel
                         null
                     }
 
+                val downloadSnapshot = downloadUtil.playlistDownloadSnapshot(playlistId)
                 val added =
                     database.withTransaction {
                         // Ensure playlist exists in local database (it should, but just in case)
@@ -557,6 +559,7 @@ class LocalPlaylistViewModel
                     return false
                 }
 
+                downloadUtil.downloadPlaylistAdditions(downloadSnapshot, listOf(song.id))
                 // Update suggested song IDs to avoid duplicates
                 suggestedSongIds.value = suggestedSongIds.value + song.id
 

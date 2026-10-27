@@ -343,9 +343,10 @@ private fun SpotifyAccountIcon(avatarUrl: String?) {
     }
 }
 
+/** Vibra: login shared by Settings and the onboarding's artist import, one WebView. */
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
-private fun SpotifyLoginSheet(
+fun SpotifyLoginSheet(
     onDismiss: () -> Unit,
     onCookiesCaptured: (spDc: String, spKey: String) -> Unit,
 ) {

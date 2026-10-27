@@ -73,6 +73,7 @@ fun AddToPlaylistDialogOnline(
     onStatusChange: (String) -> Unit = {},
 ) {
     val context = LocalContext.current
+    val downloadUtil = moe.rukamori.archivetune.LocalDownloadUtil.current
     val database = LocalDatabase.current
     val syncUtils = LocalSyncUtils.current
     val coroutineScope = rememberCoroutineScope()
@@ -213,7 +214,9 @@ fun AddToPlaylistDialogOnline(
                 val savedResults =
                     if (targetPlaylist != null) {
                         try {
+                            val snapshot = downloadUtil.playlistDownloadSnapshot(targetPlaylist.id)
                             database.addSongToPlaylist(targetPlaylist, preparedResults.mapNotNull { it.resolvedId })
+                            downloadUtil.downloadPlaylistAdditions(snapshot, preparedResults.mapNotNull { it.resolvedId })
                             preparedResults
                         } catch (error: Exception) {
                             Timber.e(error, "Failed to add imported songs to playlist")

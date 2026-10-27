@@ -18,8 +18,15 @@ import androidx.compose.ui.input.pointer.changedToUpIgnoreConsumed
 import androidx.compose.ui.input.pointer.pointerInput
 
 /**
- * A light bounce when an element is tapped: pressed and lifted in place, before a long press.
- * Song rows and tiles use it, so starting a song gets a small physical answer wherever it is.
+ * A light bounce when an element is pressed. Song rows and tiles use it, so starting a song gets
+ * a small physical answer wherever it is.
+ *
+ * - A quick tap squishes and springs back in one kick.
+ * - Holding the finger down keeps the element squished (also through a long press, which opens
+ *   the element's menu as usual); it springs back only when the finger lifts.
+ * - If the finger starts to scroll or swipe, the element lets go at once.
+ * The squish waits for the system tap timeout before showing, so a finger that is only starting a
+ * scroll never dents the rows it lands on.
  *
  * It only observes the pointer (initial pass, nothing consumed), so the element's own
  * click/long-click, ripple, swipe and drag handling run unchanged. A part of the element that
@@ -47,11 +54,28 @@ fun Modifier.tapBounce(
             awaitEachGesture {
                 val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
                 bounce.skippedPointer = null
-                val up =
-                    withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
-                        awaitTapUp(down, viewConfiguration.touchSlop)
+                val slop = viewConfiguration.touchSlop
+                // Phase 1: a quick tap that lifts before the tap timeout gets the one-shot kick.
+                var outcome: PressOutcome = PressOutcome.Held
+                withTimeoutOrNull(TapTimeoutMillis) {
+                    outcome = awaitPressEnd(down, slop)
+                }
+                if (bounce.skippedPointer == down.id) return@awaitEachGesture
+                when (outcome) {
+                    PressOutcome.Lifted -> bounce.nudge.kick()
+                    PressOutcome.Moved -> Unit
+                    PressOutcome.Held -> {
+                        // Phase 2: the finger is still down — squish and hold until it lifts or
+                        // starts scrolling. No timeout: a long press keeps the squish too.
+                        bounce.nudge.press()
+                        try {
+                            awaitPressEnd(down, slop)
+                        } finally {
+                            // Also when the gesture is cancelled (element leaves the screen).
+                            bounce.nudge.release()
+                        }
                     }
-                if (up != null && bounce.skippedPointer != down.id) bounce.nudge.kick()
+                }
             }
         }
 
@@ -63,16 +87,27 @@ fun Modifier.noTapBounce(bounce: TapBounce): Modifier =
         }
     }
 
-/** The lift of [down], or null once the finger travels past [slop] (a scroll or swipe). */
-private suspend fun AwaitPointerEventScope.awaitTapUp(
+/** How a press of the [tapBounce] element ended (or that it is still going on). */
+private enum class PressOutcome { Lifted, Moved, Held }
+
+/**
+ * Waits until the finger of [down] lifts ([PressOutcome.Lifted]) or travels past [slop], i.e. a
+ * scroll or swipe took over ([PressOutcome.Moved]). A cancelled pointer counts as moved.
+ */
+private suspend fun AwaitPointerEventScope.awaitPressEnd(
     down: PointerInputChange,
     slop: Float,
-): PointerInputChange? {
+): PressOutcome {
     while (true) {
-        val change = awaitPointerEvent(PointerEventPass.Initial).changes.firstOrNull { it.id == down.id } ?: return null
-        if (change.changedToUpIgnoreConsumed()) return change
-        if ((change.position - down.position).getDistance() > slop) return null
+        val change =
+            awaitPointerEvent(PointerEventPass.Initial).changes.firstOrNull { it.id == down.id }
+                ?: return PressOutcome.Moved
+        if (change.changedToUpIgnoreConsumed()) return PressOutcome.Lifted
+        if ((change.position - down.position).getDistance() > slop) return PressOutcome.Moved
     }
 }
 
 private const val TapSquash = 0.04f
+
+/** Android's tap timeout (ViewConfiguration.getTapTimeout): below it a press is still a "tap". */
+private const val TapTimeoutMillis = 100L

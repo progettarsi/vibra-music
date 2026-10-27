@@ -5,6 +5,8 @@
 
 package app.vibra.update
 
+import app.vibra.power.PowerSave
+import app.vibra.power.PowerSaveLevel
 import android.app.Application
 import android.content.Context
 import android.content.Intent
@@ -148,13 +150,18 @@ object VibraUpdates {
             scope.launch {
                 while (true) {
                     val wait = lastCheckAt?.let { CheckInterval - (SystemClock.elapsedRealtime() - it) } ?: 0L
+                    // Battery saver at its maximum: the check on opening the app stays, the
+                    // periodic re-checks while it is open don't.
+                    val saving = PowerSave.level.value == PowerSaveLevel.MAX
                     if (wait > 0) {
+                        if (saving) break
                         delay(wait)
                         continue
                     }
                     lastCheckAt = SystemClock.elapsedRealtime()
                     // Not tied to the foreground: a download goes on when the user leaves.
                     if (checkJob?.isActive != true) checkJob = scope.launch { check() }
+                    if (saving) break
                 }
             }
     }

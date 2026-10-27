@@ -5,6 +5,9 @@
 
 package app.vibra.ui.blocks
 
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.draw.BlurredEdgeTreatment
+import androidx.compose.ui.draw.blur
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -102,7 +105,14 @@ fun ForYouBlock(
     moods: List<MoodEntry>,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    mosaicUrls: List<String> = emptyList(),
 ) {
+    // Alone in its card (no mixes beside it) For You has the whole rectangle: it becomes a
+    // mosaic of the songs it will play instead of a lone blob in an empty card.
+    if (moods.isEmpty() && mosaicUrls.size >= MosaicMinCovers) {
+        ForYouMosaic(urls = mosaicUrls, title = title, subtitle = subtitle, onClick = onClick, modifier = modifier)
+        return
+    }
     VibraCard(modifier = modifier.height(ForYouHeight)) {
         Row(
             modifier = Modifier.fillMaxSize().padding(9.dp),
@@ -160,6 +170,106 @@ fun ForYouBlock(
                     }
                 }
             }
+        }
+    }
+}
+
+/**
+ * For You on its own: the covers of the songs it will play, laid out as a slightly tilted
+ * collage that fills the whole rounded card and is blurred into one soft field of their
+ * colours — recognisable as "your music" without any single cover taking over. A dim and a
+ * bottom gradient keep the white title readable on any covers.
+ *
+ * Static on purpose (no drifting): the blur is one GPU pass over a layer that never changes,
+ * so the home scrolls as cheaply as with a single picture. Below Android 12 `blur` does
+ * nothing, so the covers are dimmed more there instead.
+ */
+@Composable
+private fun ForYouMosaic(
+    urls: List<String>,
+    title: String,
+    subtitle: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val haptics = rememberVibraHaptics()
+    val blurSupported = android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S
+    Box(
+        modifier =
+            modifier
+                .height(ForYouHeight)
+                .clip(VibraShapes.Card)
+                .background(MaterialTheme.colorScheme.surfaceContainer)
+                .clickable(role = Role.Button) {
+                    haptics.press()
+                    onClick()
+                },
+    ) {
+        // The collage: two rows of three covers, oversized and tilted so no card edge or gap
+        // shows, then blurred as one layer.
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        scaleX = MosaicOverscan
+                        scaleY = MosaicOverscan
+                        rotationZ = MosaicTilt
+                    }.blur(MosaicBlur, edgeTreatment = BlurredEdgeTreatment.Unbounded),
+        ) {
+            urls.take(MosaicCovers).chunked(MosaicCovers / 2).forEach { row ->
+                Row(Modifier.weight(1f).fillMaxWidth()) {
+                    row.forEach { url ->
+                        VibraArtwork(
+                            url = url,
+                            shape = androidx.compose.ui.graphics.RectangleShape,
+                            sizePx = 160,
+                            modifier = Modifier.weight(1f).fillMaxHeight(),
+                        )
+                    }
+                }
+            }
+        }
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = if (blurSupported) 0.22f else 0.5f))
+                .background(Brush.verticalGradient(0.35f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.45f))),
+        )
+        Column(
+            modifier = Modifier.align(Alignment.BottomStart).padding(20.dp),
+        ) {
+            Text(
+                text = "✦ $title",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+                modifier = Modifier.semantics { heading() },
+            )
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.labelLarge,
+                color = Color.White.copy(alpha = 0.85f),
+                maxLines = 2,
+            )
+        }
+        // The play cookie: the card is one big play button, this says so.
+        Box(
+            modifier =
+                Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(16.dp)
+                    .size(56.dp)
+                    .clip(VibraShapes.Sunny)
+                    .background(Color.White),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                painter = painterResource(R.drawable.play),
+                contentDescription = null,
+                tint = Color.Black,
+                modifier = Modifier.size(26.dp),
+            )
         }
     }
 }
@@ -785,6 +895,15 @@ private fun EmptyBlockBody(
 }
 
 private val ForYouHeight = 244.dp
+
+/** Covers in the For You mosaic (two rows of three), and the fewest that make one. */
+private const val MosaicCovers = 6
+const val MosaicMinCovers = 3
+
+/** How much the mosaic is enlarged and tilted so its edges never show inside the card. */
+private const val MosaicOverscan = 1.35f
+private const val MosaicTilt = -8f
+private val MosaicBlur = 22.dp
 private val PlaylistRowHeight = 137.dp
 
 /** Spotlight cover: a little wider than tall, so the block is big without filling the screen. */

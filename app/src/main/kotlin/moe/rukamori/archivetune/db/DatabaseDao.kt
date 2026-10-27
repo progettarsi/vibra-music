@@ -324,6 +324,10 @@ interface DatabaseDao {
     @Query("SELECT * FROM playlist_song_map WHERE playlistId = :playlistId ORDER BY position")
     fun playlistSongs(playlistId: String): Flow<List<PlaylistSong>>
 
+    // Vibra: the auto-download decision needs only the IDs, not every Song relation.
+    @Query("SELECT songId FROM playlist_song_map WHERE playlistId = :playlistId ORDER BY position")
+    fun playlistSongIdsForAutoDownload(playlistId: String): List<String>
+
     @Transaction
     @Query("SELECT * FROM playlist_song_map WHERE playlistId = :playlistId ORDER BY position")
     suspend fun getPlaylistSongs(playlistId: String): List<PlaylistSong>

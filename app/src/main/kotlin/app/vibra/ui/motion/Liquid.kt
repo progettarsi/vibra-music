@@ -166,17 +166,20 @@ fun Modifier.liquidPress(
     pressedScale: Float = 0.92f,
 ): Modifier {
     val pressed by interactionSource.collectIsPressedAsState()
-    val scale by animateFloatAsState(
-        targetValue = if (pressed) pressedScale else 1f,
-        // Pressing is a short, direct movement → fast spatial spring. Releasing uses the
-        // default spatial spring, whose expressive damping (0.8) lets the surface overshoot
-        // and settle like a liquid drop.
-        animationSpec = Liquid.spatial(if (pressed) LiquidSpeed.Fast else LiquidSpeed.Default),
-        label = "liquidPress",
-    )
+    val scale =
+        animateFloatAsState(
+            targetValue = if (pressed) pressedScale else 1f,
+            // Pressing is a short, direct movement → fast spatial spring. Releasing uses the
+            // default spatial spring, whose expressive damping (0.8) lets the surface overshoot
+            // and settle like a liquid drop.
+            animationSpec = Liquid.spatial(if (pressed) LiquidSpeed.Fast else LiquidSpeed.Default),
+            label = "liquidPress",
+        )
+    // Read in the layer block, not here: each animation frame then only redraws the layer
+    // instead of recomposing the pressed element (and everything it contains).
     return graphicsLayer {
-        scaleX = scale
-        scaleY = scale
+        scaleX = scale.value
+        scaleY = scale.value
     }
 }
 
@@ -199,6 +202,20 @@ class LiquidNudge internal constructor(
             value.animateTo(1f, out)
             value.animateTo(0f, back)
         }
+    }
+
+    /**
+     * Holds the kick at its peak while a finger stays down: the element squishes on the fast
+     * spring and waits there. [release] lets it spring back. A new call interrupts the running one
+     * (Animatable cancels the previous animation), so press/release never fight.
+     */
+    fun press() {
+        scope.launch { value.animateTo(1f, out) }
+    }
+
+    /** The bounce-back of [press], on the default spring whose overshoot gives the rebound. */
+    fun release() {
+        scope.launch { value.animateTo(0f, back) }
     }
 }
 

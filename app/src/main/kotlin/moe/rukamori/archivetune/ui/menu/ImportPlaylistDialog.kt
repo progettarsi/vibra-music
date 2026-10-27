@@ -54,6 +54,7 @@ fun ImportPlaylistDialog(
     snackbarHostState: SnackbarHostState? = null,
     onDismiss: () -> Unit,
 ) {
+    val downloadUtil = moe.rukamori.archivetune.LocalDownloadUtil.current
     val database = LocalDatabase.current
     val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -238,7 +239,8 @@ fun ImportPlaylistDialog(
                                     if (newSongIds.isEmpty()) {
                                         showMessage(context.getString(R.string.playlist_synced))
                                     } else {
-                                        database.transaction {
+                                        val snapshot = downloadUtil.playlistDownloadSnapshot(playlist.id)
+                                        database.withTransaction {
                                             var position = playlist.songCount
                                             newSongIds.forEach { songId ->
                                                 insert(
@@ -250,6 +252,7 @@ fun ImportPlaylistDialog(
                                                 )
                                             }
                                         }
+                                        downloadUtil.downloadPlaylistAdditions(snapshot, newSongIds)
                                         showMessage(context.getString(R.string.playlist_synced))
                                     }
                                 } else {

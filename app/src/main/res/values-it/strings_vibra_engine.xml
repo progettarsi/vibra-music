@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Vibra (2026) — GPL-3.0 License. Derived from ArchiveTune © Rukamori (github.com/rukamori). -->
+<resources>
+    <string name="vibra_power_save">Risparmio energetico</string>
+    <string name="vibra_power_save_auto">Risparmio automatico</string>
+    <string name="vibra_power_save_threshold">Soglia della batteria</string>
+    <string name="vibra_power_save_below">Sotto il %1$d %%</string>
+    <string name="vibra_power_save_mode">Modalità risparmio</string>
+    <string name="vibra_power_save_normal">Normale</string>
+    <string name="vibra_power_save_max">Massimo</string>
+    <string name="vibra_power_save_normal_description">Meno animazioni e niente video musicali</string>
+    <string name="vibra_power_save_max_description">Solo l\'essenziale: animazioni minime e nessuna attività in background</string>
+</resources>

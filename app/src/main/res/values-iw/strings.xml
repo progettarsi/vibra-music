@@ -242,7 +242,7 @@
         <item quantity="other">%d שירים</item>
     </plurals>
     <string name="duplicates">כפילויות</string>
-    <string name="widget_tap_to_open">לחץ כדי לפתוח את Vibra</string>
+    <string name="widget_tap_to_open">לחץ כדי לפתוח את vibra</string>
     <string name="eq_waiting_for_audio_session">ממתין לסשן שמע</string>
     <string name="shuffle">ערבוב</string>
     <string name="proxy_username">שם משתמש</string>
@@ -335,7 +335,7 @@
     <string name="library_top_mixes_refresh">רענון מיקסים</string>
     <string name="library_top_mixes_configure_ai">הגדרת בינה מלאכותית</string>
     <string name="library_top_mixes_ai_not_configured_title">הגדרת בינה מלאכותית ליצירת מיקסים</string>
-    <string name="library_top_mixes_ai_not_configured_desc">נדרש שילוב של בינה מלאכותית לפני ש-Vibra יוכל לבנות מיקסים מובילים אישיים.</string>
+    <string name="library_top_mixes_ai_not_configured_desc">נדרש שילוב של בינה מלאכותית לפני ש-vibra יוכל לבנות מיקסים מובילים אישיים.</string>
     <string name="library_top_mixes_no_recent_history_title">עדיין אין מיקס האזנה אחרון</string>
     <string name="library_top_mixes_no_recent_history">האזינו לשירים נוספים, ולאחר מכן רעננו כדי ליצור מיקסי AI מההיסטוריה האחרונה שלכם.</string>
     <string name="library_top_mixes_no_valid_mixes">הבינה המלאכותית לא החזירה מיקסים ניתנים להפעלה מההיסטוריה האחרונה שלך.</string>
@@ -471,9 +471,9 @@
     <string name="update_notification_channel_name">עדכוני אפליקציה</string>
     <string name="update_notification_channel_desc">התראות על עדכוני אפליקציה חדשים</string>
     <string name="update_notification_title">עדכון זמין</string>
-    <string name="update_notification_text">Vibra %s זמין כעת</string>
+    <string name="update_notification_text">vibra %s זמין כעת</string>
     <string name="download">הורדה</string>
-    <string name="permissions_title">אפשר ל-Vibra לפעול בצורה הטובה ביותר</string>
+    <string name="permissions_title">אפשר ל-vibra לפעול בצורה הטובה ביותר</string>
     <string name="permissions_subtitle">אנו משתמשים במספר הרשאות כדי להשמיע ולנהל את המוזיקה שלך בצורה אמינה. ניתן לשנות אותן בכל עת בהגדרות המערכת.</string>
     <string name="permission_storage_title">גישה לאחסון</string>
     <string name="permission_storage_desc">נדרש לקריאת קבצי אודיו שהורדת ומקומיים לצורך השמעה.</string>
@@ -505,7 +505,7 @@
     <string name="unsaved_account_dialog_save_yes">כן, שמור את החשבון הנוכחי</string>
     <string name="cast">שידור</string>
     <string name="cast_devices">מכשירים לשידור</string>
-    <string name="cast_sheet_subtitle">בחר היכן יושמע Vibra</string>
+    <string name="cast_sheet_subtitle">בחר היכן יושמע vibra</string>
     <string name="cast_available_devices">מכשירים זמינים</string>
     <string name="cast_searching_devices">מחפש מכשירים</string>
     <string name="cast_no_devices">לא נמצאו מכשירים לשידור</string>
@@ -529,12 +529,12 @@
     <string name="widget_no_recent_songs">אין עדיין שירים אחרונים</string>
     <string name="widget_no_genres">אין עדיין ז\'אנרים</string>
     <string name="widget_no_recommendations">אין עדיין המלצות</string>
-    <string name="updates_channel_warning_intro">Vibra מספקת שני ערוצי הורדה עבור גרסאות הפצה:</string>
+    <string name="updates_channel_warning_intro">vibra מספקת שני ערוצי הורדה עבור גרסאות הפצה:</string>
     <string name="updates_channel_warning_stable_title">גרסאות הפצה יציבות</string>
     <string name="updates_channel_warning_stable_source">מופץ דרך גרסאות GitHub רשמיות.</string>
     <string name="updates_channel_warning_stable_desc">גרסאות אלו נבדקו ומומלצות עבור רוב המשתמשים.</string>
     <string name="download_complete">ההורדה הושלמה</string>
-    <string name="onboarding_welcome_title">ברוכים הבאים ל- Vibra</string>
+    <string name="onboarding_welcome_title">ברוכים הבאים ל- vibra</string>
     <string name="onboarding_welcome_subtitle">הגדר השמעה, מוזיקה מקומית ועדכון הרשאות לפני שתתחיל להאזין.</string>
     <string name="onboarding_permissions_title">בדיקת הרשאות</string>
     <string name="onboarding_permissions_subtitle">הענק רק את מה שאתה רוצה כעת. תוכל להמשיך ולאפשר הרשאות מאוחר יותר.</string>
@@ -543,7 +543,7 @@
     <string name="onboarding_foss_variant">מהדורת FOSS</string>
     <string name="onboarding_version_label">גרסה %1$s</string>
     <string name="onboarding_empty_title">הגדרה לא זמינה</string>
-    <string name="onboarding_empty_subtitle">המשך ל-Vibra.</string>
+    <string name="onboarding_empty_subtitle">המשך ל-vibra.</string>
     <string name="onboarding_error_generic">לא ניתן היה לטעון את ההגדרות</string>
     <string name="onboarding_permission_allowed_by_install">מורשה על ידי התקנה</string>
     <string name="onboarding_permission_unavailable">לא זמין</string>
@@ -554,11 +554,11 @@
     <string name="onboarding_permission_network_title">גישה לרשת</string>
     <string name="onboarding_permission_network_desc">הזרמת מוזיקה, טעינת גרפיקה ובדיקת תוכן אפליקציה מקוונת.</string>
     <string name="onboarding_permission_playback_service_title">השמעה ברקע</string>
-    <string name="onboarding_permission_playback_service_desc">שמרו על השמעת מוזיקה בצורה אמינה כאשר Vibra פועל ברקע.</string>
+    <string name="onboarding_permission_playback_service_desc">שמרו על השמעת מוזיקה בצורה אמינה כאשר vibra פועל ברקע.</string>
     <string name="onboarding_permission_audio_settings_title">הגדרות שמע ורטט</string>
     <string name="onboarding_permission_audio_settings_desc">התאם את התנהגות השמעה ומתן משוב מגע קל.</string>
     <string name="onboarding_permission_app_installation_title">התקנת אפליקציה</string>
-    <string name="onboarding_permission_app_installation_desc">התקן עדכוני APK שהורדת מ-Vibra.</string>
+    <string name="onboarding_permission_app_installation_desc">התקן עדכוני APK שהורדת מ-vibra.</string>
     <string name="onboarding_permission_bluetooth_scan_title">סריקת Bluetooth</string>
     <string name="onboarding_permission_bluetooth_scan_desc">גלה שידור ומכשירי הפעלה בקרבת מקום.</string>
 </resources>

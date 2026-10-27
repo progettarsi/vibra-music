@@ -125,6 +125,7 @@ import androidx.media3.common.Player.REPEAT_MODE_ALL
 import androidx.media3.common.Player.REPEAT_MODE_OFF
 import androidx.media3.common.Player.REPEAT_MODE_ONE
 import androidx.navigation.NavController
+import app.vibra.ui.motion.LocalAmbientMotion
 import app.vibra.ui.components.ArtworkAccent
 import app.vibra.ui.components.ArtworkAtmosphere
 import app.vibra.ui.components.MarqueeScroll
@@ -367,7 +368,12 @@ fun VibraPlayerSheet(
             // player, uncovered and in the foreground, and it gives way to the cover as soon as
             // the player starts closing.
             val artworkVideo =
-                rememberArtworkVideoStream(metadata, enabled = sheet.isOpenOrOpening, request = connection.service::requestArtworkVideo)
+                rememberArtworkVideoStream(
+                    metadata,
+                    // In battery saver a running video stops too and the cover takes its place.
+                    enabled = sheet.isOpenOrOpening && LocalAmbientMotion.current,
+                    request = connection.service::requestArtworkVideo,
+                )
             val currentVideo = remember { CurrentArtworkVideo() }
             // The cover's content (image and video), drawn a second time, blurred, as the live
             // backdrop (see LiveCoverExtension).
@@ -807,7 +813,7 @@ private fun FlyingCover(
                 }.then(
                     // As the cover lands its top and bottom dissolve into the backdrop, which
                     // continues the cover (CoverExtension) — one image, not two.
-                    if (fullBleed) Modifier.coverEdgeFade { 1f - progress() } else Modifier,
+                    if (fullBleed) Modifier.coverEdgeFade(edge = { 1f - progress() }, dim = { cachedCoverDim(url) }) else Modifier,
                 ),
     ) {
         // One keyed layer per cover (its image, and its video if any): after a track change the
@@ -849,7 +855,16 @@ private fun FlyingCover(
                             placeholderSizePx = SmallArtworkPx,
                             contentDescription = if (isFading) null else contentDescription,
                             onLoaded = { if (!isFading) onCoverDrawn(layerUrl) },
-                            modifier = Modifier.fillMaxSize(),
+                            modifier =
+                                Modifier.fillMaxSize().graphicsLayer {
+                                    // A letterboxed thumbnail is enlarged past its black bands, so
+                                    // the sharp cover shows the same square as its backdrop.
+                                    val zoom = cachedCoverZoom(layerUrl)
+                                    scaleX = zoom.scale
+                                    scaleY = zoom.scale
+                                    translationX = zoom.shiftX * size.width
+                                    translationY = zoom.shiftY * size.height
+                                },
                         )
                         layerVideos[layerUrl]?.let { layerVideo -> videoLayer(layerVideo, !isFading) }
                     }

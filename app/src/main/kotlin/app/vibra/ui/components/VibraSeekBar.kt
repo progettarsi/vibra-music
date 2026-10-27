@@ -5,6 +5,7 @@
 
 package app.vibra.ui.components
 
+import app.vibra.ui.motion.ambientMotionAllowed
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateDpAsState
@@ -106,7 +107,8 @@ fun VibraSeekBar(
         animationSpec = Liquid.spatial(LiquidSpeed.Fast),
         label = "seekThickness",
     )
-    val animationsDisabled = LocalAnimationsDisabled.current
+    // The wave is ambient motion: flat in battery saver too.
+    val animationsDisabled = !ambientMotionAllowed
     val waveOn = wavy && !dragging && !animationsDisabled
     val amplitude by animateFloatAsState(
         targetValue = if (waveOn) 1f else 0f,

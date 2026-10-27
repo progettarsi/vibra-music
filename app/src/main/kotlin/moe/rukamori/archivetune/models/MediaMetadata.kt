@@ -40,6 +40,8 @@ data class MediaMetadata(
     val trackNumber: Int? = null,
     val discNumber: Int? = null,
     val year: Int? = null,
+    // Vibra: serialised with an unchanged UID; queues saved before 1.3 read false.
+    val userQueued: Boolean = false,
 ) : Serializable {
     companion object {
         private const val serialVersionUID = 1L

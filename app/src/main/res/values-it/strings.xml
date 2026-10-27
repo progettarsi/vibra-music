@@ -278,9 +278,9 @@
     <string name="update_notification_channel_name">Aggiornamenti dell\'app</string>
     <string name="update_notification_channel_desc">Notifiche per nuovi aggiornamenti dell\'app</string>
     <string name="update_notification_title">Aggiornamento disponibile</string>
-    <string name="update_notification_text">Vibra %s è ora disponibile</string>
+    <string name="update_notification_text">vibra %s è ora disponibile</string>
     <string name="download">Scarica</string>
-    <string name="permissions_title">Consenti a Vibra di funzionare al meglio</string>
+    <string name="permissions_title">Consenti a vibra di funzionare al meglio</string>
     <string name="permissions_subtitle">Alcune autorizzazioni servono per riprodurre e gestire la tua musica. Puoi modificarle in qualsiasi momento nelle impostazioni di sistema.</string>
     <string name="permission_storage_title">Accesso allo spazio di archiviazione</string>
     <string name="permission_storage_desc">Necessario per leggere i file audio scaricati e locali per la riproduzione.</string>

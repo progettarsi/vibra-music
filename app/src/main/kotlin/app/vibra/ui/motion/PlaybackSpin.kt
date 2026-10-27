@@ -37,7 +37,8 @@ val LocalPlaybackSpin = staticCompositionLocalOf<PlaybackSpin?> { null }
 @Composable
 fun rememberPlaybackSpin(isPlaying: Boolean): PlaybackSpin {
     val spin = remember { PlaybackSpin() }
-    val animationsDisabled = LocalAnimationsDisabled.current
+    // Ambient: the spin stops in battery saver (and with animations off).
+    val animationsDisabled = !ambientMotionAllowed
     LaunchedEffect(isPlaying, animationsDisabled) {
         if (!isPlaying || animationsDisabled) return@LaunchedEffect
         var last = withFrameNanos { it }

@@ -62,6 +62,8 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
+import app.vibra.ui.shell.DockAvatarSize
+import app.vibra.ui.shell.LocalAvatarFlight
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.input.pointer.util.VelocityTracker
@@ -357,6 +359,7 @@ private fun DockLeadingButton(
     onClick: () -> Unit,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
+    val avatarFlight = LocalAvatarFlight.current
     val description =
         stringResource(if (leading is DockLeading.Settings) R.string.settings else R.string.account)
     Box(
@@ -386,7 +389,12 @@ private fun DockLeadingButton(
                             shape = CircleShape,
                             sizePx = 160,
                             fallbackIcon = R.drawable.person,
-                            modifier = Modifier.size(44.dp),
+                            // Hidden while the profile's avatar flies into (or out of) this
+                            // button: the flying picture takes its place (AvatarFlight).
+                            modifier =
+                                Modifier.size(DockAvatarSize).graphicsLayer {
+                                    alpha = if (avatarFlight?.flying() == true) 0f else 1f
+                                },
                         )
                     } else {
                         Icon(

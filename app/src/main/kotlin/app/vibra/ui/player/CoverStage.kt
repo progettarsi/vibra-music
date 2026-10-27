@@ -10,8 +10,10 @@ import android.util.LruCache
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.GraphicsContext
 import androidx.compose.ui.graphics.TileMode
@@ -64,11 +66,12 @@ import coil3.PlatformContext
 import coil3.SingletonImageLoader
 import coil3.compose.LocalPlatformContext
 import coil3.request.ImageRequest
+import coil3.request.allowHardware
 import coil3.request.SuccessResult
 import coil3.toBitmap
-import kotlin.math.min
-import kotlin.math.pow
 import kotlin.math.roundToInt
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
 import moe.rukamori.archivetune.extensions.metadata
@@ -79,11 +82,15 @@ import moe.rukamori.archivetune.ui.utils.resize
  *  COVER STAGE — the player's cover and the backdrop that continues it
  * ─────────────────────────────────────────────────────────────────────────────────────
  *
- *  Backdrop (CoverExtension): the cover drawn again at its own place, its top and bottom
- *  rows stretched out to the screen edges, then blurred in two strengths — a soft blur
- *  hugging the cover's edges over a heavy one everywhere — so the sharp cover, whose top
- *  and bottom dissolve (coverEdgeFade), passes through a slightly blurred copy of itself
- *  into a strongly blurred one: a gradual depth-of-field, not a sharp image on a wash.
+ *  Backdrop (CoverExtension): the cover drawn again at its own place and continued above
+ *  and below by a MIRRORED copy of its edge band (CoverAnalysis picks the band: no black
+ *  letterbox bands, no Parental Advisory label), then blurred in two strengths — a soft
+ *  blur hugging the cover's edges over a heavy one everywhere. A mirror matches the cover
+ *  exactly at the seam and keeps its shapes and colours further out, so the continuation
+ *  reads as the same picture going on (stretched edge rows made straight streaks).
+ *  The sharp cover's top and bottom dissolve (coverEdgeFade) along an eased curve, and are
+ *  darkened as they dissolve by the same amount as the backdrop: no visible mask line and
+ *  no brightness step where the sharp picture ends.
  *
  *  Swipe: cover and backdrop are one page. While the cover is dragged sideways the
  *  neighbouring track's page (its backdrop and cover, prefetched) comes in from that
@@ -109,7 +116,7 @@ fun PrefetchCovers(urls: List<String?>) {
         val loader = SingletonImageLoader.get(context)
         urls.filterNotNull().forEach { url ->
             loader.enqueue(ImageRequest.Builder(context).data(url.resize(PlayerArtworkPx, PlayerArtworkPx)).build())
-            loadCoverImage(context, url)
+            loadCover(context, url)
         }
     }
 }
@@ -180,23 +187,88 @@ fun rememberCoverCrossfade(
 /**
  * Dissolves a full-bleed cover's top and bottom into the backdrop. [edge] is the opacity
  * left at the very edges (1 while the cover is still flying in, 0 once it has landed).
+ * [dim] is the backdrop's darkening for the text (see CoverAnalysis): the cover takes it on
+ * progressively as it dissolves, so its colours meet the backdrop's at the seam instead of a
+ * bright picture ending on a darker wash.
+ *
+ * Both ramps follow a smoothstep curve sampled in [FadeSteps] stops: a linear ramp has a
+ * visible start and end ("the mask"); an eased one has none.
  */
-fun Modifier.coverEdgeFade(edge: () -> Float): Modifier =
+fun Modifier.coverEdgeFade(
+    edge: () -> Float,
+    dim: () -> Float = { 0f },
+): Modifier =
     graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
         .drawWithContent {
             drawContent()
             val e = edge()
+            val d = dim() * (1f - e)
+            // Darken where the cover fades (0 where it is fully opaque).
+            if (d > 0.005f) {
+                drawRect(brush = Brush.verticalGradient(colorStops = edgeRamp { a -> Color.Black.copy(alpha = d * (1f - a)) }))
+            }
             drawRect(
-                brush =
-                    Brush.verticalGradient(
-                        0f to Color.Black.copy(alpha = e),
-                        EdgeFadeTop to Color.Black,
-                        EdgeFadeBottom to Color.Black,
-                        1f to Color.Black.copy(alpha = e),
-                    ),
+                brush = Brush.verticalGradient(colorStops = edgeRamp { a -> Color.Black.copy(alpha = e + (1f - e) * a) }),
                 blendMode = BlendMode.DstIn,
             )
         }
+
+/**
+ * Colour stops over the cover's height: [colour] of the cover's opacity a (0 at the edges,
+ * 1 between [EdgeFadeTop] and [EdgeFadeBottom]) eased with smoothstep.
+ */
+private inline fun edgeRamp(colour: (Float) -> Color): Array<Pair<Float, Color>> =
+    Array(FadeSteps * 2 + 2) { i ->
+        if (i <= FadeSteps) {
+            val f = i / FadeSteps.toFloat()
+            (f * EdgeFadeTop) to colour(smoothstep(f))
+        } else {
+            val f = (i - FadeSteps - 1) / FadeSteps.toFloat()
+            (EdgeFadeBottom + f * (1f - EdgeFadeBottom)) to colour(smoothstep(1f - f))
+        }
+    }
+
+/** 0..1 → 0..1 with zero slope at both ends. */
+internal fun smoothstep(x: Float): Float {
+    val t = x.coerceIn(0f, 1f)
+    return t * t * (3f - 2f * t)
+}
+
+/**
+ * The darkening [url]'s backdrop uses, if its cover was already analysed (it is, by the time
+ * the player shows it: PrefetchCovers and the backdrop bake load it first); else 0.
+ */
+fun cachedCoverDim(url: String?): Float = url?.let { CoverImages[it]?.second?.dim } ?: 0f
+
+/**
+ * How the sharp cover must be zoomed so it shows the same square as the backdrop: a
+ * letterboxed thumbnail is enlarged past its black bands (scale > 1, centred on the
+ * picture). Identity for ordinary covers or before the analysis is known.
+ */
+fun cachedCoverZoom(url: String?): CoverZoom {
+    val (image, crop) = url?.let { CoverImages[it] } ?: return CoverZoom.None
+    val plain = CoverCrop.centered(image.width, image.height).square
+    if (crop.square == plain) return CoverZoom.None
+    val scale = plain.width.toFloat() / crop.square.width
+    return CoverZoom(
+        scale = scale,
+        // Shift (share of the cover's side) that brings the crop's centre to the middle.
+        shiftX = (plain.center.x - crop.square.center.x) / plain.width.toFloat() * scale,
+        shiftY = (plain.center.y - crop.square.center.y) / plain.height.toFloat() * scale,
+    )
+}
+
+/** See [cachedCoverZoom]. */
+@Immutable
+data class CoverZoom(
+    val scale: Float,
+    val shiftX: Float,
+    val shiftY: Float,
+) {
+    companion object {
+        val None = CoverZoom(1f, 0f, 0f)
+    }
+}
 
 /**
  * The backdrop continuing the cover (see the file header), drawn from the image [baker]
@@ -313,8 +385,8 @@ class BackdropBaker internal constructor(
     ) {
         if (baked.containsKey(url)) return
         val started = generation
-        val image = loadCoverImage(platformContext, url) ?: return
-        val bitmap = mutex.withLock { render(image, slot, size) }
+        val (image, crop) = loadCover(platformContext, url) ?: return
+        val bitmap = mutex.withLock { render(image, crop, slot, size) }
         if (started != generation) return
         // Uploaded to the GPU now, not in the first frame that shows it.
         bitmap.prepareToDraw()
@@ -330,6 +402,7 @@ class BackdropBaker internal constructor(
     /** The two blurs and the legibility scrim, composed into one full-size picture. */
     private suspend fun render(
         image: ImageBitmap,
+        crop: CoverCrop,
         slot: Rect,
         size: IntSize,
     ): ImageBitmap {
@@ -342,14 +415,14 @@ class BackdropBaker internal constructor(
             val direction = LayoutDirection.Ltr
             // Heavy blur everywhere…
             heavy.renderEffect = BlurEffect(heavyRadius, heavyRadius, TileMode.Decal)
-            heavy.record(density, direction, size) { drawExtension(image, slot) }
+            heavy.record(density, direction, size) { drawExtension(image, crop, slot) }
             // …and a soft one around the cover's edges, where the sharp cover dissolves.
             soft.renderEffect = BlurEffect(softRadius, softRadius, TileMode.Decal)
-            soft.record(density, direction, size) { softEdge(slot, this.size) { drawExtension(image, slot) } }
+            soft.record(density, direction, size) { softEdge(slot, this.size) { drawExtension(image, crop, slot) } }
             root.record(density, direction, size) {
                 drawLayer(heavy)
                 drawLayer(soft)
-                drawBackdropScrims(slot, contrastDim(image))
+                drawBackdropScrims(slot, crop.dim)
             }
             return root.toImageBitmap()
         } finally {
@@ -375,15 +448,19 @@ internal inline fun DrawScope.softEdge(
     drawContext.canvas.saveLayer(Rect(Offset.Zero, canvasSize), Paint())
     extension()
     drawRect(
+        // Eased like the cover's own fade, so the soft band has no visible border either.
         brush =
             Brush.verticalGradient(
                 colorStops =
-                    arrayOf(
-                        ((slot.top - reach) / height).coerceIn(0f, 1f) to Color.Transparent,
-                        (slot.top / height).coerceIn(0f, 1f) to Color.Black,
-                        (slot.bottom / height).coerceIn(0f, 1f) to Color.Black,
-                        ((slot.bottom + reach) / height).coerceIn(0f, 1f) to Color.Transparent,
-                    ),
+                    Array(FadeSteps * 2 + 2) { i ->
+                        if (i <= FadeSteps) {
+                            val f = i / FadeSteps.toFloat()
+                            ((slot.top - reach * (1f - f)) / height).coerceIn(0f, 1f) to Color.Black.copy(alpha = smoothstep(f))
+                        } else {
+                            val f = (i - FadeSteps - 1) / FadeSteps.toFloat()
+                            ((slot.bottom + reach * f) / height).coerceIn(0f, 1f) to Color.Black.copy(alpha = smoothstep(1f - f))
+                        }
+                    },
             ),
         size = canvasSize,
         blendMode = BlendMode.DstIn,
@@ -419,7 +496,7 @@ internal fun DrawScope.drawBackdropScrims(
 internal suspend fun coverContrastDim(
     context: PlatformContext,
     url: String,
-): Float = loadCoverImage(context, url)?.let(::contrastDim) ?: 0f
+): Float = loadCover(context, url)?.second?.dim ?: 0f
 
 @Composable
 fun rememberBackdropBaker(): BackdropBaker {
@@ -446,111 +523,113 @@ fun NeighbourCover(
             Modifier
                 .offset { IntOffset((slot.left + offsetX()).roundToInt(), slot.top.roundToInt()) }
                 .size(with(density) { slot.width.toDp() }, with(density) { slot.height.toDp() })
-                .coverEdgeFade { 0f },
+                .coverEdgeFade(edge = { 0f }, dim = { cachedCoverDim(url) }),
     )
 }
 
+/** Recent covers, already analysed (see CoverAnalysis), so neighbours and re-bakes are free. */
 private object CoverImages {
-    private val cache = LruCache<String, ImageBitmap>(8)
+    private val cache = LruCache<String, Pair<ImageBitmap, CoverCrop>>(8)
 
-    operator fun get(url: String): ImageBitmap? = cache.get(url)
+    operator fun get(url: String): Pair<ImageBitmap, CoverCrop>? = cache.get(url)
 
     operator fun set(
         url: String,
-        image: ImageBitmap,
+        cover: Pair<ImageBitmap, CoverCrop>,
     ) {
-        cache.put(url, image)
-    }
-}
-
-private suspend fun loadCoverImage(
-    context: PlatformContext,
-    url: String,
-): ImageBitmap? {
-    CoverImages[url]?.let { return it }
-    val request = ImageRequest.Builder(context).data(url.resize(SmallArtworkPx, SmallArtworkPx)).build()
-    val result = SingletonImageLoader.get(context).execute(request) as? SuccessResult ?: return null
-    return result.image.toBitmap().asImageBitmap().also { CoverImages[url] = it }
-}
-
-/** The cover at [slot] plus its top/bottom rows stretched to the canvas edges. */
-private fun DrawScope.drawExtension(
-    image: ImageBitmap,
-    slot: Rect,
-) {
-    extensionParts(image.width, image.height, slot, size.height).forEach { (source, target) ->
-        drawImage(image, source.topLeft, source.size, target.topLeft, target.size)
+        cache.put(url, cover)
     }
 }
 
 /**
- * Where an image of [imageWidth] × [imageHeight] goes to continue the cover at [slot] on a
- * canvas [canvasHeight] tall, as (source, target) rectangles: its centre square at the slot
- * (videos have 16:9 pictures; covers are cropped), then its top and bottom rows stretched
- * out to the canvas edges. Shared by the baked and the live backdrop.
+ * Loads [url]'s small cover and analyses it (letterbox, edge logos, brightness). The image is
+ * a software bitmap so its pixels can be read; the analysis runs off the main thread.
+ */
+private suspend fun loadCover(
+    context: PlatformContext,
+    url: String,
+): Pair<ImageBitmap, CoverCrop>? {
+    CoverImages[url]?.let { return it }
+    val request =
+        ImageRequest
+            .Builder(context)
+            .data(url.resize(SmallArtworkPx, SmallArtworkPx))
+            .allowHardware(false)
+            .build()
+    val result = SingletonImageLoader.get(context).execute(request) as? SuccessResult ?: return null
+    val image = result.image.toBitmap().asImageBitmap()
+    val crop =
+        withContext(Dispatchers.Default) {
+            val pixels = IntArray(image.width * image.height)
+            if (runCatching { image.readPixels(pixels, 0, 0, image.width, image.height) }.isSuccess) {
+                analyzeCover(pixels, image.width, image.height)
+            } else {
+                CoverCrop.centered(image.width, image.height)
+            }
+        }
+    return (image to crop).also { CoverImages[url] = it }
+}
+
+/** The cover at [slot] plus its mirrored edge bands out to the canvas edges (see [extensionParts]). */
+private fun DrawScope.drawExtension(
+    image: ImageBitmap,
+    crop: CoverCrop,
+    slot: Rect,
+) {
+    extensionParts(crop, slot, size.height).forEach { part ->
+        val target = part.target
+        if (part.mirrored) {
+            // Flipped upside down inside its target: the band's seam row lands on the seam.
+            scale(1f, -1f, pivot = Offset(target.center.x.toFloat(), target.center.y.toFloat())) {
+                drawImage(image, part.source.topLeft, part.source.size, target.topLeft, target.size)
+            }
+        } else {
+            drawImage(image, part.source.topLeft, part.source.size, target.topLeft, target.size)
+        }
+    }
+}
+
+/** A piece of the backdrop: [source] of the picture drawn into [target], flipped if [mirrored]. */
+@Immutable
+internal data class ExtensionPart(
+    val source: IntRect,
+    val target: IntRect,
+    val mirrored: Boolean,
+)
+
+/**
+ * Where a picture goes to continue the cover at [slot] on a canvas [canvasHeight] tall: the
+ * [crop]'s square at the slot; above it, the band of the square nearest its top edge, flipped
+ * (a mirror at the seam); below it the same with the bottom band. The bands start at the crop's
+ * strips, so a logo stepped over by the analysis stays out of the mirror too. Shared by the
+ * baked and the live backdrop (the live one, a video, uses [CoverCrop.centered]).
  */
 internal fun extensionParts(
-    imageWidth: Int,
-    imageHeight: Int,
+    crop: CoverCrop,
     slot: Rect,
     canvasHeight: Float,
-): List<Pair<IntRect, IntRect>> {
-    val side = min(imageWidth, imageHeight)
-    val square = IntRect(IntOffset((imageWidth - side) / 2, (imageHeight - side) / 2), IntSize(side, side))
-    val strip = (side * EdgeStrip).roundToInt().coerceAtLeast(1)
+): List<ExtensionPart> {
     val left = slot.left.roundToInt()
     val right = left + slot.width.roundToInt()
     val top = slot.top.roundToInt()
     val bottom = slot.bottom.roundToInt()
     val height = canvasHeight.roundToInt()
+    val square = crop.square
+    val band = (square.height * MirrorBand).roundToInt().coerceAtLeast(1)
     return buildList {
-        add(square to IntRect(left, top, right, bottom))
-        if (top > 0) add(IntRect(square.left, square.top, square.right, square.top + strip) to IntRect(left, 0, right, top))
-        if (height > bottom) add(IntRect(square.left, square.bottom - strip, square.right, square.bottom) to IntRect(left, bottom, right, height))
-    }
-}
-
-/**
- * How much the backdrop must be darkened for white text to read on it: 0 for dark covers,
- * up to [MaxContrastDim] for bright ones. The cover's mean relative luminance (WCAG) is
- * brought down to [TargetLuminance], which keeps white text above a 4.5 : 1 contrast ratio
- * (1.05 / (0.16 + 0.05) = 5.0). A black overlay of alpha a scales sRGB channels by (1 - a),
- * i.e. luminance by roughly (1 - a)^2.2.
- */
-internal fun contrastDim(image: ImageBitmap): Float {
-    val width = image.width
-    val height = image.height
-    val step = maxOf(1, minOf(width, height) / 24)
-    val columns = (width + step - 1) / step
-    val rows = (height + step - 1) / step
-    val pixels = IntArray(width * height)
-    // A hardware-backed bitmap cannot always be read; then the extra darkening is skipped.
-    if (runCatching { image.readPixels(pixels, 0, 0, width, height) }.isFailure) return 0f
-    var sum = 0.0
-    var count = 0
-    for (row in 0 until rows) {
-        for (column in 0 until columns) {
-            val argb = pixels[(row * step) * width + column * step]
-            sum += relativeLuminance(argb)
-            count++
+        add(ExtensionPart(square, IntRect(left, top, right, bottom), mirrored = false))
+        if (top > 0) {
+            val from = crop.topStrip.top
+            val source = IntRect(square.left, from, square.right, (from + band).coerceAtMost(square.bottom))
+            add(ExtensionPart(source, IntRect(left, 0, right, top), mirrored = true))
+        }
+        if (height > bottom) {
+            val to = crop.bottomStrip.bottom
+            val source = IntRect(square.left, (to - band).coerceAtLeast(square.top), square.right, to)
+            add(ExtensionPart(source, IntRect(left, bottom, right, height), mirrored = true))
         }
     }
-    // Bright patches matter more than the mean (white text on a light corner), so lean up.
-    val luminance = (sum / count.coerceAtLeast(1)) * 1.15
-    if (luminance <= TargetLuminance) return 0f
-    return (1.0 - (TargetLuminance / luminance).pow(1.0 / 2.2)).toFloat().coerceIn(0f, MaxContrastDim)
 }
-
-private fun relativeLuminance(argb: Int): Double {
-    fun channel(value: Int): Double {
-        val c = value / 255.0
-        return if (c <= 0.03928) c / 12.92 else ((c + 0.055) / 1.055).pow(2.4)
-    }
-    return 0.2126 * channel((argb shr 16) and 0xFF) + 0.7152 * channel((argb shr 8) and 0xFF) + 0.0722 * channel(argb and 0xFF)
-}
-
-private const val TargetLuminance = 0.16
-private const val MaxContrastDim = 0.6f
 
 /** Darkening of the backdrop under the status bar and at the bottom, behind the controls. */
 private const val TopScrim = 0.28f
@@ -571,8 +650,11 @@ internal val SoftBlur = 14.dp
 /** How far beyond the cover (share of its height) the soft blur still shows. */
 internal const val SoftReach = 0.3f
 
-/** Share of the cover's height whose edge rows are stretched beyond it. */
-private const val EdgeStrip = 0.06f
+/** Share of the cover's side mirrored above/below it: enough shape to read as its continuation. */
+private const val MirrorBand = 0.35f
+
+/** Stops per eased ramp (smoothstep sampled finely enough to look continuous). */
+private const val FadeSteps = 8
 
 /** Where a full-bleed cover's top is fully opaque, and where its bottom starts to fade. */
 private const val EdgeFadeTop = 0.22f

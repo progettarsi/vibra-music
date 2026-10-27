@@ -57,7 +57,7 @@
     <string name="play">Puter</string>
     <string name="widget_pause">Jeda</string>
     <string name="widget_previous">Sadurunge</string>
-    <string name="widget_tap_to_open">Ketuk untuk membuka Vibra</string>
+    <string name="widget_tap_to_open">Ketuk untuk membuka vibra</string>
     <string name="play_next">Puter sabanjure</string>
     <string name="add_to_queue">Tambahke ke antrean</string>
     <string name="add_to_library">Tambahke ke pustaka</string>
@@ -348,9 +348,9 @@
     <string name="update_notification_channel_name">Pembaruan Aplikasi</string>
     <string name="update_notification_channel_desc">Pemberitahuan untuk pembaruan aplikasi baru</string>
     <string name="update_notification_title">Pembaruan Tersedia</string>
-    <string name="update_notification_text">Vibra %s kini tersedia</string>
+    <string name="update_notification_text">vibra %s kini tersedia</string>
     <string name="download">Unduh</string>
-    <string name="permissions_title">Izinkan Vibra bekerja dengan optimal</string>
+    <string name="permissions_title">Izinkan vibra bekerja dengan optimal</string>
     <string name="permissions_subtitle">Kami menggunakan beberapa izin untuk memutar dan mengelola musik Kowe dengan andal. Kowe dapat mengubahnya kapan saja di pengaturan sistem.</string>
     <string name="permission_storage_title">Akses penyimpanan</string>
     <string name="permission_storage_desc">Diperlukan untuk membaca file audio lokal dan unduhan Kowe untuk diputer.</string>

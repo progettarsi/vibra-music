@@ -119,7 +119,7 @@
     <string name="library_top_mixes_refresh">تحديث الميكسات</string>
     <string name="library_top_mixes_configure_ai">ظبّط الذكاء الاصطناعي</string>
     <string name="library_top_mixes_ai_not_configured_title">ظبّط الذكاء الاصطناعي عشان نجهزلك الميكسات</string>
-    <string name="library_top_mixes_ai_not_configured_desc">لازم نربط الذكاء الاصطناعي الأول عشان Vibra يقدر يعمل ميكساتك المفضلة.</string>
+    <string name="library_top_mixes_ai_not_configured_desc">لازم نربط الذكاء الاصطناعي الأول عشان vibra يقدر يعمل ميكساتك المفضلة.</string>
     <string name="library_top_mixes_no_recent_history_title">لسه مفيش ميكس استماع أخير</string>
     <string name="library_top_mixes_no_recent_history">اسمع أغاني أكتر، وبعدين اعمل تحديث عشان نعمل ميكسات بالذكاء الاصطناعي من الأغاني اللي سمعتها من قريب.</string>
     <string name="library_top_mixes_no_valid_mixes">الذكاء الاصطناعي مطلعش أي ميكسات ينفع تشتغل من الأغاني اللي سمعتها من قريب.</string>
@@ -170,7 +170,7 @@
     <string name="featured_album_badge">ألبوم مميز</string>
     <string name="cast">بث</string>
     <string name="cast_devices">أجهزة البث</string>
-    <string name="cast_sheet_subtitle">اختار المكان اللي عايز Vibra يشتغل فيه</string>
+    <string name="cast_sheet_subtitle">اختار المكان اللي عايز vibra يشتغل فيه</string>
     <string name="cast_available_devices">الأجهزة المتاحة</string>
     <string name="cast_searching_devices">بندور على أجهزة</string>
     <string name="cast_no_devices">ملقناش أي أجهزة بث قريبة</string>
@@ -182,7 +182,7 @@
     <string name="cast_route_picker_unavailable">البث مش متاح في الوقت الحالي.</string>
     <string name="widget_pause">توقيف مؤقت</string>
     <string name="widget_previous">اللي فات</string>
-    <string name="widget_tap_to_open">دوس هنا عشان تفتح Vibra</string>
+    <string name="widget_tap_to_open">دوس هنا عشان تفتح vibra</string>
     <string name="widget_insights_title">تحليلات استماعك للمزيكا</string>
     <string name="widget_recommendations">ترشيحات</string>
     <string name="widget_listening_time_empty">لسه مفيش أي وقت استماع</string>
@@ -482,7 +482,7 @@
     <string name="update_channel">قناة التحديثات</string>
     <string name="update_channel_desc">اختار بين النسخ المستقرة المتجربة أو النسخ التجريبية.</string>
     <string name="recent_commits">التعديلات الأخيرة (Commits)</string>
-    <string name="updates_channel_warning_intro">Vibra بيوفر قناتين لتنزيل النسخ:</string>
+    <string name="updates_channel_warning_intro">vibra بيوفر قناتين لتنزيل النسخ:</string>
     <string name="updates_channel_warning_stable_title">النسخ المستقرة</string>
     <string name="updates_channel_warning_stable_source">بتتوزع عبر صفحة إصدارات GitHub الرسمية.</string>
     <string name="updates_channel_warning_stable_desc">الإصدارات دي اتجربت وبننصح بيها لغالبية المستخدمين.</string>
@@ -497,17 +497,17 @@
     <string name="update_notification_channel_name">تحديثات التطبيق</string>
     <string name="update_notification_channel_desc">إشعارات لما ينزل تحديث جديد للتطبيق</string>
     <string name="update_notification_title">في تحديث جديد نزل</string>
-    <string name="update_notification_text">تحديث Vibra %s بقى متاح دلوقتي</string>
+    <string name="update_notification_text">تحديث vibra %s بقى متاح دلوقتي</string>
     <string name="download">تنزيل</string>
     <string name="download_complete">اكتمل التنزيل</string>
-    <string name="permissions_title">خلي Vibra يشتغل بأفضل أداء</string>
+    <string name="permissions_title">خلي vibra يشتغل بأفضل أداء</string>
     <string name="permissions_subtitle">بنحتاج شوية صلاحيات عشان نشغل وننظم مزيكتك من غير مشاكل. تقدر تغيرهم في أي وقت من إعدادات النظام.</string>
     <string name="permission_storage_title">الوصول للمساحة</string>
     <string name="permission_storage_desc">مطلوب عشان نوصل للمساحة ونقرا أغانيك المتنزلة والمحلية.</string>
     <string name="permission_status_allowed">مسموح بيه</string>
     <string name="next">التالي</string>
     <string name="allow">سماح</string>
-    <string name="onboarding_welcome_title">أهلاً بيك في Vibra</string>
+    <string name="onboarding_welcome_title">أهلاً بيك في vibra</string>
     <string name="onboarding_welcome_subtitle">ظبّط التشغيل، المزيكا المحلية، وصلاحيات التحديثات قبل ما تبدأ تسمع.</string>
     <string name="onboarding_permissions_title">راجِع الصلاحيات</string>
     <string name="onboarding_permissions_subtitle">ادينا الصلاحيات اللي عايزها دلوقتي بس. تقدر تكمل وتفعل الباقي بعدين.</string>
@@ -516,7 +516,7 @@
     <string name="onboarding_foss_variant">نسخة المصدر المفتوح (FOSS)</string>
     <string name="onboarding_version_label">إصدار %1$s</string>
     <string name="onboarding_empty_title">الإعداد مش متاح</string>
-    <string name="onboarding_empty_subtitle">كمل لـ Vibra.</string>
+    <string name="onboarding_empty_subtitle">كمل لـ vibra.</string>
     <string name="onboarding_error_generic">معرفناش نحمل الإعداد</string>
     <string name="onboarding_permission_allowed_by_install">مسموح بيه مع التثبيت</string>
     <string name="onboarding_permission_unavailable">مش متاح</string>
@@ -527,11 +527,11 @@
     <string name="onboarding_permission_network_title">الوصول للشبكة</string>
     <string name="onboarding_permission_network_desc">تشغيل المزيكا أونلاين، تحميل أغلفة الألبومات، والوصول للمحتوى.</string>
     <string name="onboarding_permission_playback_service_title">التشغيل في الخلفية</string>
-    <string name="onboarding_permission_playback_service_desc">عشان المزيكا تفضل شغالة بثبات لما يكون Vibra في الخلفية.</string>
+    <string name="onboarding_permission_playback_service_desc">عشان المزيكا تفضل شغالة بثبات لما يكون vibra في الخلفية.</string>
     <string name="onboarding_permission_audio_settings_title">إعدادات الصوت والاهتزاز</string>
     <string name="onboarding_permission_audio_settings_desc">تظبيط أداء الصوت وتوفير اهتزاز خفيف أول ما تضغط.</string>
     <string name="onboarding_permission_app_installation_title">تثبيت التطبيق</string>
-    <string name="onboarding_permission_app_installation_desc">تثبيت تحديثات APK اللي هتنزلها من جوه Vibra.</string>
+    <string name="onboarding_permission_app_installation_desc">تثبيت تحديثات APK اللي هتنزلها من جوه vibra.</string>
     <string name="onboarding_permission_bluetooth_scan_title">البحث عن بلوتوث</string>
     <string name="onboarding_permission_bluetooth_scan_desc">اكتشاف أجهزة البث وأجهزة التشغيل اللي جنبك.</string>
     <string name="you_might_like">حاجات هتعجبك</string>
@@ -565,7 +565,7 @@
     <string name="eq_screen_subtitle">اضبط الصوت حسب ودنك وسماعتك</string>
     <string name="eq_sound_shaping_on">تعديل الصوت مفعل</string>
     <string name="eq_sound_shaping_off">تعديل الصوت معطل</string>
-    <string name="eq_enable_description">بيطبق الإعدادات دي على تشغيل Vibra</string>
+    <string name="eq_enable_description">بيطبق الإعدادات دي على تشغيل vibra</string>
     <string name="eq_control_mode">وضع التحكم</string>
     <string name="eq_basic">بسيط</string>
     <string name="eq_advanced">متقدم</string>
@@ -655,5 +655,5 @@
     <string name="updates_channel_warning_artifact_unstable">إصدارات Canary مخصصة للاختبار والوصول المبكر بس.\nالاستقرار والتوافق والوظائف مش مضمونين.</string>
     <string name="updates_channel_warning_artifact_acknowledgement">ملاحظة: التنزيل المباشر من GitHub بيتجاوز أي فحص إضافي للمتجر اللي انت ممكن تكون حملت منه التطبيق.\nبمتابعتك، انت معترف إن نسخ Canary ممكن تكون مش مستقرة وعلى مسئوليتك الكاملة.</string>
     <string name="updates_artifact_channel_confirmation">حول لقناة Canary عشان تجيلك الإصدارات التطويرية.\n\nإصدارات Canary بتتنشر تلقائياً من أحدث فرع تطويري.\nملاحظة: التنزيل المباشر من GitHub بيتجاوز أي فحص إضافي للمتجر اللي انت ممكن تكون حملت منه التطبيق.</string>
-    <string name="onboarding_permission_device_audio_capture_desc">بيتعرف على المزيكا اللي شغالة في التطبيقات التانية من غير ما يستخدم المايك. أندرويد هيطلب منك إذن الشاشة والصوت، بس Vibra بياخد الصوت بس.</string>
+    <string name="onboarding_permission_device_audio_capture_desc">بيتعرف على المزيكا اللي شغالة في التطبيقات التانية من غير ما يستخدم المايك. أندرويد هيطلب منك إذن الشاشة والصوت، بس vibra بياخد الصوت بس.</string>
 </resources>

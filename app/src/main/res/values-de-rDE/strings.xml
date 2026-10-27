@@ -318,7 +318,7 @@
     <string name="library_top_mixes_loading">Bereite deine KI-Mixe vor…</string>
     <string name="widget_pause">Pause</string>
     <string name="widget_previous">Vorheriger</string>
-    <string name="widget_tap_to_open">Tippe, um Vibra zu öffnen</string>
+    <string name="widget_tap_to_open">Tippe, um vibra zu öffnen</string>
     <string name="haptics">Vibration</string>
     <string name="dns_over_https">DNS über HTTPS</string>
     <string name="dns_over_https_desc">Nutze DNS über HTTPS (DOH) um Hostnamen aufzulösen</string>
@@ -381,9 +381,9 @@
     <string name="update_notification_channel_name">App-Updates</string>
     <string name="update_notification_channel_desc">Benachrichtigungen bei neuen App-Updates</string>
     <string name="update_notification_title">Update verfügbar</string>
-    <string name="update_notification_text">Vibra %s ist jetzt verfügbar</string>
+    <string name="update_notification_text">vibra %s ist jetzt verfügbar</string>
     <string name="download">Herunterladen</string>
-    <string name="permissions_title">Erlaube Vibra am Besten zu funktionieren</string>
+    <string name="permissions_title">Erlaube vibra am Besten zu funktionieren</string>
     <string name="permissions_subtitle">Wir verwenden einige Berechtigungen um deine Musik zuverlässig zu spielen und verwalten. Diese kannst du jederzeit in den Systemeinstellungen verändern.</string>
     <string name="permission_storage_title">Speicherzugriff</string>
     <string name="permission_storage_desc">Benötigt um deine heruntergeladene und lokale Audiodateien wiederzugeben.</string>
@@ -460,9 +460,9 @@
     <string name="lastfm_login_network_error">Netzwerkfehler. Prüfe deine Verbindung.</string>
     <string name="lastfm_login_failed">Anmeldung fehlgeschlagen. Versuche es erneut.</string>
     <string name="duration_seconds_short">%1$ds</string>
-    <string name="onboarding_welcome_title">Willkommen bei Vibra</string>
+    <string name="onboarding_welcome_title">Willkommen bei vibra</string>
     <string name="top_mixes">Top-Mixe für dich</string>
-    <string name="library_top_mixes_ai_not_configured_desc">KI-Integration wird benötigt, bevor Vibra persönliche Top-Mixe erstellen kann.</string>
+    <string name="library_top_mixes_ai_not_configured_desc">KI-Integration wird benötigt, bevor vibra persönliche Top-Mixe erstellen kann.</string>
     <string name="library_top_mixes_no_valid_mixes">KI hat keine abspielbaren Mixe aus deinem bisherigen Verlauf zurückgegeben.</string>
     <string name="library_top_mixes_failed">Erstellung der Top-Mixe fehlgeschlagen</string>
     <string name="subscribed_only">Nur Abonnierte</string>
@@ -493,7 +493,7 @@
     <string name="copy_log_entry">Logeintrag kopieren</string>
     <string name="enable_update_notification_channel_desc">Werde benachrichtigt, wenn eine neue Veröffentlichung auf dem ausgewählten Kanal verfügbar ist</string>
     <string name="update_channel_desc">Wähle zwischen getesteten Veröffentlichungen und Entwicklungssnapshots.</string>
-    <string name="updates_channel_warning_intro">Vibra stellt zwei Downloadkanäle für Builds zur Verfügung:</string>
+    <string name="updates_channel_warning_intro">vibra stellt zwei Downloadkanäle für Builds zur Verfügung:</string>
     <string name="updates_channel_warning_stable_title">Stabile Builds</string>
     <string name="updates_channel_warning_stable_source">Verteilt über die offiziellen GitHub Releases.</string>
     <string name="updates_channel_warning_stable_desc">Diese Versionen sind getestet und für die meisten Nutzer empfohlen.</string>
@@ -513,12 +513,12 @@
     <string name="lyrics_search_still_searching">Suche noch</string>
     <string name="unsupported_language">Sprache nicht unterstützt: %1$s</string>
     <string name="top_artist_badge">TOP-KÜNSTLER</string>
-    <string name="cast_sheet_subtitle">Wähle wo Vibra spielen soll</string>
+    <string name="cast_sheet_subtitle">Wähle wo vibra spielen soll</string>
     <string name="cast_disconnect">Trennen</string>
     <string name="enable_youlyplus_lyrics">YouLyPlus-Songtexte aktivieren</string>
     <string name="eq_waiting_for_audio_session">Warte auf Audiositzung</string>
     <string name="onboarding_permissions_title">Berechtigungen überprüfen</string>
-    <string name="onboarding_empty_subtitle">Zu Vibra fortfahren.</string>
+    <string name="onboarding_empty_subtitle">Zu vibra fortfahren.</string>
     <string name="no_saved_accounts">Noch keine gespeicherten Konten</string>
     <string name="unsaved_account_dialog_text">Dein aktuelles Konto wurde noch nicht gespeichert. Möchtest du es speichern, bevor du ein weiteres hinzufügst?</string>
     <string name="unsaved_account_dialog_no_thanks">Nein, danke</string>
@@ -540,7 +540,7 @@
     <string name="scheduled_backup">Automatische, geplante Sicherung</string>
     <string name="scheduled_backup_enabled">Geplante Sicherung aktivieren</string>
     <string name="scheduled_backup_frequency">Sicherungsplan</string>
-    <string name="scheduled_backup_frequency_description">Wähle, wie oft Vibra eine Sicherung erstellt.</string>
+    <string name="scheduled_backup_frequency_description">Wähle, wie oft vibra eine Sicherung erstellt.</string>
     <string name="scheduled_backup_daily">Täglich</string>
     <string name="scheduled_backup_weekly">Wöchentlich</string>
     <string name="scheduled_backup_monthly">Monatlich</string>
@@ -584,7 +584,7 @@
     <string name="eq_screen_subtitle">Passe die Wiedergabe für deine Ohren und dein Equipment an</string>
     <string name="eq_sound_shaping_on">Soundanpassung ist an</string>
     <string name="eq_sound_shaping_off">Soundanpassung ist aus</string>
-    <string name="eq_enable_description">Diese Kontrollen auf die Vibra-Wiedergabe anwenden</string>
+    <string name="eq_enable_description">Diese Kontrollen auf die vibra-Wiedergabe anwenden</string>
     <string name="eq_control_mode">Kontrollmodus</string>
     <string name="eq_advanced">Erweitert</string>
     <string name="eq_preset_number">Voreinstellung %1$d</string>
@@ -595,7 +595,7 @@
     <string name="download_progress_summary">%1$d%% · %2$s/s</string>
     <string name="download_action_failed">Download konnte nicht aktualisiert werden</string>
     <string name="onboarding_permission_app_installation_title">App-Installation</string>
-    <string name="onboarding_permission_app_installation_desc">Installiere heruntergeladene APK-Updates von Vibra.</string>
+    <string name="onboarding_permission_app_installation_desc">Installiere heruntergeladene APK-Updates von vibra.</string>
     <string name="source">Quelle</string>
     <string name="onboarding_welcome_subtitle">Richte die Wiedergabe und lokale Musik ein und aktualisiere die Berechtigungen bevor du mit dem Hören beginnst.</string>
     <string name="onboarding_permission_notifications_desc">Wiedergabesteuerung und Musikaktivitäten im Benachrichtigungscenter anzeigen.</string>

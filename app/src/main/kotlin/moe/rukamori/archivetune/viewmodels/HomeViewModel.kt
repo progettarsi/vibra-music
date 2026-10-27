@@ -790,7 +790,8 @@ class HomeViewModel
                     .first()
                     .filter { it.artist.blockedAt == null && it.artist.isYouTubeArtist }
                     .shuffled()
-                    .take(3)
+                    // Vibra: one related artist trims the prefetch without emptying the home.
+                    .take(if (app.vibra.power.PowerSave.level.value == app.vibra.power.PowerSaveLevel.OFF) 3 else 1)
                     .mapNotNull {
                         val items = mutableListOf<YTItem>()
                         YouTube.artist(it.id).onSuccess { page ->
@@ -825,7 +826,8 @@ class HomeViewModel
                     .first()
                     .filter { !it.song.isPodcast && it.album != null }
                     .shuffled()
-                    .take(2)
+                    // Vibra: no speculative next/related requests in battery saver.
+                    .take(if (app.vibra.power.PowerSave.level.value == app.vibra.power.PowerSaveLevel.OFF) 2 else 0)
                     .mapNotNull { song ->
                         val endpoint =
                             YouTube.next(WatchEndpoint(videoId = song.id)).getOrNull()?.relatedEndpoint

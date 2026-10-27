@@ -137,6 +137,9 @@ fun PlayerSettings(navController: NavController, advanced: Boolean = false) {
         remember(sponsorBlockSettingsViewModel) {
             sponsorBlockSettingsViewModel::retry
         }
+    val (powerAuto, setPowerAuto) = rememberPreference(moe.rukamori.archivetune.constants.VibraPowerSaveAutoKey, false)
+    val (powerThreshold, setPowerThreshold) = rememberPreference(moe.rukamori.archivetune.constants.VibraPowerSaveThresholdKey, 20)
+    val (powerMode, setPowerMode) = rememberEnumPreference(moe.rukamori.archivetune.constants.VibraPowerSaveModeKey, app.vibra.power.PowerSaveMode.NORMAL)
     val (audioQuality, onAudioQualityChange) =
         rememberEnumPreference(
             AudioQualityKey,
@@ -250,6 +253,29 @@ fun PlayerSettings(navController: NavController, advanced: Boolean = false) {
                 .verticalScroll(rememberScrollState())
                 .padding(bottom = SettingsDimensions.ScreenBottomPadding),
         ) {
+            if (!advanced) PreferenceGroup(title = stringResource(R.string.vibra_power_save)) {
+                item {
+                    SwitchPreference(title = { Text(stringResource(R.string.vibra_power_save_auto)) },
+                        checked = powerAuto, onCheckedChange = setPowerAuto)
+                }
+                item {
+                    moe.rukamori.archivetune.ui.component.ListPreference(
+                        title = { Text(stringResource(R.string.vibra_power_save_threshold)) },
+                        selectedValue = powerThreshold, values = listOf(10, 15, 20, 30, 50),
+                        valueText = { stringResource(R.string.vibra_power_save_below, it) },
+                        onValueSelected = setPowerThreshold, isEnabled = powerAuto,
+                    )
+                }
+                item {
+                    moe.rukamori.archivetune.ui.component.ListPreference(
+                        title = { Text(stringResource(R.string.vibra_power_save_mode)) },
+                        selectedValue = powerMode, values = app.vibra.power.PowerSaveMode.entries.toList(),
+                        valueText = { stringResource(if (it == app.vibra.power.PowerSaveMode.NORMAL) R.string.vibra_power_save_normal else R.string.vibra_power_save_max) },
+                        valueDescription = { stringResource(if (it == app.vibra.power.PowerSaveMode.NORMAL) R.string.vibra_power_save_normal_description else R.string.vibra_power_save_max_description) },
+                        onValueSelected = setPowerMode, isEnabled = powerAuto,
+                    )
+                }
+            }
             PreferenceGroup(title = stringResource(R.string.player)) {
                 item(visible = !advanced) {
                     PreferenceEntry(title = { Text(stringResource(R.string.equalizer)) },

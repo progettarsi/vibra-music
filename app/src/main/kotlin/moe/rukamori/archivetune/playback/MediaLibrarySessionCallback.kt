@@ -1975,7 +1975,8 @@ class MediaLibrarySessionCallback
                     } else {
                         null
                     }
-                database.withTransaction {
+                val downloadSnapshot = downloadUtil.playlistDownloadSnapshot(playlistId)
+                val added = database.withTransaction {
                     if (getSongByIdBlocking(songId) == null) {
                         currentItem.metadata?.let { insert(it) } ?: return@withTransaction false
                     }
@@ -1984,6 +1985,8 @@ class MediaLibrarySessionCallback
                     addSongEntriesToPlaylist(latestPlaylist, listOf(songId to setVideoId))
                     true
                 }
+                if (added) downloadUtil.downloadPlaylistAdditions(downloadSnapshot, listOf(songId))
+                added
             }
         }
 

@@ -108,7 +108,7 @@
     <string name="share_as_image">以圖像形式分享</string>
     <string name="music_recognition_settings">音樂辨識設定</string>
     <string name="music_recognition_background_title">後台識別</string>
-    <string name="music_recognition_background_description">啟用後，無需開啟 Vibra，點擊控制中心上的磁貼即可識別裝置上正在播放的音訊。</string>
+    <string name="music_recognition_background_description">啟用後，無需開啟 vibra，點擊控制中心上的磁貼即可識別裝置上正在播放的音訊。</string>
     <string name="music_recognition_background_foss_description">FOSS 版本不支援後台辨識功能。控制中心上的磁貼改為開啟識別介面。</string>
     <string name="music_recognition_notification_channel_name">音樂識別</string>
     <string name="music_recognition_notification_channel_description">音樂辨識進展與結果</string>
@@ -225,13 +225,13 @@
     <string name="storage_migration_warning">警告：在此過程中，請勿關閉應用程式或關閉設備，否則可能導致資料遺失。</string>
     <string name="storage_folder_invalid">請選擇一個有效的資料夾。</string>
     <string name="storage_folder_unsupported">此資料夾無法供基於檔案的媒體快取使用。</string>
-    <string name="storage_folder_not_writable">Vibra 無法在此資料夾中寫入快取檔案。</string>
+    <string name="storage_folder_not_writable">vibra 無法在此資料夾中寫入快取檔案。</string>
     <string name="storage_cache_cleared">快取已清除。</string>
     <string name="storage_cache_clear_failed">無法清除快取。請檢查記憶卡權限。</string>
     <string name="storage_clear_song_cache_progress">正在清除歌曲快取…%1$d%%</string>
     <string name="storage_clear_downloads_progress">正在清除下載內容…%1$d%%</string>
     <string name="storage_clear_image_cache_progress">正在清除圖像快取…%1$d%%</string>
-    <string name="storage_cache_clear_warning">在刪除快取檔案的過程中，請保持 Vibra 開啟。</string>
+    <string name="storage_cache_clear_warning">在刪除快取檔案的過程中，請保持 vibra 開啟。</string>
     <string name="storage_size_ratio">%1$s / %2$s</string>
     <string name="clear_song_cache_dialog">您確定要清除所有快取的歌曲嗎？</string>
     <string name="clear_image_cache_dialog">您確定要清除所有快取的圖像嗎？</string>

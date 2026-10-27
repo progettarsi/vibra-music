@@ -17,7 +17,7 @@
     <string name="music_recognition_error">何か問題が発生しました</string>
     <string name="music_recognition_settings">音楽認識設定</string>
     <string name="music_recognition_background_title">バックグラウンドでの認識</string>
-    <string name="music_recognition_background_description">有効にすると、クイック設定タイルは、Vibra を開かなくても、このデバイスで再生されているオーディオを認識します。</string>
+    <string name="music_recognition_background_description">有効にすると、クイック設定タイルは、vibra を開かなくても、このデバイスで再生されているオーディオを認識します。</string>
     <string name="music_recognition_background_foss_description">バックグラウンド認識は FOSS バリアントでは利用できません。代わりに、クイック設定タイルにより認識画面が開きます。</string>
     <string name="music_recognition_notification_channel_name">音楽認識</string>
     <string name="music_recognition_notification_channel_description">音楽認識の進捗状況と結果</string>
@@ -232,13 +232,13 @@
     <string name="storage_folder_selected_restart">保存フォルダーが保存されました。アプリは 3 秒後に再起動します。</string>
     <string name="storage_folder_invalid">有効なフォルダーを選択してください。</string>
     <string name="storage_folder_unsupported">このフォルダーは、ファイルベースのメディア キャッシュでは使用できません。</string>
-    <string name="storage_folder_not_writable">Vibra はこのフォルダーにキャッシュ ファイルを書き込むことができません。</string>
+    <string name="storage_folder_not_writable">vibra はこのフォルダーにキャッシュ ファイルを書き込むことができません。</string>
     <string name="storage_cache_cleared">キャッシュがクリアされました。</string>
     <string name="storage_cache_clear_failed">キャッシュをクリアできませんでした。 SDカードへのアクセスを確認してください。</string>
     <string name="storage_clear_song_cache_progress">曲のキャッシュをクリア中...%1$d%%</string>
     <string name="storage_clear_downloads_progress">ダウンロードをクリア中...%1$d%%</string>
     <string name="storage_clear_image_cache_progress">画像キャッシュをクリア中...%1$d%%</string>
-    <string name="storage_cache_clear_warning">キャッシュ ファイルが削除されている間、Vibra を開いたままにしてください。</string>
+    <string name="storage_cache_clear_warning">キャッシュ ファイルが削除されている間、vibra を開いたままにしてください。</string>
     <string name="storage_size_ratio">%1$s / %2$s</string>
     <string name="clear_song_cache_dialog">  キャッシュされた曲をすべてクリアしてもよろしいですか?</string>
     <string name="clear_image_cache_dialog">  キャッシュされた画像をすべてクリアしてもよろしいですか?</string>

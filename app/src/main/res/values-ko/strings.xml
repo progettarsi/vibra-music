@@ -343,9 +343,9 @@
     <string name="update_notification_channel_name">앱 업데이트 상태 푸시</string>
     <string name="update_notification_channel_desc">앱의 신버전 배포 시점에 알리는 시스템 전용 푸시 알림 채널입니다.</string>
     <string name="update_notification_title">새로운 업데이트 발견됨</string>
-    <string name="update_notification_text">이제 기기에서 즉시 Vibra %s 버전을 설치하여 이용할 수 있습니다.</string>
+    <string name="update_notification_text">이제 기기에서 즉시 vibra %s 버전을 설치하여 이용할 수 있습니다.</string>
     <string name="download">오프라인 저장</string>
-    <string name="permissions_title">Vibra 최적 작동 권한 허용</string>
+    <string name="permissions_title">vibra 최적 작동 권한 허용</string>
     <string name="permissions_subtitle">음악 재생 안정성을 보장하고 미디어를 편하게 컨트롤 및 관리할 수 있도록 스마트폰 시스템의 권한을 일부 활용합니다. 시스템 설정에서 철회하실 수 있습니다.</string>
     <string name="permission_storage_title">기기 내부 미디어 저장소 접근 권한</string>
     <string name="permission_storage_desc">스마트폰 내부 저장소에 소장 중인 로컬 음악 파일을 재생 목록으로 스캔하여 불러오기 위해 해당 미디어 권한이 필수로 사용됩니다.</string>
@@ -412,7 +412,7 @@
     <string name="newest_year">최신 연도순</string>
     <string name="recently_updated">최근에 업데이트됨</string>
     <string name="recently_played">최근 재생한 음악</string>
-    <string name="widget_tap_to_open">탭하여 Vibra 열기</string>
+    <string name="widget_tap_to_open">탭하여 vibra 열기</string>
     <string name="top_artist_badge">인기 아티스트</string>
     <string name="your_playlists">내 재생목록</string>
     <string name="youtube_channels">YouTube 공식 아티스트 채널</string>

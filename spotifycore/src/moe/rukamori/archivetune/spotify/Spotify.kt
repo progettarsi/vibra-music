@@ -250,7 +250,7 @@ object Spotify {
         for (attempt in 0 until maxRetries) {
             log(
                 "D",
-                "GQL POST $operationName (token: ${token.take(8)}...)" +
+                "GQL POST $operationName" +
                     if (attempt > 0) " [retry $attempt]" else "",
             )
 
@@ -283,9 +283,9 @@ object Spotify {
                 return GqlResult(json = null, isPersistedQueryNotFound = true)
             }
             if (response.status.value !in 200..299) {
-                val bodyText = response.bodyAsText()
-                log("E", "GQL $operationName FAILED: ${response.status.value} — ${bodyText.take(200)}")
-                throw SpotifyException(response.status.value, "GraphQL error ${response.status.value}: $bodyText")
+                // Vibra: responses and token prefixes must never reach the import logs.
+                log("E", "GQL $operationName FAILED: ${response.status.value}")
+                throw SpotifyException(response.status.value, "GraphQL error ${response.status.value}")
             }
 
             val responseJson = json.parseToJsonElement(response.bodyAsText()).jsonObject
@@ -323,7 +323,7 @@ object Spotify {
         for (attempt in 0 until maxRetries) {
             log(
                 "D",
-                "REST GET $endpoint (token: ${token.take(8)}...)" +
+                "REST GET $endpoint" +
                     if (attempt > 0) " [retry $attempt]" else "",
             )
             val response =
@@ -350,9 +350,9 @@ object Spotify {
                 throw SpotifyException(429, "Rate limited", retryAfterSec = retryAfter)
             }
             if (response.status.value !in 200..299) {
-                val bodyText = response.bodyAsText()
-                log("E", "REST $endpoint FAILED: ${response.status.value} — ${bodyText.take(200)}")
-                throw SpotifyException(response.status.value, "Spotify API error ${response.status.value}: $bodyText")
+                // Vibra: keep only the HTTP status, never the body of an authenticated response.
+                log("E", "REST $endpoint FAILED: ${response.status.value}")
+                throw SpotifyException(response.status.value, "Spotify API error ${response.status.value}")
             }
             return response.body()
         }

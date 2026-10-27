@@ -7,6 +7,7 @@
 
 package app.vibra.ui.profile
 
+import app.vibra.ui.motion.ambientMotionAllowed
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -78,6 +79,7 @@ import androidx.graphics.shapes.toPath
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
+import app.vibra.ui.shell.avatarFlightSource
 import app.vibra.ui.blocks.BlockSize
 import app.vibra.ui.blocks.VibraBlock
 import app.vibra.ui.blocks.blockColumnsFor
@@ -273,6 +275,8 @@ private fun ProfileIdentity(
                 modifier =
                     Modifier
                         .size(220.dp)
+                        // Flies into the dock's avatar button when the profile closes.
+                        .avatarFlightSource(url = avatarUrl, shape = shape.polygon)
                         .liquidPress(interaction, pressedScale = 0.95f)
                         .clickable(interactionSource = interaction, indication = null, role = Role.Button) {
                             haptics.press()
@@ -353,7 +357,7 @@ private fun ShapeWallpaper(
     val color = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
     val path = remember(shape) { shape.polygon.toPath().asComposePath() }
     val turn =
-        if (LocalAnimationsDisabled.current) {
+        if (!ambientMotionAllowed) {
             null
         } else {
             rememberInfiniteTransition(label = "wallpaper").animateFloat(

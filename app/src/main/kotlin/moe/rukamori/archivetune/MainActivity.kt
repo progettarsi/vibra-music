@@ -149,7 +149,12 @@ import moe.rukamori.archivetune.ui.screens.LOGIN_URL_ARGUMENT
 import moe.rukamori.archivetune.ui.screens.LoginScreen
 import moe.rukamori.archivetune.ui.screens.Screens
 import moe.rukamori.archivetune.ui.screens.buildLoginRoute
-import moe.rukamori.archivetune.ui.screens.onboarding.OnboardingRoute
+import app.vibra.power.PowerSave
+import app.vibra.power.PowerSaveLevel
+import app.vibra.ui.motion.LocalAmbientMotion
+import moe.rukamori.archivetune.spotify.SpotifyOnboardingLogin
+import app.vibra.ui.onboarding.VibraOnboarding
+import app.vibra.ui.onboarding.VibraOnboardingViewModel
 import moe.rukamori.archivetune.ui.screens.settings.DarkMode
 import moe.rukamori.archivetune.ui.theme.ArchiveTuneTheme
 import moe.rukamori.archivetune.ui.theme.DefaultThemeColor
@@ -562,10 +567,14 @@ class MainActivity : ComponentActivity() {
 
             val darkTheme by rememberEnumPreference(DarkModeKey, defaultValue = DarkModeDefault)
             val defaultDisableAnimations = remember(this@MainActivity) { applicationContext.isLowRamDevice() }
-            val disableAnimations by rememberPreference(
+            val userDisabledAnimations by rememberPreference(
                 DisableAnimationsKey,
                 defaultValue = defaultDisableAnimations,
             )
+            // Battery saver (app.vibra.power): Normal stops ambient motion (LocalAmbientMotion),
+            // Max turns every animation off, exactly like the "disable animations" setting.
+            val powerSaveLevel by PowerSave.level.collectAsStateWithLifecycle()
+            val disableAnimations = userDisabledAnimations || powerSaveLevel == PowerSaveLevel.MAX
             val fontPreference by rememberEnumPreference(FontPreferenceKey, defaultValue = AppFontPreference.DEFAULT)
             val customFontUri by rememberPreference(CustomFontUriKey, defaultValue = "")
             val legacyUseSystemFont by rememberPreference(UseSystemFontKey, defaultValue = false)
@@ -616,6 +625,11 @@ class MainActivity : ComponentActivity() {
                     }
 
                 if (shouldShowOnboarding) {
+                    // Vibra onboarding (app.vibra.ui.onboarding). The sign-in screens take its
+                    // place while open; its state lives in an activity-scoped ViewModel, so it
+                    // resumes where it was when they close.
+                    val vibraOnboarding: VibraOnboardingViewModel = hiltViewModel()
+                    var showOnboardingSpotify by rememberSaveable { mutableStateOf(false) }
                     if (showOnboardingLogin) {
                         CompositionLocalProvider(
                             LocalPlayerAwareWindowInsets provides WindowInsets.systemBars,
@@ -623,17 +637,30 @@ class MainActivity : ComponentActivity() {
                             LoginScreen(
                                 navController = navController,
                                 onLoginComplete = {
-                                    onboardingViewModel.onLoginCompleted()
                                     showOnboardingLogin = false
+                                    vibraOnboarding.onYouTubeSignedIn()
                                 },
                                 onNavigateBack = { showOnboardingLogin = false },
                             )
                         }
                     } else {
-                        OnboardingRoute(
-                            viewModel = onboardingViewModel,
-                            onLoginRequested = { showOnboardingLogin = true },
+                        VibraOnboarding(
+                            viewModel = vibraOnboarding,
+                            onSignInYouTube = { showOnboardingLogin = true },
+                            onSignInSpotify = { showOnboardingSpotify = true },
+                            onFinished = onboardingViewModel::complete,
                         )
+                        // Spotify only imports artists: its sign-in sheet opens over the
+                        // onboarding, which then moves on to the Artists step.
+                        if (showOnboardingSpotify) {
+                            SpotifyOnboardingLogin(
+                                onDismiss = { showOnboardingSpotify = false },
+                                onConnected = {
+                                    showOnboardingSpotify = false
+                                    vibraOnboarding.onSpotifySignedIn()
+                                },
+                            )
+                        }
                     }
                     return@ArchiveTuneTheme
                 }
@@ -701,6 +728,7 @@ class MainActivity : ComponentActivity() {
                 CompositionLocalProvider(
                     LocalHapticFeedback provides customHaptic,
                     LocalAnimationsDisabled provides disableAnimations,
+                    LocalAmbientMotion provides (powerSaveLevel == PowerSaveLevel.OFF),
                     LocalDatabase provides database,
                     LocalContentColor provides if (pureBlack) Color.White else contentColorFor(MaterialTheme.colorScheme.surface),
                     LocalPlayerConnection provides playerConnection,

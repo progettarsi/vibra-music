@@ -19,6 +19,7 @@ import moe.rukamori.archivetune.innertube.models.WatchEndpoint.WatchEndpointMusi
 import moe.rukamori.archivetune.innertube.models.WatchEndpoint.WatchEndpointMusicSupportedConfigs.WatchEndpointMusicConfig.Companion.MUSIC_VIDEO_TYPE_UGC
 import moe.rukamori.archivetune.models.MediaMetadata
 import moe.rukamori.archivetune.models.toMediaMetadata
+import moe.rukamori.archivetune.playback.queues.VIBRA_USER_QUEUED
 import moe.rukamori.archivetune.ui.utils.YTThumbQuality
 import moe.rukamori.archivetune.ui.utils.YtimgResizePolicy
 import moe.rukamori.archivetune.ui.utils.buildYTThumbnailUrl
@@ -146,6 +147,7 @@ fun MediaMetadata.toMediaItem() =
                     Bundle().apply {
                         putBoolean(ExtraIsMusicVideo, isMusicVideo)
                         putBoolean(ExtraIsPodcast, isPodcast)
+                        putBoolean(VIBRA_USER_QUEUED, userQueued)
                     },
                 )
                 .build(),

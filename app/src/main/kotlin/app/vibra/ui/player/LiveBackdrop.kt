@@ -129,10 +129,12 @@ private fun DrawScope.drawContentExtension(
 ) {
     val contentSize = content.size
     if (contentSize.width <= 0 || contentSize.height <= 0) return
-    extensionParts(contentSize.width, contentSize.height, slot, canvasHeight).forEach { (source, target) ->
+    extensionParts(CoverCrop.centered(contentSize.width, contentSize.height), slot, canvasHeight).forEach { (source, target, mirrored) ->
         withTransform({
-            translate(target.left.toFloat(), target.top.toFloat())
-            scale(target.width.toFloat() / source.width, target.height.toFloat() / source.height, Offset.Zero)
+            // A mirrored band is flipped: its first row lands at the target's bottom edge.
+            translate(target.left.toFloat(), if (mirrored) target.bottom.toFloat() else target.top.toFloat())
+            val scaleY = target.height.toFloat() / source.height
+            scale(target.width.toFloat() / source.width, if (mirrored) -scaleY else scaleY, Offset.Zero)
             translate(-source.left.toFloat(), -source.top.toFloat())
             clipRect(source.left.toFloat(), source.top.toFloat(), source.right.toFloat(), source.bottom.toFloat())
         }) {

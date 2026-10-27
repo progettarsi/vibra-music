@@ -17,7 +17,7 @@
     <string name="music_recognition_error">Nəsə səhv getdi</string>
     <string name="music_recognition_settings">Musiqi tanıma parametrləri</string>
     <string name="music_recognition_background_title">Arxa planda tanınma</string>
-    <string name="music_recognition_background_description">Aktivləşdirildikdə, \"Tez-tez istifadə olunan parametrlər\" (Quick Settings) paneli \"Vibra\" tətbiqini açmadan bu cihazda səsləndirilən audionu tanıyır.</string>
+    <string name="music_recognition_background_description">Aktivləşdirildikdə, \"Tez-tez istifadə olunan parametrlər\" (Quick Settings) paneli \"vibra\" tətbiqini açmadan bu cihazda səsləndirilən audionu tanıyır.</string>
     <string name="music_recognition_background_foss_description">FOSS versiyasında fon rejimində tanıma funksiyası mövcud deyil. Bunun əvəzinə, \"Tez tənzimləmələr\" panelindəki düymə tanıma ekranını açır.</string>
     <string name="music_recognition_notification_channel_name">Musiqinin tanınması</string>
     <string name="music_recognition_notification_channel_description">Musiqinin tanınması sahəsində irəliləyiş və nəticələr</string>

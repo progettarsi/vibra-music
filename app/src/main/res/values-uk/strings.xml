@@ -327,9 +327,9 @@
     <string name="update_notification_channel_name">Оновлення додатку</string>
     <string name="update_notification_channel_desc">Сповіщення про нові оновлення додатку</string>
     <string name="update_notification_title">Доступно нове оновлення</string>
-    <string name="update_notification_text">Vibra %s тепер доступно</string>
+    <string name="update_notification_text">vibra %s тепер доступно</string>
     <string name="download">Завантажити</string>
-    <string name="permissions_title">Дозволити Vibra працювати на повну</string>
+    <string name="permissions_title">Дозволити vibra працювати на повну</string>
     <string name="permissions_subtitle">Для безперебійного відтворення та управління вашою музикою нам потрібні деякі дозволи. Ви можете змінити їх у будь-який час у налаштуваннях системи.</string>
     <string name="permission_storage_title">Доступ до сховища</string>
     <string name="permission_storage_desc">Необхідно для зчитування завантажених та локальних аудіофайлів з метою їх відтворення.</string>

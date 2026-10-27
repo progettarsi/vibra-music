@@ -219,7 +219,7 @@
         <item quantity="one">%d makale</item>
         <item quantity="other">%d makaleler</item>
     </plurals>
-    <string name="music_recognition_background_description">Etkinleştirildiğinde, Hızlı Ayarlar kutucuğu Vibra\'u açmadan bu cihazda oynatılan sesi tanır.</string>
+    <string name="music_recognition_background_description">Etkinleştirildiğinde, Hızlı Ayarlar kutucuğu vibra\'u açmadan bu cihazda oynatılan sesi tanır.</string>
     <string name="history_remote_loading">Uzak geçmiş senkronize ediliyor</string>
     <string name="history_remote_empty_title">Hiç uzak geçmiş mevcut değil</string>
     <string name="history_remote_error_title">Uzak geçmiş yüklenemedi</string>
@@ -270,13 +270,13 @@
     <string name="storage_folder_selected_restart">Depolama konumu kaydedildi. Uygulama 3 saniye içinde yeniden başlayacak.</string>
     <string name="storage_folder_invalid">Geçerli bir klasör seçin.</string>
     <string name="storage_folder_unsupported">Bu klasör, dosya tabanlı medya önbelleği tarafından kullanılamaz.</string>
-    <string name="storage_folder_not_writable">Vibra bu klasöre önbellek dosyaları yazamaz.</string>
+    <string name="storage_folder_not_writable">vibra bu klasöre önbellek dosyaları yazamaz.</string>
     <string name="storage_cache_cleared">Önbellek temizlendi.</string>
     <string name="storage_cache_clear_failed">Önbellek temizlenemedi. SD kart erişimini kontrol edin.</string>
     <string name="storage_clear_song_cache_progress">Şarkı önbelleği temizleniyor...%1$d%%</string>
     <string name="storage_clear_downloads_progress">İndirilenler temizleniyor...%1$d%%</string>
     <string name="storage_clear_image_cache_progress">Resim önbelleği temizleniyor...%1$d%%</string>
-    <string name="storage_cache_clear_warning">Önbellek dosyaları temizlenirken Vibra\'u açık tutun.</string>
+    <string name="storage_cache_clear_warning">Önbellek dosyaları temizlenirken vibra\'u açık tutun.</string>
     <string name="storage_size_ratio">%1$s/%2$s</string>
     <string name="history_duration_desc">Bir şarkının dinlenmiş sayılması için gereken minimum çalma süresi</string>
     <string name="history_duration_seconds">%1$s sn</string>

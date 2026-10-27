@@ -26,9 +26,11 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import moe.rukamori.archivetune.db.MusicDatabase
@@ -37,6 +39,8 @@ import moe.rukamori.archivetune.extensions.getCurrentQueueIndex
 import moe.rukamori.archivetune.extensions.getQueueWindows
 import moe.rukamori.archivetune.playback.MusicService.MusicBinder
 import moe.rukamori.archivetune.playback.queues.Queue
+import moe.rukamori.archivetune.playback.queues.isUserQueued
+import moe.rukamori.archivetune.playback.queues.userQueueRegionSize
 import moe.rukamori.archivetune.utils.isLocalMediaId
 import moe.rukamori.archivetune.utils.reportException
 
@@ -57,18 +61,23 @@ class PlayerConnection(
     val isPlaying = _isPlaying.asStateFlow()
     val playbackParameters = MutableStateFlow(player.playbackParameters)
     val mediaMetadata = service.currentMediaMetadata
+    // Vibra: metadata and likes change without a track change; avoid reopening the Room queries.
+    private val currentMediaId = mediaMetadata.map { it?.id }.distinctUntilChanged()
     val currentSong =
-        mediaMetadata.flatMapLatest {
-            database.song(it?.id)
+        currentMediaId.flatMapLatest {
+            database.song(it)
         }
     val currentLyrics =
-        mediaMetadata.flatMapLatest { mediaMetadata ->
-            database.lyrics(mediaMetadata?.id)
+        currentMediaId.flatMapLatest { id ->
+            database.lyrics(id)
         }
     val currentFormat =
-        mediaMetadata.flatMapLatest { mediaMetadata ->
-            database.format(mediaMetadata?.id)
+        currentMediaId.flatMapLatest { id ->
+            database.format(id)
         }
+
+    private val _userQueueCount = MutableStateFlow(0)
+    val userQueueCount = _userQueueCount.asStateFlow()
 
     val queueTitle = MutableStateFlow<String?>(null)
     val queueWindows = MutableStateFlow<List<Timeline.Window>>(emptyList())
@@ -101,6 +110,7 @@ class PlayerConnection(
         currentMediaItemIndex.value = player.currentMediaItemIndex
         shuffleModeEnabled.value = player.shuffleModeEnabled
         repeatMode.value = player.repeatMode
+        updateUserQueueCount()
         if (player.mediaItemCount > 0 && service.currentMediaMetadata.value == null) {
             service.currentMediaMetadata.value = player.currentMetadata
         }
@@ -329,6 +339,18 @@ class PlayerConnection(
                 error.value = playbackError
             }
         }
+    }
+
+    // Vibra: Media3 raggruppa timeline, transizione e shuffle nello stesso callback.
+    override fun onEvents(player: Player, events: Player.Events) {
+        if (events.containsAny(Player.EVENT_TIMELINE_CHANGED, Player.EVENT_MEDIA_ITEM_TRANSITION,
+                Player.EVENT_SHUFFLE_MODE_ENABLED_CHANGED)) updateUserQueueCount()
+    }
+
+    private fun updateUserQueueCount() {
+        _userQueueCount.value = userQueueRegionSize(
+            queueWindows.value.map { it.firstPeriodIndex }, player.currentMediaItemIndex,
+        ) { player.getMediaItemAt(it).isUserQueued() }
     }
 
     private fun updateCanSkipPreviousAndNext() {

@@ -286,7 +286,7 @@
     <string name="storage_folder_selected_restart">Đã lưu thư mục lưu trữ. Ứng dụng sẽ khởi động lại sau 3 giây.</string>
     <string name="storage_folder_invalid">Chọn thư mục hợp lệ.</string>
     <string name="storage_folder_unsupported">Không thể sử dụng thư mục này cho bộ nhớ đệm phương tiện.</string>
-    <string name="storage_folder_not_writable">Vibra không thể ghi tệp bộ đệm trong thư mục này.</string>
+    <string name="storage_folder_not_writable">vibra không thể ghi tệp bộ đệm trong thư mục này.</string>
     <string name="storage_size_ratio">%1$s / %2$s</string>
     <string name="spotify_connect">Kết nối Spotify</string>
     <string name="spotify_available_count">%1$d danh sách phát có sẵn</string>
@@ -369,7 +369,7 @@
     <string name="top_albums">Album hàng đầu</string>
     <string name="music_recognition_settings">Cài đặt nhận dạng nhạc</string>
     <string name="music_recognition_background_title">Nhận dạng nền</string>
-    <string name="music_recognition_background_description">Khi được bật, ô Cài đặt nhanh sẽ nhận dạng âm thanh đang phát trên thiết bị này mà không cần mở Vibra.</string>
+    <string name="music_recognition_background_description">Khi được bật, ô Cài đặt nhanh sẽ nhận dạng âm thanh đang phát trên thiết bị này mà không cần mở vibra.</string>
     <string name="music_recognition_background_foss_description">Nhận dạng nền không khả dụng trong bản FOSS. Ô Cài đặt nhanh sẽ mở màn hình nhận dạng.</string>
     <string name="music_recognition_notification_channel_name">Nhận dạng nhạc</string>
     <string name="music_recognition_notification_channel_description">Tiến trình và kết quả nhận dạng nhạc</string>

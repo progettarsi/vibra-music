@@ -316,9 +316,9 @@
     <string name="update_notification_channel_name">Обновления приложения</string>
     <string name="update_notification_channel_desc">Уведомления для новых обновлений приложения</string>
     <string name="update_notification_title">Доступно обновление</string>
-    <string name="update_notification_text">Vibra %s теперь доступен</string>
+    <string name="update_notification_text">vibra %s теперь доступен</string>
     <string name="download">Загрузить</string>
-    <string name="permissions_title">Разрешите Vibra работать лучше</string>
+    <string name="permissions_title">Разрешите vibra работать лучше</string>
     <string name="permissions_subtitle">Мы используем несколько разрешений чтобы надёжно воспроизводить и управлять вашей музыкой. Вы всегда можете изменить их в системных настройках.</string>
     <string name="permission_storage_title">Доступ к хранилищу</string>
     <string name="permission_storage_desc">Необходим чтобы читать ваши загруженные и локальные аудиофайлы для воспроизведения.</string>
@@ -383,7 +383,7 @@
     <string name="library_top_mixes_refresh">Обновить миксы</string>
     <string name="library_top_mixes_configure_ai">Настроить ИИ</string>
     <string name="library_top_mixes_ai_not_configured_title">Настроить ИИ для создания миксов</string>
-    <string name="library_top_mixes_ai_not_configured_desc">Для создания персональных топ-миксов Vibra необходима интеграция с ИИ.</string>
+    <string name="library_top_mixes_ai_not_configured_desc">Для создания персональных топ-миксов vibra необходима интеграция с ИИ.</string>
     <string name="library_top_mixes_no_recent_history_title">Нет недавно прослушанного микса</string>
     <string name="library_top_mixes_no_recent_history">Послушайте несколько песен и обновите страницу для создания ИИ-миксов на основе вашей истории прослушивания.</string>
     <string name="library_top_mixes_no_valid_mixes">Не удалось создать ни одного микса на основе вашей истории прослушивания.</string>

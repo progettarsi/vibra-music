@@ -158,6 +158,8 @@ fun VibraAppShell(
     pageMotion.maxOriginCornerPx = with(LocalDensity.current) { MaxOriginCorner.toPx() }
     pageMotion.semantics = { (view as? RootForTest)?.semanticsOwner }
     var dockBounds by remember { mutableStateOf<Rect?>(null) }
+    // The profile picture flies between the profile page and the dock button (AvatarFlight).
+    val avatarFlight = remember { AvatarFlight() }
     var shellOffset by remember { mutableStateOf(Offset.Zero) }
     val nowPlaying = connection?.collectNowPlaying() ?: NoMedia
     val backStackEntry by navController.currentBackStackEntryAsState()
@@ -196,7 +198,7 @@ fun VibraAppShell(
         }
     }
 
-    CompositionLocalProvider(LocalPlaybackSpin provides spin) {
+    CompositionLocalProvider(LocalPlaybackSpin provides spin, LocalAvatarFlight provides avatarFlight) {
     Box(
         modifier =
             modifier
@@ -315,6 +317,9 @@ fun VibraAppShell(
                     },
             )
         }
+
+        // ── Profile picture in flight (above pages and dock, below the player) ───────────
+        AvatarFlightOverlay(flight = avatarFlight, shellOffset = { shellOffset })
 
         // ── Full player (on top of everything while open) ─────────────────────────────
         if (connection != null) {

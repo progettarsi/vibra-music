@@ -89,6 +89,8 @@ import androidx.media3.extractor.DefaultExtractorsFactory
 import androidx.media3.session.CommandButton
 import androidx.media3.session.MediaLibraryService
 import androidx.media3.session.MediaSession
+import app.vibra.power.PowerSave
+import app.vibra.power.PowerSaveLevel
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -212,6 +214,9 @@ import moe.rukamori.archivetune.morideobfuscator.youtubei.YoutubeiFailureKind
 import moe.rukamori.archivetune.playback.preload.NextStreamPreloader
 import moe.rukamori.archivetune.playback.preload.ObservePlaybackPreloadConfigurationUseCase
 import moe.rukamori.archivetune.playback.preload.PlaybackPreloadConfiguration
+import moe.rukamori.archivetune.playback.queues.asUserQueued
+import moe.rukamori.archivetune.playback.queues.isUserQueued
+import moe.rukamori.archivetune.playback.queues.userQueueInsertion
 import moe.rukamori.archivetune.playback.stream.AudioStreamRequest
 import moe.rukamori.archivetune.playback.stream.ResolveAudioStreamUseCase
 import moe.rukamori.archivetune.playback.stream.ResolvedAudioStream
@@ -3224,54 +3229,6 @@ class MusicService :
         localPlayer.setShuffleOrder(DefaultShuffleOrder(shuffledIndices, System.currentTimeMillis()))
     }
 
-    private fun buildPlayNextShuffleOrder(
-        currentIndex: Int,
-        insertionIndex: Int,
-        insertionCount: Int,
-    ): DefaultShuffleOrder? {
-        if (insertionCount <= 0 || player.currentTimeline.isEmpty) return null
-
-        fun adjustedIndex(index: Int): Int =
-            if (index >= insertionIndex) {
-                index + insertionCount
-            } else {
-                index
-            }
-
-        val timeline = player.currentTimeline
-        val previousIndices = ArrayDeque<Int>()
-        var traversalIndex = currentIndex
-        while (true) {
-            traversalIndex = timeline.getPreviousWindowIndex(traversalIndex, REPEAT_MODE_OFF, true)
-            if (traversalIndex == C.INDEX_UNSET) {
-                break
-            }
-            previousIndices.addFirst(adjustedIndex(traversalIndex))
-        }
-
-        val nextIndices = mutableListOf<Int>()
-        traversalIndex = currentIndex
-        while (true) {
-            traversalIndex = timeline.getNextWindowIndex(traversalIndex, REPEAT_MODE_OFF, true)
-            if (traversalIndex == C.INDEX_UNSET) {
-                break
-            }
-            nextIndices += adjustedIndex(traversalIndex)
-        }
-
-        val shuffledIndices =
-            buildList(player.mediaItemCount + insertionCount) {
-                addAll(previousIndices)
-                add(currentIndex)
-                repeat(insertionCount) { offset ->
-                    add(insertionIndex + offset)
-                }
-                addAll(nextIndices)
-            }.toIntArray()
-
-        return DefaultShuffleOrder(shuffledIndices, System.currentTimeMillis())
-    }
-
     fun startRadioSeamlessly() {
         cancelInfiniteQueueBootstrap()
         suppressAutoPlayback = false
@@ -3443,27 +3400,24 @@ class MusicService :
         }
     }
 
-    fun playNext(items: List<MediaItem>) {
-        val allowedItems =
-            items
-                .filterBlockedArtists(blockedArtistIds)
-                .filterVideo(hideMusicVideos)
+    fun playNext(items: List<MediaItem>) = insertUserQueue(items, playNext = true)
+
+    // Vibra: finds the position in play order before the timeline changes (see UserQueue).
+    private fun insertUserQueue(items: List<MediaItem>, playNext: Boolean) {
+        val allowedItems = items.filterBlockedArtists(blockedArtistIds).filterVideo(hideMusicVideos)
+            .map { it.asUserQueued() }
         if (allowedItems.isEmpty()) return
         suppressAutoPlayback = false
-        val insertionIndex = if (player.mediaItemCount == 0) 0 else player.currentMediaItemIndex + 1
-        val playNextShuffleOrder =
-            if (player.shuffleModeEnabled && player.mediaItemCount > 0) {
-                buildPlayNextShuffleOrder(
-                    currentIndex = player.currentMediaItemIndex,
-                    insertionIndex = insertionIndex,
-                    insertionCount = allowedItems.size,
-                )
-            } else {
-                null
-            }
-
-        player.addMediaItems(insertionIndex, allowedItems)
-        playNextShuffleOrder?.let(localPlayer::setShuffleOrder)
+        val order = player.getQueueWindows().map { it.firstPeriodIndex }
+        val insertion = userQueueInsertion(
+            order, player.currentMediaItemIndex,
+            List(player.mediaItemCount) { player.getMediaItemAt(it).isUserQueued() },
+            allowedItems.size, playNext, player.shuffleModeEnabled,
+        )
+        player.addMediaItems(insertion.index, allowedItems)
+        if (player.shuffleModeEnabled) {
+            localPlayer.setShuffleOrder(DefaultShuffleOrder(insertion.playOrder.toIntArray(), System.currentTimeMillis()))
+        }
         player.prepare()
     }
 
@@ -3524,16 +3478,7 @@ class MusicService :
         }
     }
 
-    fun addToQueue(items: List<MediaItem>) {
-        val allowedItems =
-            items
-                .filterBlockedArtists(blockedArtistIds)
-                .filterVideo(hideMusicVideos)
-        if (allowedItems.isEmpty()) return
-        suppressAutoPlayback = false
-        player.addMediaItems(allowedItems)
-        player.prepare()
-    }
+    fun addToQueue(items: List<MediaItem>) = insertUserQueue(items, playNext = false)
 
     fun playFromVoiceSearch(query: String) {
         val trimmed = query.trim()
@@ -4486,7 +4431,8 @@ class MusicService :
                     purpose = StreamPurpose.PLAYBACK,
                     authState = configuration.authState,
                     pinnedFormatId = null,
-                    artworkVideo = nextMediaItem.metadata?.isMusicVideo == true && !isLowDataModeActive(),
+                    // Vibra: skips the video request in battery saver, keeping the audio preload.
+                    artworkVideo = PowerSave.level.value == PowerSaveLevel.OFF && nextMediaItem.metadata?.isMusicVideo == true && !isLowDataModeActive(),
                 ),
         )
     }
@@ -5055,7 +5001,8 @@ class MusicService :
      * resolution has (audio served from the cache needs none). Low priority, best effort.
      */
     fun requestArtworkVideo(mediaId: String) {
-        if (isLowDataModeActive()) return
+        // Vibra: no decorative video streams while the battery saver is on.
+        if (isLowDataModeActive() || PowerSave.level.value != PowerSaveLevel.OFF) return
         ioScope.launch {
             runCatching {
                 resolveAudioStream.preload(
@@ -5065,7 +5012,7 @@ class MusicService :
                         networkMetered = false,
                         purpose = StreamPurpose.PLAYBACK,
                         authState = YouTube.currentPlaybackAuthState(),
-                        artworkVideo = true,
+                        artworkVideo = PowerSave.level.value == PowerSaveLevel.OFF,
                     ),
                 )
             }.onFailure { if (it is CancellationException) throw it }
@@ -5112,7 +5059,8 @@ class MusicService :
                             purpose = StreamPurpose.PLAYBACK,
                             authState = YouTube.currentPlaybackAuthState(),
                             pinnedFormatId = pinnedFormatId,
-                            artworkVideo = !lowDataModeActive && isMusicVideo(mediaId),
+                            // Vibra: also skips the video resolution on the normal audio path.
+                            artworkVideo = PowerSave.level.value == PowerSaveLevel.OFF && !lowDataModeActive && isMusicVideo(mediaId),
                         ),
                     ).also { resolved ->
                         resolvedRequestHeaders = resolved.requestHeaders
@@ -5687,7 +5635,7 @@ class MusicService :
 
     private fun MediaItem.toPersistableMetadata(): moe.rukamori.archivetune.models.MediaMetadata? {
         val tagged = metadata
-        if (tagged != null) return tagged
+        if (tagged != null) return tagged.copy(userQueued = isUserQueued())
 
         val id =
             mediaId
@@ -5743,6 +5691,7 @@ class MusicService :
             title = title,
             artists = artists,
             duration = -1,
+            userQueued = isUserQueued(),
             thumbnailUrl = thumbnailUrl,
             album = album,
             explicit = false,

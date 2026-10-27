@@ -253,6 +253,23 @@ class SpotifyLibraryRepository
                 tracks
             }
 
+        /** Vibra: followed artists, paged with the same session renewal as playlists. */
+        suspend fun followedArtists(): List<moe.rukamori.archivetune.spotify.models.SpotifyArtist> =
+            withContext(Dispatchers.IO) {
+                ensureAuthenticated()
+                val artists = mutableListOf<moe.rukamori.archivetune.spotify.models.SpotifyArtist>()
+                var offset = 0
+                while (true) {
+                    val page = spotifyCallWithTokenRetry { Spotify.myArtists(limit = 50, offset = offset).getOrThrow() }
+                    if (page.items.isEmpty()) break
+                    artists += page.items
+                    val nextOffset = page.offset + page.limit
+                    if (nextOffset <= offset || nextOffset >= page.total) break
+                    offset = nextOffset
+                }
+                artists.distinctBy { it.id }
+            }
+
         private suspend fun ensureAuthenticated() {
             val prefs = context.dataStore.data.first()
             val token = prefs[SpotifyAccessTokenKey].orEmpty()

@@ -1,15 +1,23 @@
-# VIBRA
+# vibra
 
 **Music that moves like liquid.**
 
-VIBRA is a music app for Android with a fluid, expressive interface: a floating dock whose
+vibra is a music app for Android with a fluid, expressive interface: a floating dock whose
 search bar grows out of the search button, a player that swells out of the mini-player,
 covers that bleed into the whole screen, and spring physics, gooey surfaces and haptics
 everywhere. It plays YouTube Music and your local files.
 
-VIBRA is built on top of [ArchiveTune](https://github.com/rukamori/ArchiveTune): its music
+vibra is built on top of [ArchiveTune](https://github.com/rukamori/ArchiveTune): its music
 engine runs underneath, while the interface is all new, designed in Figma on Material 3
 Expressive.
+
+## What matters here
+
+vibra is built around **how it feels to use**, not around a list of features. Every screen,
+transition and touch is designed and tuned by hand: if something moves, it moves on a spring;
+if something changes, it changes in place instead of blinking; if you touch something, it
+answers. A feature only ships when it is as smooth and coherent as the rest of the app, so
+vibra deliberately does fewer things, and does them well.
 
 ## Highlights
 
@@ -59,7 +67,7 @@ You need JDK 21 and the Android SDK (platform 37). Then:
 adb install -r app/build/outputs/apk/gmsMobileUniversal/debug/app-gms-mobile-universal-debug.apk
 ```
 
-The debug build installs as **VIBRA Debug**, next to the release.
+The debug build installs as **vibra debug**, next to the release.
 [`docs/SETUP.md`](docs/SETUP.md) covers build variants, release signing and the optional
 integrations. [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) explains how the pieces fit,
 and [`docs/FIGMA_IMPLEMENTATION_MAP.md`](docs/FIGMA_IMPLEMENTATION_MAP.md) maps the design
@@ -69,21 +77,21 @@ to the code.
 
 | Where | What |
 |---|---|
-| `app/src/main/kotlin/app/vibra/` | VIBRA's interface: shell and dock, player, lyrics, blocks, motion, haptics, theme |
+| `app/src/main/kotlin/app/vibra/` | vibra's interface: shell and dock, player, lyrics, blocks, motion, haptics, theme |
 | `app/src/main/kotlin/moe/rukamori/archivetune/` | The music engine: playback service, database, YouTube Music, settings |
 | `core/`, `lyrics/`, `lastfm/`, `morideobfuscator/`, … | Engine libraries |
 
 ## Licence and credits
 
-VIBRA is free software under the **GNU General Public License v3.0** (see
+vibra is free software under the **GNU General Public License v3.0** (see
 [`LICENSE`](LICENSE)). It contains code © Rukamori and the ArchiveTune contributors. Their
 copyright notices are kept in every engine file, and their original documents are in
 [`docs/upstream/`](docs/upstream). The bundled fonts (Roboto, Google Sans Flex) are under
 the SIL Open Font License 1.1. Third-party licences are listed in the app under
 *Settings → About*.
 
-VIBRA is not affiliated with or endorsed by ArchiveTune, YouTube or Google. Please don't
-send VIBRA's changes to the ArchiveTune repositories.
+vibra is not affiliated with or endorsed by ArchiveTune, YouTube or Google. Please don't
+send vibra's changes to the ArchiveTune repositories.
 
 ## A note on how this was made
 

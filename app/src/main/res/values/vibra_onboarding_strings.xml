@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Vibra onboarding (app/vibra/ui/onboarding). Short, calm, one idea per screen. -->
+<resources>
+    <string name="vibra_onb_step">Step %1$d of %2$d</string>
+    <string name="vibra_onb_skip">Skip</string>
+    <string name="vibra_onb_continue">Continue</string>
+
+    <string name="vibra_onb_welcome_eyebrow">Welcome to vibra</string>
+    <string name="vibra_onb_welcome_title">Music that feels like you.</string>
+    <string name="vibra_onb_welcome_body">Bring your music, pick your colour and shape. Less than a minute, then press play.</string>
+    <string name="vibra_onb_start">Get started</string>
+
+    <string name="vibra_onb_account_title">Bring your music</string>
+    <string name="vibra_onb_account_body">Sign in with YouTube Music: your library, likes and mixes come with you, and your name and picture are set for you.</string>
+    <string name="vibra_onb_account_youtube">Sign in with YouTube Music</string>
+    <string name="vibra_onb_account_spotify">Import from Spotify instead</string>
+    <string name="vibra_onb_account_spotify_note">Only your artists are imported. Music always plays from YouTube Music.</string>
+    <string name="vibra_onb_account_later">Continue without an account</string>
+    <string name="vibra_onb_account_loading">Loading your profile…</string>
+
+    <string name="vibra_onb_artists_title">Who do you listen to?</string>
+    <string name="vibra_onb_artists_body">We found these in your account. Follow them and your home starts from here.</string>
+    <string name="vibra_onb_artists_empty">No artists found in your account. You can follow them any time from their page.</string>
+    <string name="vibra_onb_artists_follow">Follow %1$d artists</string>
+    <string name="vibra_onb_artists_follow_one">Follow 1 artist</string>
+
+    <string name="vibra_onb_style_title">Make it yours</string>
+    <string name="vibra_onb_style_body">Your colour tints the whole app. Your shape frames your picture. Both can change later.</string>
+    <string name="vibra_onb_style_colour">Colour</string>
+    <string name="vibra_onb_style_shape">Shape</string>
+
+    <string name="vibra_onb_ready_title">All set.</string>
+    <string name="vibra_onb_ready_body">Your home is ready. vibra will only ask for notifications, for the player controls.</string>
+    <string name="vibra_onb_ready_enter">Enter vibra</string>
+    <string name="vibra_onb_ready_hello">Hi, %1$s.</string>
+</resources>

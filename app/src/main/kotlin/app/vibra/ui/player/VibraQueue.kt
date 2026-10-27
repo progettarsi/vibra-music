@@ -24,7 +24,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
@@ -33,6 +32,7 @@ import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
+import androidx.compose.material3.Text
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.rememberSwipeToDismissBoxState
@@ -59,7 +59,9 @@ import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -82,6 +84,7 @@ import moe.rukamori.archivetune.R
 import moe.rukamori.archivetune.extensions.metadata
 import moe.rukamori.archivetune.extensions.move
 import moe.rukamori.archivetune.playback.PlayerConnection
+import moe.rukamori.archivetune.playback.queues.isUserQueued
 import moe.rukamori.archivetune.ui.player.QueueDragInfo
 import moe.rukamori.archivetune.ui.player.commitQueueDrag
 import moe.rukamori.archivetune.ui.player.queueDragDestinationFor
@@ -100,6 +103,12 @@ import sh.calvin.reorderable.rememberReorderableLazyListState
  *  - pull down at top .. a further strong pull drags the whole sheet down and closes it
  *  - header ............ close (✕) only, no grabber (shuffle is in the player)
  *
+ * Sections (Spotify's model, see the engine's UserQueue): after the current track come the
+ * songs the user queued by hand ("Queued", played first, in the order chosen: Play next puts
+ * a song at the top of it, Add to queue at its end), then the rest of what is playing
+ * ("Next from <playlist>"). Each section starts with a small label, so the hand-made queue
+ * reads as its own short list without boxing it in.
+ *
  * Mutations go straight to the Media3 player through PlayerConnection, which also
  * persists the queue; the list is a projection of `queueWindows`.
  */
@@ -117,6 +126,7 @@ fun VibraQueuePanel(
     val snackbarHostState = remember { SnackbarHostState() }
     val queueWindows by connection.queueWindows.collectAsStateWithLifecycle()
     val currentIndex by connection.currentWindowIndex.collectAsStateWithLifecycle()
+    val queueTitle by connection.queueTitle.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
     val pullToClose = remember(queueSheet) { PullToCloseConnection(queueSheet) }
 
@@ -188,41 +198,62 @@ fun VibraQueuePanel(
                     ),
                 verticalArrangement = Arrangement.spacedBy(VibraDimens.RowGap),
             ) {
-                itemsIndexed(visibleWindows, key = { _, window -> window.queueItemKey }) { index, window ->
-                    ReorderableItem(reorderState, key = window.queueItemKey) { isDragging ->
-                        QueueRow(
-                            window = window,
-                            isCurrent = window.uid == queueWindows.getOrNull(currentIndex)?.uid,
-                            isDragging = isDragging,
-                            modifier = Modifier.reorderWobble(active = reorderState.isAnyItemDragging && !isDragging, seed = index),
-                            onClick = {
-                                haptics.press()
-                                connection.player.seekToDefaultPosition(window.firstPeriodIndex)
-                                connection.player.playWhenReady = true
-                            },
-                            onRemove = {
-                                val removal = connection.removeQueueItems(listOf(window)) ?: return@QueueRow
-                                haptics.confirm()
-                                scope.launch {
-                                    val title = window.mediaItem.metadata?.title.orEmpty()
-                                    val result =
-                                        snackbarHostState.showSnackbar(
-                                            message = resources.getString(R.string.vibra_removed_from_queue, title),
-                                            actionLabel = resources.getString(R.string.undo),
-                                            duration = SnackbarDuration.Short,
-                                        )
-                                    if (result == SnackbarResult.ActionPerformed) {
-                                        connection.restoreQueueItems(removal)
-                                    } else {
-                                        connection.discardQueueRemoval(removal)
+                // Where the sections start, from the rows as shown (they follow a drag live).
+                val currentUid = queueWindows.getOrNull(currentIndex)?.uid
+                val currentRow = visibleWindows.indexOfFirst { it.uid == currentUid }
+                val userEnd =
+                    if (currentRow < 0) {
+                        -1
+                    } else {
+                        var end = currentRow + 1
+                        while (end < visibleWindows.size && visibleWindows[end].mediaItem.isUserQueued()) end++
+                        end
+                    }
+                visibleWindows.forEachIndexed { index, window ->
+                    if (currentRow >= 0 && index == currentRow + 1 && userEnd > currentRow + 1) {
+                        item(key = SectionQueued, contentType = SectionQueued) { QueueSection(stringResource(R.string.vibra_queue_queued)) }
+                    }
+                    if (currentRow >= 0 && index == userEnd && userEnd < visibleWindows.size) {
+                        item(key = SectionContext, contentType = SectionContext) {
+                            QueueSection(queueTitle?.takeIf { it.isNotBlank() }?.let { stringResource(R.string.vibra_queue_next_from, it) } ?: stringResource(R.string.vibra_queue_next))
+                        }
+                    }
+                    item(key = window.queueItemKey, contentType = "row") {
+                        ReorderableItem(reorderState, key = window.queueItemKey) { isDragging ->
+                            QueueRow(
+                                window = window,
+                                isCurrent = window.uid == currentUid,
+                                isDragging = isDragging,
+                                modifier = Modifier.reorderWobble(active = reorderState.isAnyItemDragging && !isDragging, seed = index),
+                                onClick = {
+                                    haptics.press()
+                                    connection.player.seekToDefaultPosition(window.firstPeriodIndex)
+                                    connection.player.playWhenReady = true
+                                },
+                                onRemove = {
+                                    val removal = connection.removeQueueItems(listOf(window)) ?: return@QueueRow
+                                    haptics.confirm()
+                                    scope.launch {
+                                        val title = window.mediaItem.metadata?.title.orEmpty()
+                                        val result =
+                                            snackbarHostState.showSnackbar(
+                                                message = resources.getString(R.string.vibra_removed_from_queue, title),
+                                                actionLabel = resources.getString(R.string.undo),
+                                                duration = SnackbarDuration.Short,
+                                            )
+                                        if (result == SnackbarResult.ActionPerformed) {
+                                            connection.restoreQueueItems(removal)
+                                        } else {
+                                            connection.discardQueueRemoval(removal)
+                                        }
                                     }
-                                }
-                            },
-                            dragHandleModifier =
-                                Modifier.longPressDraggableHandle(
-                                    onDragStarted = { haptics.longPress() },
-                                ),
-                        )
+                                },
+                                dragHandleModifier =
+                                    Modifier.longPressDraggableHandle(
+                                        onDragStarted = { haptics.longPress() },
+                                    ),
+                            )
+                        }
                     }
                 }
             }
@@ -263,6 +294,22 @@ fun VibraQueuePanel(
         )
     }
 }
+
+/** A section label in the queue ("Queued", "Next from …"): small, quiet, with air above it. */
+@Composable
+private fun QueueSection(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.titleSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        modifier = Modifier.fillMaxWidth().padding(start = 4.dp, top = 14.dp, bottom = 2.dp).semantics { heading() },
+    )
+}
+
+private const val SectionQueued = "section_queued"
+private const val SectionContext = "section_context"
 
 /** Close (✕), the queue's only close control (Figma queueOpen). */
 @Composable

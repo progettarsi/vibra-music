@@ -294,6 +294,11 @@ private fun homeBlocks(
                 title = forYouTitle,
                 subtitle = forYouSubtitle,
                 moods = moods,
+                // The covers of what For You will play, for its mosaic when it is alone.
+                mosaicUrls =
+                    (localPicks.mapNotNull { it.song.thumbnailUrl } + remotePicks.mapNotNull { it.thumbnail })
+                        .distinct()
+                        .take(6),
                 onClick = {
                     when {
                         localPicks.isNotEmpty() -> actions.playSongs(localPicks, 0)

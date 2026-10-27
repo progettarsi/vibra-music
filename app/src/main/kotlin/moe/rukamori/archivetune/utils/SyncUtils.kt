@@ -75,6 +75,7 @@ class SyncUtils
     @Inject
     constructor(
         private val database: MusicDatabase,
+        private val downloadUtil: moe.rukamori.archivetune.playback.DownloadUtil,
         @ApplicationContext private val context: Context,
     ) {
         private val syncScope = CoroutineScope(Dispatchers.IO)
@@ -1041,6 +1042,7 @@ class SyncUtils
                 return@coroutineScope
             }
 
+            val downloadSnapshot = downloadUtil.playlistDownloadSnapshot(playlistId)
             val localIds =
                 try {
                     database
@@ -1099,6 +1101,7 @@ class SyncUtils
                         onProgress(completedSongs, remoteIds.size)
                     }
                 }
+                if (isSyncStillEnabled(gen)) downloadUtil.downloadPlaylistAdditions(downloadSnapshot, remoteIds)
                 Timber.d("syncPlaylist: Successfully synced playlist")
             } catch (e: Exception) {
                 if (e is CancellationException) throw e

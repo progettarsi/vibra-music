@@ -5,6 +5,7 @@
 
 package app.vibra.ui.components
 
+import app.vibra.ui.motion.ambientMotionAllowed
 import android.os.Build
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.LinearEasing
@@ -131,7 +132,7 @@ fun ArtworkAtmosphere(
     textureBlur: Dp = 72.dp,
 ) {
     val colors = rememberArtworkColors(url)
-    val drift = rememberDrift(moving && !LocalAnimationsDisabled.current)
+    val drift = rememberDrift(moving && ambientMotionAllowed)
     val base = MaterialTheme.colorScheme.background
     Box(
         modifier =

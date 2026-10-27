@@ -17,7 +17,7 @@
     <string name="music_recognition_error">บางอย่างผิดปกติ</string>
     <string name="music_recognition_settings">ตั้งค่าการรับรู้เสียง</string>
     <string name="music_recognition_background_title">กำลังจดจำในเบื้องหลัง</string>
-    <string name="music_recognition_background_description">เมื่อเปิดใช้งานแล้ว ไอคอนการตั้งค่าด่วนจะตรวจจับเสียงที่กำลังเล่นบนอุปกรณ์นี้โดยไม่ต้องเปิด Vibra</string>
+    <string name="music_recognition_background_description">เมื่อเปิดใช้งานแล้ว ไอคอนการตั้งค่าด่วนจะตรวจจับเสียงที่กำลังเล่นบนอุปกรณ์นี้โดยไม่ต้องเปิด vibra</string>
     <string name="music_recognition_background_foss_description">การจดจำพื้นหลังไม่สามารถใช้งานได้ในเวอร์ชันโอเพนซอร์ส ไอคอนการตั้งค่าด่วนจะเปิดหน้าจอการจดจำแทน</string>
     <string name="music_recognition_notification_channel_name">การจดจำเพลง</string>
     <string name="music_recognition_notification_channel_description">ความคืบหน้าและผลลัพธ์ของการจดจำเพลง</string>

@@ -7,6 +7,14 @@
 
 package moe.rukamori.archivetune.playback
 
+import app.vibra.power.PowerSave
+import app.vibra.power.PowerSaveLevel
+import androidx.media3.exoplayer.offline.DownloadRequest
+import androidx.media3.exoplayer.offline.DownloadService
+import kotlinx.coroutines.withContext
+import moe.rukamori.archivetune.downloads.PlaylistDownloadSnapshot
+import moe.rukamori.archivetune.downloads.shouldAutoDownloadPlaylist
+import moe.rukamori.archivetune.utils.isLocalMediaId
 import android.content.Context
 import android.net.Uri
 import androidx.core.net.toUri
@@ -144,6 +152,44 @@ class DownloadUtil
                     chain.proceed(requestBuilder.build())
                 }.build()
         }
+
+        /** Snapshots the previous IDs: only a non-empty, fully downloaded playlist enables auto-download. */
+        suspend fun playlistDownloadSnapshot(playlistId: String): PlaylistDownloadSnapshot =
+            withContext(Dispatchers.IO) {
+                val ids = database.playlistSongIdsForAutoDownload(playlistId)
+                val completed = ids.filter {
+                    downloadManager.downloadIndex.getDownload(it)?.state == Download.STATE_COMPLETED
+                }.toSet()
+                PlaylistDownloadSnapshot(ids.toSet(), shouldAutoDownloadPlaylist(ids, completed))
+            }
+
+        /** Uses the same service and constraints as manual downloads; call only after the Room commit. */
+        fun downloadPlaylistAdditions(snapshot: PlaylistDownloadSnapshot, songIds: List<String>) {
+            // Vibra: the MAX battery saver starts no new automatic downloads while on battery.
+            if (!snapshot.fullyDownloaded || automaticDownloadsBlocked()) return
+            downloadScope.launch {
+                try {
+                    songIds.distinct().filterNot { it in snapshot.existingIds || it.isLocalMediaId() }
+                        .forEach { id ->
+                            if (automaticDownloadsBlocked()) return@launch
+                            if (downloadManager.downloadIndex.getDownload(id)?.state != Download.STATE_COMPLETED) {
+                                val song = database.getSongByIdBlocking(id) ?: return@forEach
+                                val request = DownloadRequest.Builder(id, id.toUri())
+                                    .setCustomCacheKey(id).setData(song.title.toByteArray()).build()
+                                DownloadService.sendAddDownload(context, ExoDownloadService::class.java, request, false)
+                            }
+                        }
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (error: Exception) {
+                    // Vibra: a refused background start must not crash the app.
+                    Timber.w("Automatic playlist download unavailable (%s)", error.javaClass.simpleName)
+                }
+            }
+        }
+
+        private fun automaticDownloadsBlocked(): Boolean =
+            PowerSave.level.value == PowerSaveLevel.MAX && !PowerSave.charging.value
 
         val downloads = MutableStateFlow<Map<String, Download>>(emptyMap())
 

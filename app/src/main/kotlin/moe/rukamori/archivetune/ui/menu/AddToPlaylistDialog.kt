@@ -182,6 +182,7 @@ fun AddToPlaylistDialog(
     onAddComplete: ((songCount: Int, playlistNames: List<String>) -> Unit)? = null,
 ) {
     if (!isVisible) return
+    val downloadUtil = moe.rukamori.archivetune.LocalDownloadUtil.current
     val database = LocalDatabase.current
     val scope = rememberCoroutineScope()
     val haptic = LocalHapticFeedback.current
@@ -219,6 +220,7 @@ fun AddToPlaylistDialog(
         val ids = songIds.orEmpty().toSet()
         val browseId = playlist.playlist.browseId
         check(browseId == null || hasYouTubeLoginCookie(cookie))
+        val downloadSnapshot = if (!remove) downloadUtil.playlistDownloadSnapshot(playlist.id) else null
         var added = 0
         if (remove) {
             val entries = database.getPlaylistSongs(playlist.id).filter { it.map.songId in ids }
@@ -239,6 +241,7 @@ fun AddToPlaylistDialog(
                         val current = getPlaylistById(playlist.id) ?: kotlin.error("Playlist removed")
                         addSongEntriesToPlaylist(current, listOf(songId to setVideoId))
                     }
+                    downloadSnapshot?.let { downloadUtil.downloadPlaylistAdditions(it, listOf(songId)) }
                     added++
                 }
             }

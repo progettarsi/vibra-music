@@ -56,7 +56,7 @@
     <string name="library_top_mixes_refresh">Atualizar mixes</string>
     <string name="library_top_mixes_configure_ai">Configurar IA</string>
     <string name="library_top_mixes_ai_not_configured_title">Configure a IA para criar mixes</string>
-    <string name="library_top_mixes_ai_not_configured_desc">A integração de IA é necessária para que o Vibra crie top mixes pessoais.</string>
+    <string name="library_top_mixes_ai_not_configured_desc">A integração de IA é necessária para que o vibra crie top mixes pessoais.</string>
     <string name="library_top_mixes_no_recent_history_title">Ainda não há mix de escutas recentes</string>
     <string name="library_top_mixes_no_recent_history">Ouça mais músicas e atualize para criar mixes de IA com base no seu histórico recente.</string>
     <string name="library_top_mixes_no_valid_mixes">A IA não retornou nenhum mix reproduzível do seu histórico recente.</string>
@@ -115,7 +115,7 @@
     <string name="retry">Tentar novamente</string>
     <string name="cast">Transmitir</string>
     <string name="cast_devices">Dispositivos Cast</string>
-    <string name="cast_sheet_subtitle">Escolha onde o Vibra toca</string>
+    <string name="cast_sheet_subtitle">Escolha onde o vibra toca</string>
     <string name="cast_available_devices">Dispositivos disponíveis</string>
     <string name="cast_searching_devices">Procurando dispositivos</string>
     <string name="cast_no_devices">Nenhum dispositivo Cast encontrado</string>
@@ -134,7 +134,7 @@
     <string name="play">Tocar</string>
     <string name="widget_pause">Pausar</string>
     <string name="widget_previous">Anterior</string>
-    <string name="widget_tap_to_open">Toque para abrir o Vibra</string>
+    <string name="widget_tap_to_open">Toque para abrir o vibra</string>
     <string name="widget_insights_title">Insights de escuta</string>
     <string name="widget_recommendations">Recomendações</string>
     <string name="widget_listening_time_empty">Ainda sem tempo de escuta</string>
@@ -485,7 +485,7 @@
     <string name="update_channel">Canal de atualização</string>
     <string name="update_channel_desc">Escolha entre versões testadas e snapshots de desenvolvimento.</string>
     <string name="recent_commits">Commits recentes</string>
-    <string name="updates_channel_warning_intro">O Vibra oferece dois canais de download para builds:</string>
+    <string name="updates_channel_warning_intro">O vibra oferece dois canais de download para builds:</string>
     <string name="updates_channel_warning_stable_title">Builds estáveis</string>
     <string name="updates_channel_warning_stable_source">Distribuídas pelas GitHub Releases oficiais.</string>
     <string name="updates_channel_warning_stable_desc">Essas versões são testadas e recomendadas para a maioria dos usuários.</string>
@@ -500,17 +500,17 @@
     <string name="update_notification_channel_name">Atualizações do app</string>
     <string name="update_notification_channel_desc">Notificações de novas atualizações do app</string>
     <string name="update_notification_title">Atualização disponível</string>
-    <string name="update_notification_text">Vibra %s já está disponível</string>
+    <string name="update_notification_text">vibra %s já está disponível</string>
     <string name="download">Baixar</string>
     <string name="download_complete">Download concluído</string>
-    <string name="permissions_title">Permita que o Vibra funcione melhor</string>
+    <string name="permissions_title">Permita que o vibra funcione melhor</string>
     <string name="permissions_subtitle">Usamos algumas permissões para tocar e gerenciar sua música com confiabilidade. Você pode alterá-las a qualquer momento nas configurações do sistema.</string>
     <string name="permission_storage_title">Acesso ao armazenamento</string>
     <string name="permission_storage_desc">Necessário para ler seus arquivos de áudio baixados e locais para reprodução.</string>
     <string name="permission_status_allowed">Permitido</string>
     <string name="next">Próximo</string>
     <string name="allow">Permitir</string>
-    <string name="onboarding_welcome_title">Bem-vindo ao Vibra</string>
+    <string name="onboarding_welcome_title">Bem-vindo ao vibra</string>
     <string name="onboarding_welcome_subtitle">Configure reprodução, músicas locais e permissões de atualização antes de começar a ouvir.</string>
     <string name="onboarding_permissions_title">Revisar permissões</string>
     <string name="onboarding_permissions_subtitle">Conceda apenas o que deseja agora. Você pode continuar e permitir as permissões depois.</string>
@@ -519,7 +519,7 @@
     <string name="onboarding_foss_variant">Edição FOSS</string>
     <string name="onboarding_version_label">Versão %1$s</string>
     <string name="onboarding_empty_title">Configuração indisponível</string>
-    <string name="onboarding_empty_subtitle">Continuar para o Vibra.</string>
+    <string name="onboarding_empty_subtitle">Continuar para o vibra.</string>
     <string name="onboarding_error_generic">Não foi possível carregar a configuração</string>
     <string name="onboarding_permission_allowed_by_install">Permitido pela instalação</string>
     <string name="onboarding_permission_unavailable">Indisponível</string>
@@ -530,11 +530,11 @@
     <string name="onboarding_permission_network_title">Acesso à rede</string>
     <string name="onboarding_permission_network_desc">Transmitir música, carregar capas e verificar conteúdo online do app.</string>
     <string name="onboarding_permission_playback_service_title">Reprodução em segundo plano</string>
-    <string name="onboarding_permission_playback_service_desc">Manter a música tocando com confiabilidade quando o Vibra estiver em segundo plano.</string>
+    <string name="onboarding_permission_playback_service_desc">Manter a música tocando com confiabilidade quando o vibra estiver em segundo plano.</string>
     <string name="onboarding_permission_audio_settings_title">Configurações de áudio e vibração</string>
     <string name="onboarding_permission_audio_settings_desc">Ajustar o comportamento do áudio de reprodução e fornecer feedback tátil leve.</string>
     <string name="onboarding_permission_app_installation_title">Instalação do app</string>
-    <string name="onboarding_permission_app_installation_desc">Instalar atualizações APK baixadas pelo Vibra.</string>
+    <string name="onboarding_permission_app_installation_desc">Instalar atualizações APK baixadas pelo vibra.</string>
     <string name="onboarding_permission_bluetooth_scan_title">Busca Bluetooth</string>
     <string name="onboarding_permission_bluetooth_scan_desc">Descobrir dispositivos Cast e de reprodução próximos.</string>
     <string name="you_might_like">Você pode gostar</string>
@@ -581,7 +581,7 @@
     <string name="updates_channel_warning_artifact_acknowledgement">Observação: o download direto do GitHub ignora qualquer verificação adicional realizada pela loja na qual você possa ter instalado o aplicativo originalmente.\nAo continuar, você reconhece que as versões Canary podem ser instáveis e que as utiliza por sua própria conta e risco.</string>
     <string name="updates_artifact_channel_confirmation">Mude para o canal Canary para receber versões de desenvolvimento.\n\nAs versões Canary são publicadas automaticamente a partir do ramo de desenvolvimento mais recente.\nObservação: o download direto do GitHub ignora qualquer verificação adicional realizada pela loja na qual você possa ter instalado o aplicativo originalmente.</string>
     <string name="onboarding_permission_device_audio_capture_title">Reconhecimento de áudio no próprio dispositivo</string>
-    <string name="onboarding_permission_device_audio_capture_desc">Reconheça músicas que estão tocando em outros aplicativos sem usar o microfone. O Android solicita autorização para capturar a tela e o áudio a cada vez, enquanto o Vibra processa apenas o áudio.</string>
+    <string name="onboarding_permission_device_audio_capture_desc">Reconheça músicas que estão tocando em outros aplicativos sem usar o microfone. O Android solicita autorização para capturar a tela e o áudio a cada vez, enquanto o vibra processa apenas o áudio.</string>
     <string name="remove_playlist_cover">Remover capa personalizada</string>
     <string name="playlist_cover_updated">Capa da playlist atualizada</string>
     <string name="playlist_cover_update_failed">Não foi possível atualizar a capa da playlist</string>
@@ -590,7 +590,7 @@
     <string name="eq_screen_subtitle">Personalize a reprodução de acordo com seus ouvidos e seu equipamento</string>
     <string name="eq_sound_shaping_on">A função de modelagem de som está ativada</string>
     <string name="eq_sound_shaping_off">A função de modelagem de som está desativada</string>
-    <string name="eq_enable_description">Aplica esses controles à reprodução do Vibra</string>
+    <string name="eq_enable_description">Aplica esses controles à reprodução do vibra</string>
     <string name="eq_control_mode">Modo de controle</string>
     <string name="eq_basic">Básico</string>
     <string name="eq_advanced">Avançado</string>
@@ -650,7 +650,7 @@
     <string name="scheduled_backup_enabled_description">Os backups são executados automaticamente de acordo com a programação abaixo.</string>
     <string name="scheduled_backup_disabled_description">Os backups automáticos estão suspensos.</string>
     <string name="scheduled_backup_frequency">Agendamento de backup</string>
-    <string name="scheduled_backup_frequency_description">Escolha com que frequência o Vibra cria um backup.</string>
+    <string name="scheduled_backup_frequency_description">Escolha com que frequência o vibra cria um backup.</string>
     <string name="scheduled_backup_daily">Diariamente</string>
     <string name="scheduled_backup_weekly">Semanalmente</string>
     <string name="scheduled_backup_monthly">Mensalmente</string>

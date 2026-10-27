@@ -39,7 +39,7 @@ fun Modifier.reorderWobble(
     seed: Int,
 ): Modifier {
     val enabled by rememberPreference(ReorderWobbleKey, defaultValue = true)
-    val animationsDisabled = LocalAnimationsDisabled.current
+    val animationsDisabled = !ambientMotionAllowed
     val strength by animateFloatAsState(
         targetValue = if (active && enabled && !animationsDisabled) 1f else 0f,
         animationSpec = Liquid.effects(),

@@ -17,7 +17,7 @@
     <string name="music_recognition_error">Ada yang tidak beres</string>
     <string name="music_recognition_settings">Pengaturan pengenalan musik</string>
     <string name="music_recognition_background_title">Pengenalan di latar belakang</string>
-    <string name="music_recognition_background_description">Jika diaktifkan, ubin Pengaturan Cepat akan mengenali audio yang diputar di perangkat ini tanpa membuka Vibra.</string>
+    <string name="music_recognition_background_description">Jika diaktifkan, ubin Pengaturan Cepat akan mengenali audio yang diputar di perangkat ini tanpa membuka vibra.</string>
     <string name="music_recognition_background_foss_description">Pengenalan latar belakang tidak tersedia di varian FOSS. Ubin Pengaturan Cepat akan membuka layar pengenalan sebagai gantinya.</string>
     <string name="music_recognition_notification_channel_name">Pengenalan musik</string>
     <string name="music_recognition_notification_channel_description">Progres dan hasil pengenalan musik</string>
@@ -240,13 +240,13 @@
     <string name="storage_folder_selected_restart">Folder penyimpanan disimpan. Aplikasi akan dimulai ulang dalam 3 detik.</string>
     <string name="storage_folder_invalid">Pilih folder yang valid.</string>
     <string name="storage_folder_unsupported">Folder ini tidak dapat digunakan oleh cache media berbasis file.</string>
-    <string name="storage_folder_not_writable">Vibra tidak dapat menulis file cache di folder ini.</string>
+    <string name="storage_folder_not_writable">vibra tidak dapat menulis file cache di folder ini.</string>
     <string name="storage_cache_cleared">Cache dibersihkan.</string>
     <string name="storage_cache_clear_failed">Cache tidak dapat dibersihkan. Periksa akses kartu SD.</string>
     <string name="storage_clear_song_cache_progress">Membersihkan cache lagu...%1$d%%</string>
     <string name="storage_clear_downloads_progress">Menghapus unduhan...%1$d%%</string>
     <string name="storage_clear_image_cache_progress">Membersihkan cache gambar...%1$d%%</string>
-    <string name="storage_cache_clear_warning">Tetap buka Vibra saat file cache sedang dihapus.</string>
+    <string name="storage_cache_clear_warning">Tetap buka vibra saat file cache sedang dihapus.</string>
     <string name="storage_size_ratio">%1$s / %2$s</string>
     <string name="clear_song_cache_dialog">Apakah Anda yakin ingin menghapus semua lagu yang di-cache?</string>
     <string name="clear_image_cache_dialog">Apakah Anda yakin ingin menghapus semua gambar yang di-cache?</string>

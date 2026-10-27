@@ -245,7 +245,7 @@
     </plurals>
     <string name="music_recognition_settings">Настройки распознавания музыки</string>
     <string name="music_recognition_background_title">Распознавание в фоне</string>
-    <string name="music_recognition_background_description">Когда включено, плитка Быстрых Настроек распознает аудио играющие на этом устройстве без открытия Vibra.</string>
+    <string name="music_recognition_background_description">Когда включено, плитка Быстрых Настроек распознает аудио играющие на этом устройстве без открытия vibra.</string>
     <string name="music_recognition_background_foss_description">Распознавание в фоне недоступно в FOSS версии. Плитка Быстрых Настроек откроет меню распознавания.</string>
     <string name="music_recognition_notification_channel_name">Распознавание музыки</string>
     <string name="music_recognition_notification_channel_description">Прогресс распознавания музыки и результаты</string>
@@ -298,13 +298,13 @@
     <string name="storage_folder_selected_restart">Папка хранилища сохранена. Приложение перезапустится через 3 секунды.</string>
     <string name="storage_folder_invalid">Выберите допустимую папку.</string>
     <string name="storage_folder_unsupported">Эта папка не может использоваться для файлового медиа-кеша.</string>
-    <string name="storage_folder_not_writable">Vibra не может записывать файлы кеша в эту папку.</string>
+    <string name="storage_folder_not_writable">vibra не может записывать файлы кеша в эту папку.</string>
     <string name="storage_cache_cleared">Кеш очищен.</string>
     <string name="storage_cache_clear_failed">Не удалось очистить кеш. Проверьте доступ к SD-карте.</string>
     <string name="storage_clear_song_cache_progress">Очистка кеша песен...%1$d%%</string>
     <string name="storage_clear_downloads_progress">Очистка загрузок...%1$d%%</string>
     <string name="storage_clear_image_cache_progress">Очистка кеша изображений...%1$d%%</string>
-    <string name="storage_cache_clear_warning">Оставьте Vibra открытым во время удаления файлов кеша.</string>
+    <string name="storage_cache_clear_warning">Оставьте vibra открытым во время удаления файлов кеша.</string>
     <string name="storage_size_ratio">%1$s / %2$s</string>
     <string name="history_duration_desc">Минимальное время воспроизведения для засчета прослушивания песни</string>
     <string name="history_duration_seconds">%1$s с</string>

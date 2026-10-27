@@ -86,12 +86,15 @@
     </plurals>
     <string name="vibra_cast_connected">Connected</string>
     <string name="vibra_about_tagline">Music that moves like liquid.</string>
-    <string name="vibra_update_title">VIBRA %1$s is ready</string>
+    <string name="vibra_update_title">vibra %1$s is ready</string>
     <string name="vibra_update_text">The update is already downloaded. Android will ask you to confirm the installation.</string>
-    <string name="vibra_update_text_once">The update is already downloaded. Allow VIBRA to install it once: from then on, updates will install by themselves while you\'re not using the app.</string>
+    <string name="vibra_update_text_once">The update is already downloaded. Allow vibra to install it once: from then on, updates will install by themselves while you\'re not using the app.</string>
     <string name="vibra_update_install">Update</string>
     <string name="vibra_update_later">Later</string>
     <string name="vibra_update_channel">Updates</string>
-    <string name="vibra_update_done_title">VIBRA has been updated</string>
+    <string name="vibra_update_done_title">vibra has been updated</string>
     <string name="vibra_update_done_text">You now have version %1$s.</string>
+    <string name="vibra_queue_queued">Queued</string>
+    <string name="vibra_queue_next_from">Next from %1$s</string>
+    <string name="vibra_queue_next">Next up</string>
 </resources>
