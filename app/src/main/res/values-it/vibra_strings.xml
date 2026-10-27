@@ -87,4 +87,12 @@
     </plurals>
     <string name="vibra_cast_connected">Connesso</string>
     <string name="vibra_about_tagline">Musica che scorre come un liquido.</string>
+    <string name="vibra_update_title">VIBRA %1$s è pronta</string>
+    <string name="vibra_update_text">L\'aggiornamento è già scaricato. Android ti chiederà di confermare l\'installazione.</string>
+    <string name="vibra_update_text_once">L\'aggiornamento è già scaricato. Consenti a VIBRA di installarlo una volta: da lì in poi gli aggiornamenti si installeranno da soli mentre non usi l\'app.</string>
+    <string name="vibra_update_install">Aggiorna</string>
+    <string name="vibra_update_later">Più tardi</string>
+    <string name="vibra_update_channel">Aggiornamenti</string>
+    <string name="vibra_update_done_title">VIBRA è stata aggiornata</string>
+    <string name="vibra_update_done_text">Ora hai la versione %1$s.</string>
 </resources>

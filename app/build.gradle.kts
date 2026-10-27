@@ -39,6 +39,13 @@ val apiBearerToken = System.getenv("API_BEARER_TOKEN")?.trim()
     ?: localProperties.getProperty("API_BEARER_TOKEN")?.trim()
     ?: ""
 
+// Vibra: where the app looks for its updates (app.vibra.update). Release builds read the
+// latest GitHub release; the other builds only check when VIBRA_UPDATE_URL is given.
+val vibraUpdateUrl =
+    System.getenv("VIBRA_UPDATE_URL")?.trim()?.takeIf { it.isNotEmpty() }
+        ?: localProperties.getProperty("VIBRA_UPDATE_URL")?.trim()?.takeIf { it.isNotEmpty() }
+val vibraReleaseUpdateUrl = "https://api.github.com/repos/progettarsi/vibra-music/releases/latest"
+
 // Vibra: signing material belongs to the user and never lives in versioned configuration.
 fun signingValue(environment: String, property: String): String? =
     System.getenv(environment)?.takeIf { it.isNotBlank() }
@@ -59,8 +66,8 @@ android {
         applicationId = "vibra.music.com"
         minSdk = 26
         targetSdk = 37
-        versionCode = 10
-        versionName = "1.1"
+        versionCode = 11
+        versionName = "1.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
@@ -119,6 +126,7 @@ android {
                 ?: githubRepo
         buildConfigField("String", "RELEASE_GITHUB_OWNER", releaseGithubOwner.asBuildConfigString())
         buildConfigField("String", "RELEASE_GITHUB_REPO", releaseGithubRepo.asBuildConfigString())
+        buildConfigField("String", "VIBRA_UPDATE_URL", (vibraUpdateUrl ?: "").asBuildConfigString())
     }
 
     flavorDimensions += listOf("distribution", "device", "abi")
@@ -189,6 +197,7 @@ android {
 
     buildTypes {
         release {
+            buildConfigField("String", "VIBRA_UPDATE_URL", (vibraUpdateUrl ?: vibraReleaseUpdateUrl).asBuildConfigString())
             signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = true
             isShrinkResources = true
@@ -205,6 +214,7 @@ android {
         create("benchmark") {
             initWith(getByName("release"))
             applicationIdSuffix = ".benchmark"
+            buildConfigField("String", "VIBRA_UPDATE_URL", "\"\"")
             signingConfig = signingConfigs.getByName("debug")
             isDebuggable = false
             matchingFallbacks += listOf("release")

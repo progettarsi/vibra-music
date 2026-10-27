@@ -4435,6 +4435,8 @@ class MusicService :
 
         widgetUpdater.update()
         widgetUpdater.updateProgressTracking()
+        // Vibra: a downloaded update waits for the music to stop before installing.
+        app.vibra.update.VibraUpdates.onPlaybackChanged(isPlaying)
     }
 
     private fun updateNextStreamPreload() {
@@ -5797,6 +5799,7 @@ class MusicService :
     }
 
     override fun onDestroy() {
+        app.vibra.update.VibraUpdates.onPlaybackChanged(false) // Vibra
         binder.release()
         equalizerPlaybackController.detach(this)
         sponsorBlockPlaybackController.detach()

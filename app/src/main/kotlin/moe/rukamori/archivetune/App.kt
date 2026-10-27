@@ -131,6 +131,8 @@ class App :
         initializeCriticalSync()
         initializeDeferredAsync()
         initializeLauncherEntry()
+        // Vibra: checks for a newer release when the app comes to the foreground.
+        if (BuildConfig.DEVICE != "automotive") app.vibra.update.VibraUpdates.start(this)
     }
 
     private fun initializeLauncherEntry() {

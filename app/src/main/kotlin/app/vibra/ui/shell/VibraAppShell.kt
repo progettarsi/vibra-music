@@ -328,6 +328,9 @@ fun VibraAppShell(
                 modifier = Modifier.zIndex(2f),
             )
         }
+
+        // ── Update ready, when Android needs a tap to install it (see VibraUpdates) ─────
+        VibraUpdatePrompt()
     }
     }
 }
