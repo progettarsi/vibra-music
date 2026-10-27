@@ -54,6 +54,7 @@ import app.vibra.ui.components.VibraCard
 import app.vibra.ui.components.VibraFilledIconButton
 import app.vibra.ui.components.VibraPrimaryButton
 import app.vibra.ui.components.VibraRow
+import app.vibra.ui.components.entryTapBounce
 import app.vibra.ui.haptics.rememberVibraHaptics
 import app.vibra.ui.theme.VibraShapes
 import app.vibra.ui.theme.rememberMoodShape
@@ -249,6 +250,7 @@ fun SongsBlock(
                     },
                     subtitle = { RowSubtitleText(song.subtitle) },
                     trailing = { if (size != BlockSize.Small) song.duration?.let { RowDurationText(it) } },
+                    bounceOnTap = true,
                     interactionModifier = Modifier.combinedClickable(onClick = song.onClick, onLongClick = song.onLongClick),
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -309,6 +311,7 @@ private fun LabeledCover(
     Column(
         modifier =
             modifier
+                .entryTapBounce(entry)
                 .clip(VibraShapes.InnerArtwork)
                 .combinedClickable(onClick = entry.onClick, onLongClick = entry.onLongClick),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -365,6 +368,7 @@ private fun CoverGrid(
                 modifier =
                     Modifier
                         .size(side)
+                        .entryTapBounce(entry)
                         .clip(if (entry.circular) CircleShape else VibraShapes.InnerArtwork)
                         .combinedClickable(onClick = entry.onClick, onLongClick = entry.onLongClick),
             )
@@ -383,6 +387,7 @@ private fun CoverGrid(
                             modifier =
                                 Modifier
                                     .size(cell)
+                                    .entryTapBounce(entry)
                                     .clip(if (entry.circular) CircleShape else VibraShapes.RowThumbnail)
                                     .combinedClickable(onClick = entry.onClick, onLongClick = entry.onLongClick),
                         )
@@ -418,6 +423,7 @@ fun SpotlightBlock(
                     .padding(10.dp)
                     .fillMaxWidth()
                     .aspectRatio(SpotlightAspect)
+                    .entryTapBounce(lead)
                     .clip(VibraShapes.InnerArtwork)
                     .combinedClickable(onClick = lead.onClick, onLongClick = lead.onLongClick),
         ) {
@@ -464,6 +470,7 @@ fun SpotlightBlock(
                             Modifier
                                 .weight(1f)
                                 .aspectRatio(1f)
+                                .entryTapBounce(entry)
                                 .clip(shape)
                                 .combinedClickable(onClick = entry.onClick, onLongClick = entry.onLongClick),
                     )
@@ -493,6 +500,7 @@ fun CoverBlock(
                     .padding(start = 8.dp, end = 8.dp, top = 8.dp)
                     .weight(1f)
                     .fillMaxWidth()
+                    .entryTapBounce(entry)
                     .clip(VibraShapes.InnerArtwork)
                     .combinedClickable(onClick = entry.onClick, onLongClick = entry.onLongClick),
             contentAlignment = Alignment.Center,
@@ -685,6 +693,7 @@ fun PlaylistsBlock(
                                         Modifier
                                             .weight(1f)
                                             .aspectRatio(1f)
+                                            .entryTapBounce(entry)
                                             .clip(VibraShapes.RowThumbnail)
                                             .combinedClickable(onClick = entry.onClick, onLongClick = entry.onLongClick),
                                 )

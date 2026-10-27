@@ -24,6 +24,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import app.vibra.ui.motion.rememberTapBounce
+import app.vibra.ui.motion.tapBounce
 import app.vibra.ui.theme.VibraShapes
 
 /**
@@ -52,9 +54,16 @@ data class ShelfEntry(
     val subtitle: String?,
     val thumbnailUrl: String?,
     val circular: Boolean = false,
+    /** A song or episode: tapping it starts playback, so its tile bounces. */
+    val playable: Boolean = false,
     val onClick: () -> Unit,
     val onLongClick: (() -> Unit)? = null,
 )
+
+/** The tap bounce for a [ShelfEntry.playable] tile; other tiles stay still. */
+@Composable
+fun Modifier.entryTapBounce(entry: ShelfEntry): Modifier =
+    if (entry.playable) tapBounce(rememberTapBounce()) else this
 
 /** Centred message card for empty / error / offline states. */
 @Composable

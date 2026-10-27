@@ -28,6 +28,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.vibra.ui.motion.Liquid
+import app.vibra.ui.motion.noTapBounce
+import app.vibra.ui.motion.rememberTapBounce
+import app.vibra.ui.motion.tapBounce
 import app.vibra.ui.theme.VibraDimens
 import app.vibra.ui.theme.VibraShapes
 
@@ -51,7 +54,8 @@ enum class RowBackground {
  *
  * The click/long-click modifier from the caller is applied *inside* the rounded clip so
  * ripples follow the card shape. The active (now playing) row tints to the secondary
- * container with an effects spring.
+ * container with an effects spring. With [bounceOnTap] (song rows) a tap gives the row a light
+ * bounce; taps on the trailing controls don't.
  */
 @Composable
 fun VibraRow(
@@ -63,7 +67,9 @@ fun VibraRow(
     trailing: @Composable RowScope.() -> Unit = {},
     isActive: Boolean = false,
     background: RowBackground = RowBackground.Card,
+    bounceOnTap: Boolean = false,
 ) {
+    val bounce = if (bounceOnTap) rememberTapBounce() else null
     val containerColor by animateColorAsState(
         targetValue =
             when {
@@ -86,6 +92,7 @@ fun VibraRow(
     Row(
         modifier =
             modifier
+                .then(if (bounce != null) Modifier.tapBounce(bounce) else Modifier)
                 .clip(VibraShapes.Row)
                 .background(containerColor)
                 .then(interactionModifier)
@@ -127,7 +134,11 @@ fun VibraRow(
         }
 
         CompositionLocalProvider(LocalContentColor provides secondaryColor) {
-            Row(verticalAlignment = Alignment.CenterVertically, content = trailing)
+            Row(
+                modifier = if (bounce != null) Modifier.noTapBounce(bounce) else Modifier,
+                verticalAlignment = Alignment.CenterVertically,
+                content = trailing,
+            )
         }
     }
 }

@@ -402,6 +402,7 @@ private fun QueueRow(
             trailing = {
                 if (metadata.duration > 0) RowDurationText(makeTimeString(metadata.duration * 1000L))
             },
+            bounceOnTap = true,
             interactionModifier = Modifier.combinedClickable(onClick = onClick),
             modifier =
                 Modifier

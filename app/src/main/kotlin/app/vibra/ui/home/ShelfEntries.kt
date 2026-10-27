@@ -43,6 +43,7 @@ fun YTItem.toShelfEntry(actions: VibraItemActions): ShelfEntry =
         subtitle = subtitleText(),
         thumbnailUrl = thumbnail,
         circular = this is ArtistItem,
+        playable = this is SongItem || this is EpisodeItem,
         onClick = { actions.open(this) },
         onLongClick = { actions.showMenu(this) },
     )
@@ -70,6 +71,7 @@ fun LocalItem.toShelfEntry(actions: VibraItemActions): ShelfEntry =
         subtitle = subtitleText(),
         thumbnailUrl = coverUrl,
         circular = this is Artist,
+        playable = this is Song,
         onClick = { actions.open(this) },
         onLongClick = { actions.showMenu(this) },
     )

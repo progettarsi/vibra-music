@@ -262,6 +262,7 @@ fun VibraStatsScreen(navController: NavController) {
                                             color = if (index < 3) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                                         )
                                     },
+                                    bounceOnTap = true,
                                     interactionModifier =
                                         Modifier.combinedClickable(
                                             onClick = { actions.playSongs(songs, index) },

@@ -117,6 +117,8 @@ import moe.rukamori.archivetune.db.entities.Album
 import moe.rukamori.archivetune.db.entities.Artist
 import moe.rukamori.archivetune.db.entities.Playlist
 import moe.rukamori.archivetune.db.entities.Song
+import app.vibra.ui.motion.rememberTapBounce
+import app.vibra.ui.motion.tapBounce
 import moe.rukamori.archivetune.extensions.toMediaItem
 import moe.rukamori.archivetune.innertube.YouTube
 import moe.rukamori.archivetune.innertube.models.AlbumItem
@@ -148,7 +150,7 @@ const val ActiveBoxAlpha = 0.6f
  * surface-container card, 50 dp rounded thumbnail, title-large title). The signature is
  * unchanged, so the ~40 list screens inherited from ArchiveTune adopt the design as-is.
  * The caller's [modifier] (click handlers, item animations) is applied inside the card
- * clip so ripples follow the rounded shape.
+ * clip so ripples follow the rounded shape. Song rows pass [bounceOnTap] for the tap bounce.
  */
 @Composable
 inline fun ListItem(
@@ -159,6 +161,7 @@ inline fun ListItem(
     crossinline trailingContent: @Composable RowScope.() -> Unit = {},
     isActive: Boolean = false,
     showActiveContainer: Boolean = true,
+    bounceOnTap: Boolean = false,
 ) {
     app.vibra.ui.components.VibraRow(
         title = title,
@@ -166,6 +169,7 @@ inline fun ListItem(
         subtitle = subtitle,
         trailing = { trailingContent() },
         isActive = isActive && showActiveContainer,
+        bounceOnTap = bounceOnTap,
         interactionModifier = modifier.focusable(),
         modifier =
             Modifier
@@ -184,11 +188,13 @@ fun ListItem(
     trailingContent: @Composable RowScope.() -> Unit = {},
     isActive: Boolean = false,
     showActiveContainer: Boolean = true,
+    bounceOnTap: Boolean = false,
 ) = ListItem(
     title = title,
     modifier = modifier,
     isActive = isActive,
     showActiveContainer = showActiveContainer,
+    bounceOnTap = bounceOnTap,
     subtitle = {
         badges()
         if (!subtitle.isNullOrEmpty()) {
@@ -221,16 +227,22 @@ fun GridItem(
     thumbnailContent: @Composable BoxWithConstraintsScope.() -> Unit,
     thumbnailRatio: Float = 1f,
     fillMaxWidth: Boolean = false,
+    bounceOnTap: Boolean = false,
 ) {
+    val bounce = if (bounceOnTap) rememberTapBounce() else null
     Column(
         modifier =
             if (fillMaxWidth) {
-                modifier
+                Modifier
+                    .then(if (bounce != null) Modifier.tapBounce(bounce) else Modifier)
+                    .then(modifier)
                     .focusable()
                     .padding(12.dp)
                     .fillMaxWidth()
             } else {
-                modifier
+                Modifier
+                    .then(if (bounce != null) Modifier.tapBounce(bounce) else Modifier)
+                    .then(modifier)
                     .focusable()
                     .padding(12.dp)
                     .width(GridThumbnailHeight * thumbnailRatio)
@@ -269,8 +281,10 @@ fun GridItem(
     thumbnailContent: @Composable BoxWithConstraintsScope.() -> Unit,
     thumbnailRatio: Float = 1f,
     fillMaxWidth: Boolean = false,
+    bounceOnTap: Boolean = false,
 ) = GridItem(
     modifier = modifier,
+    bounceOnTap = bounceOnTap,
     title = {
         Text(
             text = title,
@@ -379,6 +393,7 @@ fun SongListItem(
             modifier = modifier,
             isActive = isActive,
             showActiveContainer = showActiveContainer,
+            bounceOnTap = true,
         )
     }
 
@@ -458,6 +473,7 @@ fun SongGridItem(
     },
     fillMaxWidth = fillMaxWidth,
     modifier = modifier,
+    bounceOnTap = true,
 )
 
 @Composable
@@ -1291,6 +1307,7 @@ fun MediaMetadataListItem(
         trailingContent = trailingContent,
         modifier = modifier,
         isActive = isActive,
+        bounceOnTap = true,
     )
 }
 
@@ -1380,6 +1397,7 @@ fun YouTubeListItem(
             modifier = modifier,
             isActive = isActive,
             showActiveContainer = showActiveContainer,
+            bounceOnTap = item is SongItem || item is EpisodeItem,
         )
     }
 
@@ -1515,6 +1533,7 @@ fun YouTubeGridItem(
         thumbnailRatio = resolvedThumbnailRatio,
         fillMaxWidth = fillMaxWidth,
         modifier = modifier,
+        bounceOnTap = item is SongItem || item is EpisodeItem,
     )
 }
 
@@ -1545,6 +1564,7 @@ fun LocalSongsGrid(
     },
     fillMaxWidth = fillMaxWidth,
     modifier = modifier,
+    bounceOnTap = true,
 )
 
 @Composable
