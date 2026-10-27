@@ -38,8 +38,11 @@ import java.security.MessageDigest
  *  UPDATES — VIBRA keeps itself up to date without getting in the way
  * ─────────────────────────────────────────────────────────────────────────────────────
  *
- *  1. Check   – whenever the app comes to the foreground (at most once an hour), read the
- *               latest release from BuildConfig.VIBRA_UPDATE_URL.
+ *  1. Check   – whenever the app is opened, and every [CheckInterval] while it stays open,
+ *               read the latest release from BuildConfig.VIBRA_UPDATE_URL. The playback
+ *               service keeps the process alive for days, so "opened" is the foreground,
+ *               not the process start. Repeated reads are conditional (ETag): GitHub
+ *               answers 304 and doesn't count them against its rate limit.
  *  2. Fetch   – a newer version is downloaded in the background and verified: the SHA-256
  *               GitHub declares, then package name, signing key and versionCode.
  *  3. Install – never under the user's fingers and never during music: once the app has
@@ -79,6 +82,7 @@ object VibraUpdates {
     private lateinit var app: Application
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var checkJob: Job? = null
+    private var watchJob: Job? = null
     private var installJob: Job? = null
     private var lastCheckAt: Long? = null
     private var foreground = false
@@ -86,8 +90,11 @@ object VibraUpdates {
     private var backgroundAt = 0L
     private var stoppedAt = 0L
 
-    /** The user closed the dialog or Android's confirmation: don't ask again until the next start. */
-    private var declined = false
+    /** When the user closed the dialog or Android's confirmation: ask again after [AskAgainAfter]. */
+    private var declinedAt: Long? = null
+
+    /** The last answer from the update source, reused when it replies 304 Not Modified. */
+    @Volatile private var latest: Latest? = null
 
     /** Android asked for confirmation on a silent attempt: the dialog has to ask. */
     private var confirmationRequired = false
@@ -128,7 +135,7 @@ object VibraUpdates {
 
     /** "Later" in the dialog. */
     fun postpone() {
-        declined = true
+        declinedAt = SystemClock.elapsedRealtime()
         refreshPrompt()
     }
 
@@ -136,14 +143,25 @@ object VibraUpdates {
         foreground = true
         installJob?.cancel()
         refreshPrompt()
-        val now = SystemClock.elapsedRealtime()
-        if (checkJob?.isActive == true || lastCheckAt?.let { now - it < CheckInterval } == true) return
-        lastCheckAt = now
-        checkJob = scope.launch { check() }
+        watchJob?.cancel()
+        watchJob =
+            scope.launch {
+                while (true) {
+                    val wait = lastCheckAt?.let { CheckInterval - (SystemClock.elapsedRealtime() - it) } ?: 0L
+                    if (wait > 0) {
+                        delay(wait)
+                        continue
+                    }
+                    lastCheckAt = SystemClock.elapsedRealtime()
+                    // Not tied to the foreground: a download goes on when the user leaves.
+                    if (checkJob?.isActive != true) checkJob = scope.launch { check() }
+                }
+            }
     }
 
     private fun onBackground() {
         foreground = false
+        watchJob?.cancel()
         backgroundAt = SystemClock.elapsedRealtime()
         refreshPrompt()
         scheduleInstall()
@@ -152,13 +170,14 @@ object VibraUpdates {
     private suspend fun check() {
         val release =
             try {
-                withContext(Dispatchers.IO) { VibraReleases.parseLatest(read(BuildConfig.VIBRA_UPDATE_URL)) }
+                withContext(Dispatchers.IO) { VibraReleases.parseLatest(readLatest()) }
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {
                 Timber.d("Update check failed: %s", error.javaClass.simpleName)
                 null
             } ?: return
+        Timber.d("Update check: latest %s", release.versionName)
         val dir = updatesDir(app)
         val prefs = prefs(app)
         if (!VibraReleases.isNewer(release.versionName, BuildConfig.VERSION_NAME) ||
@@ -201,7 +220,9 @@ object VibraUpdates {
         val ready = state.value as? State.Ready
         _prompt.value =
             ready?.release?.takeIf {
-                foreground && !declined && !confirming && (confirmationRequired || !VibraInstaller.canInstallSilently(app))
+                foreground && !confirming &&
+                    declinedAt?.let { at -> SystemClock.elapsedRealtime() - at < AskAgainAfter } != true &&
+                    (confirmationRequired || !VibraInstaller.canInstallSilently(app))
             }
     }
 
@@ -254,7 +275,7 @@ object VibraUpdates {
                 } else {
                     confirmationRequired = true
                 }
-            PackageInstaller.STATUS_FAILURE_ABORTED -> declined = true
+            PackageInstaller.STATUS_FAILURE_ABORTED -> declinedAt = SystemClock.elapsedRealtime()
             else -> {
                 Timber.d("Update install refused: status %d", status)
                 (state.value as? State.Ready)?.let { ready ->
@@ -276,14 +297,19 @@ object VibraUpdates {
         if (silently != null) VibraInstaller.notifyUpdated(context)
     }
 
-    private fun read(url: String): String =
-        open(url, accept = "application/vnd.github+json").run {
+    private fun readLatest(): String {
+        val cached = latest
+        return open(BuildConfig.VIBRA_UPDATE_URL, accept = "application/vnd.github+json", etag = cached?.etag).run {
             try {
-                inputStream.bufferedReader().use { it.readText() }
+                if (cached != null && responseCode == HttpURLConnection.HTTP_NOT_MODIFIED) return cached.body
+                inputStream.bufferedReader().use { it.readText() }.also { body ->
+                    latest = getHeaderField("ETag")?.let { Latest(it, body) }
+                }
             } finally {
                 disconnect()
             }
         }
+    }
 
     private fun download(
         release: VibraRelease,
@@ -321,13 +347,16 @@ object VibraUpdates {
     private fun open(
         url: String,
         accept: String? = null,
+        etag: String? = null,
     ): HttpURLConnection =
         (URL(url).openConnection() as HttpURLConnection).apply {
             connectTimeout = 15_000
             readTimeout = 30_000
             accept?.let { setRequestProperty("Accept", it) }
+            etag?.let { setRequestProperty("If-None-Match", it) }
             setRequestProperty("User-Agent", "VIBRA/${BuildConfig.VERSION_NAME}")
-            if (responseCode !in 200..299) {
+            val notModified = etag != null && responseCode == HttpURLConnection.HTTP_NOT_MODIFIED
+            if (responseCode !in 200..299 && !notModified) {
                 disconnect()
                 throw IOException("HTTP $responseCode")
             }
@@ -337,7 +366,13 @@ object VibraUpdates {
 
     private fun prefs(context: Context) = context.getSharedPreferences("vibra_updates", Context.MODE_PRIVATE)
 
-    private const val CheckInterval = 60 * 60 * 1000L
+    private class Latest(
+        val etag: String,
+        val body: String,
+    )
+
+    private const val CheckInterval = 15 * 60 * 1000L
+    private const val AskAgainAfter = 4 * 60 * 60 * 1000L
     private const val QuietPeriod = 30 * 1000L
     private const val KeySkipped = "skipped_version"
     private const val KeyUpdatedSilently = "updated_silently"
