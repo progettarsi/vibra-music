@@ -94,6 +94,9 @@ public fun MediaDetailHero(
     description: String? = null,
     additionalPrimaryActions: (@Composable RowScope.(Color) -> Unit)? = null,
     isToggleAddEnabled: Boolean = true,
+    // The screen's extra actions also live in its top bar menu ("⋯" at the top right), so the
+    // row would only repeat that menu. Screens without one (Spotify) keep them in the row.
+    extraActionsInRow: Boolean = false,
 ) {
     val menuState = LocalMenuState.current
     // Albums keep a rounded square (Figma 33:203); collections get the expressive pentagon
@@ -214,7 +217,7 @@ public fun MediaDetailHero(
                             }
                         }
                     },
-                additionalActions = additionalPrimaryActions,
+                additionalActions = additionalPrimaryActions.takeIf { extraActionsInRow },
                 isToggleAddEnabled = isToggleAddEnabled,
                 modifier = Modifier.padding(top = 16.dp, bottom = 12.dp),
             )
@@ -343,6 +346,8 @@ public fun MediaDetailPrimaryActions(
                         text = if (compactPlay) "" else stringResource(R.string.play),
                         icon = R.drawable.play,
                         onClick = onPlay,
+                        // Same height as the round actions beside it.
+                        height = MediaDetailActionSize,
                         contentDescription = stringResource(R.string.play),
                     )
                 }.map { it.measure(Constraints(minWidth = playWidth, maxWidth = playWidth)) }

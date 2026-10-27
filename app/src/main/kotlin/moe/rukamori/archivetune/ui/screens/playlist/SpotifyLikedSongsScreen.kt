@@ -165,6 +165,7 @@ private fun SpotifyLikedSongsContent(
         ) {
             item(key = "header", contentType = "spotify_liked_songs_header") {
                 MediaDetailHero(
+                    extraActionsInRow = true,
                     title = title,
                     thumbnailUrl = null,
                     fallbackIcon = R.drawable.favorite,

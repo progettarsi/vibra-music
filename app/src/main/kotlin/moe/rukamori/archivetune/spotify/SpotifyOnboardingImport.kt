@@ -11,20 +11,31 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import moe.rukamori.archivetune.constants.InnerTubeCookieKey
 import moe.rukamori.archivetune.db.MusicDatabase
 import moe.rukamori.archivetune.db.entities.ArtistEntity
+import moe.rukamori.archivetune.db.entities.PlaylistEntity
 import moe.rukamori.archivetune.innertube.YouTube
 import moe.rukamori.archivetune.innertube.models.ArtistItem
 import moe.rukamori.archivetune.innertube.utils.hasYouTubeLoginCookie
 import moe.rukamori.archivetune.ui.screens.settings.SpotifyLoginSheet
 import moe.rukamori.archivetune.utils.dataStore
+import moe.rukamori.archivetune.utils.reportException
 import java.text.Normalizer
 import java.time.LocalDateTime
 import java.util.Locale
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -78,6 +89,57 @@ class SpotifyOnboardingImport @Inject constructor(
         }
     }
 
+    private val importScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val playlistsImported = AtomicBoolean(false)
+
+    /**
+     * Copies every Spotify playlist into a local playlist, each track matched on YouTube Music
+     * (tracks without a match are left out). Runs on its own scope, so it carries on after the
+     * onboarding closes; once per process.
+     */
+    fun importPlaylistsInBackground() {
+        if (!playlistsImported.compareAndSet(false, true)) return
+        importScope.launch {
+            try {
+                spotifyLibrary.refreshPlaylists().forEach { playlist ->
+                    try {
+                        importPlaylist(playlist)
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (error: Exception) {
+                        reportException(error)
+                    }
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                reportException(error)
+            }
+        }
+    }
+
+    private suspend fun importPlaylist(source: moe.rukamori.archivetune.spotify.models.SpotifyPlaylist) {
+        val tracks = spotifyLibrary.playlistTracks(source.id)
+        val gate = Semaphore(PlaylistMatchParallelism)
+        val songs =
+            coroutineScope {
+                tracks.map { track -> async { gate.withPermit { SpotifyPlaybackResolver.resolveToMetadata(track) } } }.awaitAll()
+            }.filterNotNull().distinctBy { it.id }
+        if (songs.isEmpty()) return
+        val entity =
+            PlaylistEntity(
+                name = source.name,
+                thumbnailUrl = source.images.firstOrNull()?.url?.takeIf { it.isNotBlank() },
+                bookmarkedAt = LocalDateTime.now(),
+            )
+        database.withTransaction {
+            songs.forEach { insert(it) }
+            insert(entity)
+        }
+        val playlist = database.playlist(entity.id).first() ?: return
+        database.addSongToPlaylist(playlist, songs.map { it.id })
+    }
+
     /** Idempotent bookmark, like Follow; when signed in it also subscribes on YouTube Music. */
     suspend fun followArtists(ids: List<String>) = withContext(Dispatchers.IO) {
         val loggedIn = hasYouTubeLoginCookie(context.dataStore.data.first()[InnerTubeCookieKey].orEmpty())
@@ -101,3 +163,6 @@ class SpotifyOnboardingImport @Inject constructor(
         }
     }
 }
+
+/** Track searches running at once while a playlist is matched on YouTube Music. */
+private const val PlaylistMatchParallelism = 4

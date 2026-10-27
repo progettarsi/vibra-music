@@ -650,8 +650,8 @@ class MainActivity : ComponentActivity() {
                             onSignInSpotify = { showOnboardingSpotify = true },
                             onFinished = onboardingViewModel::complete,
                         )
-                        // Spotify only imports artists: its sign-in sheet opens over the
-                        // onboarding, which then moves on to the Artists step.
+                        // Spotify imports artists and playlists: its sign-in sheet opens over
+                        // the onboarding, which then marks Spotify as connected.
                         if (showOnboardingSpotify) {
                             SpotifyOnboardingLogin(
                                 onDismiss = { showOnboardingSpotify = false },

@@ -42,6 +42,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -200,7 +202,18 @@ fun VibraOnboarding(
                 Column(Modifier.fillMaxSize().padding(top = (contentTop - TopBarHeight).coerceAtLeast(0.dp))) {
                     when (step) {
                         OnboardingStep.Welcome -> WelcomeScene()
-                        OnboardingStep.Account -> AccountScene()
+                        OnboardingStep.Account ->
+                            AccountScene(
+                                state = state,
+                                onYouTube = {
+                                    haptics.press()
+                                    onSignInYouTube()
+                                },
+                                onSpotify = {
+                                    haptics.press()
+                                    onSignInSpotify()
+                                },
+                            )
                         OnboardingStep.Artists -> ArtistsScene(state = state, onToggle = viewModel::toggleArtist)
                         OnboardingStep.Style -> StyleScene(name = state.accountName, selectedColor = style.color, selectedShape = style.shape, onColor = style.setColor, onShape = style.setShape)
                         OnboardingStep.Ready -> ReadyScene(name = state.accountName)
@@ -212,14 +225,11 @@ fun VibraOnboarding(
                 onPrimary = {
                     haptics.press()
                     when (state.step) {
-                        OnboardingStep.Welcome, OnboardingStep.Style -> viewModel.next()
-                        OnboardingStep.Account -> onSignInYouTube()
+                        OnboardingStep.Welcome, OnboardingStep.Account, OnboardingStep.Style -> viewModel.next()
                         OnboardingStep.Artists -> viewModel.followSelected()
                         OnboardingStep.Ready -> enter()
                     }
                 },
-                onSpotify = onSignInSpotify,
-                onWithoutAccount = viewModel::skipAccount,
             )
         }
     }
@@ -500,21 +510,17 @@ private fun TopBar(
     }
 }
 
-/**
- * The bottom of the stage: the one primary button of the whole flow and, on the account
- * step only, the two quieter alternatives sliding out above it.
- */
+/** The bottom of the stage: the one primary button of the whole flow. */
 @Composable
 private fun Actions(
     state: OnboardingUiState,
     onPrimary: () -> Unit,
-    onSpotify: () -> Unit,
-    onWithoutAccount: () -> Unit,
 ) {
     val label =
         when (state.step) {
             OnboardingStep.Welcome -> stringResource(R.string.vibra_onb_start)
-            OnboardingStep.Account -> stringResource(R.string.vibra_onb_account_youtube)
+            OnboardingStep.Account ->
+                stringResource(if (state.anyConnected) R.string.vibra_onb_continue else R.string.vibra_onb_account_later)
             OnboardingStep.Artists -> {
                 val n = state.selectedArtists.size
                 when (n) {
@@ -526,36 +532,9 @@ private fun Actions(
             OnboardingStep.Style -> stringResource(R.string.vibra_onb_continue)
             OnboardingStep.Ready -> stringResource(R.string.vibra_onb_ready_enter)
         }
-    // Sign-in and entering are the moments that matter: the button takes the theme colour.
-    val emphasised = state.step == OnboardingStep.Account || state.step == OnboardingStep.Ready
+    // A connected account and entering are the moments that matter: the button takes the theme colour.
+    val emphasised = state.step == OnboardingStep.Account && state.anyConnected || state.step == OnboardingStep.Ready
     Column(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp, top = 8.dp)) {
-        AnimatedVisibility(
-            visible = state.step == OnboardingStep.Account,
-            enter = expandVertically(Liquid.spatial()) + fadeIn(Liquid.effects()),
-            exit = shrinkVertically(Liquid.spatial()) + fadeOut(Liquid.effects(LiquidSpeed.Fast)),
-        ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Pill(text = stringResource(R.string.vibra_onb_account_spotify), container = MaterialTheme.colorScheme.surfaceContainerHigh, content = MaterialTheme.colorScheme.onSurface, onClick = onSpotify)
-                Text(
-                    text = stringResource(R.string.vibra_onb_account_spotify_note),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(top = 8.dp, bottom = 4.dp, start = 16.dp, end = 16.dp),
-                )
-                Text(
-                    text = stringResource(R.string.vibra_onb_account_later),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier =
-                        Modifier
-                            .clip(CircleShape)
-                            .clickable(role = Role.Button, onClick = onWithoutAccount)
-                            .padding(horizontal = 16.dp, vertical = 14.dp),
-                )
-                Spacer(Modifier.height(4.dp))
-            }
-        }
         val container by animateColorAsState(
             if (emphasised) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
             Liquid.effects(),
@@ -673,13 +652,136 @@ private fun AnimatedVisibilityScope.WelcomeScene() {
     )
 }
 
+/** YouTube Music and Spotify side by side: both optional, both can be connected. */
 @Composable
-private fun AnimatedVisibilityScope.AccountScene() {
+private fun AnimatedVisibilityScope.AccountScene(
+    state: OnboardingUiState,
+    onYouTube: () -> Unit,
+    onSpotify: () -> Unit,
+) {
     Heading(
         title = stringResource(R.string.vibra_onb_account_title),
         body = stringResource(R.string.vibra_onb_account_body),
         centred = true,
     )
+    Spacer(Modifier.height(24.dp))
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = stagger(3)) {
+        ConnectionRow(
+            icon = {
+                Icon(
+                    painterResource(R.drawable.library_music),
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.size(24.dp),
+                )
+            },
+            title = stringResource(R.string.vibra_onb_account_youtube),
+            note = stringResource(R.string.vibra_onb_account_youtube_note),
+            connected = state.youTubeConnected,
+            loading = state.loadingYouTube,
+            onClick = onYouTube,
+        )
+        ConnectionRow(
+            icon = { Image(painterResource(R.drawable.spotify_icon), contentDescription = null, modifier = Modifier.size(28.dp)) },
+            title = stringResource(R.string.vibra_onb_account_spotify),
+            note = stringResource(R.string.vibra_onb_account_spotify_note),
+            connected = state.spotifyConnected,
+            loading = state.loadingSpotify,
+            onClick = onSpotify,
+        )
+    }
+}
+
+/** What a [ConnectionRow] shows at its end. */
+private enum class ConnectionStatus { Idle, Connected, Loading }
+
+/**
+ * One service: its mark, what connecting brings, and "Connect", which turns into a check once
+ * connected (a loader while its data arrives). A connected row no longer reacts to taps.
+ */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun ConnectionRow(
+    icon: @Composable () -> Unit,
+    title: String,
+    note: String,
+    connected: Boolean,
+    loading: Boolean,
+    onClick: () -> Unit,
+) {
+    val interaction = remember { MutableInteractionSource() }
+    val connectedLabel = stringResource(R.string.vibra_onb_account_connected)
+    val status =
+        when {
+            loading -> ConnectionStatus.Loading
+            connected -> ConnectionStatus.Connected
+            else -> ConnectionStatus.Idle
+        }
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .liquidPress(interaction, pressedScale = 0.97f)
+                .clip(RoundedCornerShape(28.dp))
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                .clickable(
+                    interactionSource = interaction,
+                    indication = androidx.compose.material3.ripple(),
+                    enabled = !connected,
+                    role = Role.Button,
+                    onClick = onClick,
+                ).padding(horizontal = 16.dp, vertical = 14.dp),
+    ) {
+        Box(
+            modifier = Modifier.size(44.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer),
+            contentAlignment = Alignment.Center,
+        ) { icon() }
+        Column(Modifier.weight(1f).padding(horizontal = 14.dp)) {
+            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+            Text(note, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        // Springs read from the theme here: transition lambdas can't read composition locals.
+        val fadeSpec = Liquid.effects<Float>()
+        val fadeFast = Liquid.effects<Float>(LiquidSpeed.Fast)
+        val popSpec = Liquid.spatial<Float>()
+        AnimatedContent(
+            targetState = status,
+            transitionSpec = {
+                (fadeIn(fadeSpec) + scaleIn(popSpec, initialScale = 0.6f)) togetherWith fadeOut(fadeFast)
+            },
+            contentAlignment = Alignment.Center,
+            label = "connection",
+        ) { shown ->
+            when (shown) {
+                ConnectionStatus.Loading -> LoadingIndicator(modifier = Modifier.size(36.dp))
+                ConnectionStatus.Connected ->
+                    Box(
+                        modifier =
+                            Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.primary)
+                                .semantics { contentDescription = connectedLabel },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(painterResource(R.drawable.check), contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(20.dp))
+                    }
+                ConnectionStatus.Idle ->
+                    Text(
+                        text = stringResource(R.string.vibra_onb_account_connect),
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        modifier =
+                            Modifier
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.primary)
+                                .padding(horizontal = 16.dp, vertical = 9.dp),
+                    )
+            }
+        }
+    }
 }
 
 /** Artists found in the account, preselected; a tap toggles one. */

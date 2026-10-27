@@ -282,9 +282,12 @@ class PageFlight internal constructor(
      * pushed, faded, or the page beneath).
      */
     fun progress(): Float? {
+        // Always read the animated value (see the content layer in PageFrame): callers in a layer
+        // must stay subscribed to it even while this page is beneath another one.
+        val shownNow = shown()
         val role = motion?.role(entry = entryId) ?: return null
         if (!role.top || role.style != PageStyle.Origin || role.origin == null) return null
-        val progress = PagePose.progress(shown(), role.predictive)
+        val progress = PagePose.progress(shownNow, role.predictive)
         return progress.takeIf { it < 1f }
     }
 
@@ -356,13 +359,15 @@ internal fun AnimatedVisibilityScope.PageFrame(
                 .fillMaxSize()
                 .onPlaced { frame.windowOffset = it.positionInWindow() }
                 .graphicsLayer {
+                    val shownNow = shown.value
                     val role = motion?.role(entry.id) ?: return@graphicsLayer
-                    poseContainer(role, PagePose.progress(shown.value, role.predictive), frame.windowOffset, screenCornerPx)
+                    poseContainer(role, PagePose.progress(shownNow, role.predictive), frame.windowOffset, screenCornerPx)
                 }.background(background)
                 .drawWithContent {
                     drawContent()
+                    val shownNow = shown.value
                     val role = motion?.role(entry.id) ?: return@drawWithContent
-                    val progress = PagePose.progress(shown.value, role.predictive)
+                    val progress = PagePose.progress(shownNow, role.predictive)
                     if (role.top) {
                         // A page growing out of an origin shows its content through the
                         // container's own colour: a veil over the content, which looks the
@@ -382,9 +387,14 @@ internal fun AnimatedVisibilityScope.PageFrame(
                 Modifier
                     .fillMaxSize()
                     .graphicsLayer {
+                        // Read the progress before anything else: a layer only re-runs for the state
+                        // it read last time. Had it returned early while this page was beneath another
+                        // (Settings over the profile), it would never pose the page again and the
+                        // profile would close by being cut away instead of shrinking.
+                        val shownNow = shown.value
                         val role = motion?.role(entry.id) ?: return@graphicsLayer
                         if (role.top && role.style == PageStyle.Origin && role.origin != null) {
-                            poseOriginContent(role.origin, PagePose.progress(shown.value, role.predictive), frame.windowOffset)
+                            poseOriginContent(role.origin, PagePose.progress(shownNow, role.predictive), frame.windowOffset)
                         }
                     }.onPlaced { flight.contentCoordinates = it },
         ) {

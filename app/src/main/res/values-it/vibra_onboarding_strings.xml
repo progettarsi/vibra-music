@@ -11,10 +11,10 @@
     <string name="vibra_onb_start">Inizia</string>
 
     <string name="vibra_onb_account_title">Porta la tua musica</string>
-    <string name="vibra_onb_account_body">Accedi con YouTube Music: libreria, Mi piace e mix vengono con te, e nome e immagine si impostano da soli.</string>
-    <string name="vibra_onb_account_youtube">Accedi con YouTube Music</string>
-    <string name="vibra_onb_account_spotify">Importa invece da Spotify</string>
-    <string name="vibra_onb_account_spotify_note">Importiamo solo i tuoi artisti. La musica suona sempre da YouTube Music.</string>
+    <string name="vibra_onb_account_body">Collega YouTube Music, Spotify o entrambi: quello che colleghi viene con te.</string>
+    <string name="vibra_onb_account_youtube">YouTube Music</string>
+    <string name="vibra_onb_account_spotify">Spotify</string>
+    <string name="vibra_onb_account_spotify_note">I tuoi artisti e le tue playlist. La musica suona sempre da YouTube Music.</string>
     <string name="vibra_onb_account_later">Continua senza account</string>
     <string name="vibra_onb_account_loading">Carico il tuo profilo…</string>
 
@@ -33,4 +33,7 @@
     <string name="vibra_onb_ready_body">La tua home è pronta. vibra ti chiederà solo le notifiche, per i controlli del player.</string>
     <string name="vibra_onb_ready_enter">Entra in vibra</string>
     <string name="vibra_onb_ready_hello">Ciao, %1$s.</string>
+    <string name="vibra_onb_account_youtube_note">Libreria, Mi piace e mix, più il tuo nome e la tua immagine.</string>
+    <string name="vibra_onb_account_connect">Collega</string>
+    <string name="vibra_onb_account_connected">Collegato</string>
 </resources>

@@ -32,6 +32,8 @@ class EngineOnboardingAccount
 
         override suspend fun spotifyArtists(): List<OnboardingArtist> = spotify.importFollowedArtists().getOrThrow().map { it.toOnboarding() }
 
+        override fun importSpotifyPlaylists() = spotify.importPlaylistsInBackground()
+
         override suspend fun follow(artists: List<OnboardingArtist>) {
             spotify.followArtists(artists.map { it.id })
         }

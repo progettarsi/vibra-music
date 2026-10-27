@@ -40,6 +40,7 @@ import moe.rukamori.archivetune.constants.InnerTubeCookieKey
 import moe.rukamori.archivetune.constants.QuickPicks
 import moe.rukamori.archivetune.constants.QuickPicksKey
 import moe.rukamori.archivetune.constants.SpeedDialSongIdsKey
+import moe.rukamori.archivetune.constants.VisitorDataKey
 import moe.rukamori.archivetune.constants.YtmSyncKey
 import moe.rukamori.archivetune.db.MusicDatabase
 import moe.rukamori.archivetune.db.entities.*
@@ -213,6 +214,7 @@ class HomeViewModel
         private val loadPersonalizedQuickPicksUseCase: LoadPersonalizedQuickPicksUseCase,
         private val prepareCommunityHomePageUseCase: PrepareCommunityHomePageUseCase,
         private val loadCommunityPlaylistPreviewsUseCase: LoadCommunityPlaylistPreviewsUseCase,
+        private val networkMonitor: moe.rukamori.archivetune.network.NetworkMonitor,
     ) : ViewModel() {
         private val isRefreshing = MutableStateFlow(false)
         private val isLoading = MutableStateFlow(false)
@@ -718,6 +720,7 @@ class HomeViewModel
                     }
 
                     launch {
+                        ensureVisitorData()
                         val page =
                             YouTube.home().getOrElse { throwable ->
                                 reportException(throwable)
@@ -774,6 +777,16 @@ class HomeViewModel
             } finally {
                 isInitialLoadComplete.value = true
                 isLoading.value = false
+            }
+        }
+
+        // Without a visitor id YouTube answers the home request with an empty shell. The app asks for
+        // one at start; if that happened offline, ask again here before loading the feed.
+        private suspend fun ensureVisitorData() {
+            if (!YouTube.visitorData.isNullOrBlank()) return
+            YouTube.visitorData().onSuccess { visitorData ->
+                YouTube.visitorData = visitorData
+                context.dataStore.edit { it[VisitorDataKey] = visitorData }
             }
         }
 
@@ -1230,6 +1243,24 @@ class HomeViewModel
                 kotlinx.coroutines.delay(3000)
 
                 syncUtils.cleanupDuplicatePlaylists()
+            }
+
+            // Started offline: the feed never arrived. Load it again as soon as the connection is back.
+            viewModelScope.launch(Dispatchers.IO) {
+                networkMonitor.isOnline
+                    .drop(1)
+                    .filter { it }
+                    .collect {
+                        if (homePage.value == null || accountPlaylists.value == null) {
+                            val cookie = context.dataStore.get(InnerTubeCookieKey, "")
+                            if (hasYouTubeLoginCookie(cookie)) {
+                                val refreshGeneration = beginAccountRefresh()
+                                launch { refreshAccountIdentity(refreshGeneration) }
+                                launch { refreshAccountPlaylistsInternal(refreshGeneration) }
+                            }
+                            if (homePage.value == null) refresh()
+                        }
+                    }
             }
 
             viewModelScope.launch(Dispatchers.IO) {

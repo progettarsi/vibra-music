@@ -26,6 +26,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.graphics.shapes.Morph
 import androidx.graphics.shapes.RoundedPolygon
+import androidx.graphics.shapes.TransformResult
 import androidx.compose.material3.MaterialShapes
 import app.vibra.ui.components.VibraArtwork
 import app.vibra.ui.motion.LiquidMorphShape
@@ -118,7 +119,10 @@ internal fun AvatarFlightOverlay(
 ) {
     val source = flight.source ?: return
     val density = LocalDensity.current
-    val morph = remember(source.shape) { Morph(source.shape, MaterialShapes.Circle) }
+    // Both outlines stretched to the same square: a Morph is drawn fitted to the union of its two
+    // shapes' bounds, so with raw polygons the picture would jump (shrink and drop) on the first
+    // frame of a flight, no longer matching the outline on the page, which fits its own bounds.
+    val morph = remember(source.shape) { Morph(source.shape.fittedToUnitSquare(), MaterialShapes.Circle.fittedToUnitSquare()) }
     // The picture is laid out once at its resting size and only transformed per frame.
     val restSize = flight.rest?.size ?: return
     with(density) {
@@ -170,3 +174,11 @@ internal fun AvatarFlightOverlay(
 
 /** Size of the avatar inside the dock's leading button (see VibraDock's DockLeadingButton). */
 val DockAvatarSize = 44.dp
+
+/** This polygon stretched so that its bounds are exactly the unit square, as a clip draws it. */
+private fun RoundedPolygon.fittedToUnitSquare(): RoundedPolygon {
+    val bounds = calculateBounds()
+    val width = (bounds[2] - bounds[0]).coerceAtLeast(1e-3f)
+    val height = (bounds[3] - bounds[1]).coerceAtLeast(1e-3f)
+    return transformed { x, y -> TransformResult((x - bounds[0]) / width, (y - bounds[1]) / height) }
+}

@@ -324,6 +324,7 @@ fun SpotifyPlaylistScreen(
                             ).joinToString(MediaDetailMetadataSeparator)
 
                         MediaDetailHero(
+                            extraActionsInRow = true,
                             title = currentPlaylist.name,
                             thumbnailUrl = thumbnailUrl,
                             fallbackIcon = R.drawable.queue_music,

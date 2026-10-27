@@ -23,8 +23,10 @@ import javax.inject.Inject
  *
  *  Welcome → Account → [Artists] → Style → Ready
  *
- *   • Account: YouTube Music sign-in first (it fills name and picture by itself), Spotify
- *     only to import artists, or no account at all.
+ *   • Account: YouTube Music and Spotify side by side, both optional, both connectable (it
+ *     is not a choice). YouTube Music fills name and picture by itself; Spotify brings its
+ *     artists and copies its playlists into the library. With both connected the step moves
+ *     on by itself.
  *   • Artists: only after a sign-in or an import, and skippable — it is the account part.
  *   • Style: always shown (colour and shape), but the defaults are already selected, so
  *     "Continue" alone is a valid choice.
@@ -36,9 +38,6 @@ import javax.inject.Inject
 
 /** The onboarding's screens, in order. */
 enum class OnboardingStep { Welcome, Account, Artists, Style, Ready }
-
-/** Where the account data came from (decides the Artists step's source). */
-enum class AccountSource { None, YouTube, Spotify }
 
 /** An artist offered in the Artists step. */
 @Immutable
@@ -53,16 +52,22 @@ data class OnboardingUiState(
     val step: OnboardingStep = OnboardingStep.Welcome,
     /** True when the last move went backwards (the screens slide the other way). */
     val back: Boolean = false,
-    val source: AccountSource = AccountSource.None,
-    val loadingAccount: Boolean = false,
+    val youTubeConnected: Boolean = false,
+    val spotifyConnected: Boolean = false,
+    val loadingYouTube: Boolean = false,
+    val loadingSpotify: Boolean = false,
     val accountName: String? = null,
     val accountAvatarUrl: String? = null,
     val artists: List<OnboardingArtist> = emptyList(),
     val selectedArtists: Set<String> = emptySet(),
 ) {
+    val anyConnected: Boolean get() = youTubeConnected || spotifyConnected
+
+    val loadingAccount: Boolean get() = loadingYouTube || loadingSpotify
+
     /** Screens this run will show (Artists only with an account), for the progress bar. */
     val steps: List<OnboardingStep>
-        get() = OnboardingStep.entries.filter { it != OnboardingStep.Artists || source != AccountSource.None }
+        get() = OnboardingStep.entries.filter { it != OnboardingStep.Artists || anyConnected }
 }
 
 /**
@@ -76,6 +81,9 @@ interface OnboardingAccount {
     suspend fun youTubeArtists(): List<OnboardingArtist>
 
     suspend fun spotifyArtists(): List<OnboardingArtist>
+
+    /** Copies the Spotify playlists into the library; returns at once, the copy runs on its own. */
+    fun importSpotifyPlaylists()
 
     suspend fun follow(artists: List<OnboardingArtist>)
 }
@@ -101,36 +109,46 @@ class VibraOnboardingViewModel
             }
         }
 
-        /** Continue without an account: straight to Style. */
-        fun skipAccount() {
-            mutableState.update { it.copy(source = AccountSource.None, step = OnboardingStep.Style, back = false) }
-        }
-
         /** The YouTube Music sign-in finished: load the profile and the library's artists. */
-        fun onYouTubeSignedIn() = load(AccountSource.YouTube)
-
-        /** The Spotify sign-in finished: import its followed artists. */
-        fun onSpotifySignedIn() = load(AccountSource.Spotify)
-
-        private fun load(source: AccountSource) {
-            mutableState.update { it.copy(source = source, loadingAccount = true, step = OnboardingStep.Artists, back = false) }
+        fun onYouTubeSignedIn() {
+            if (mutableState.value.youTubeConnected) return
+            mutableState.update { it.copy(youTubeConnected = true, loadingYouTube = true, step = OnboardingStep.Account, back = false) }
+            advanceWhenBothConnected()
             viewModelScope.launch {
-                val profile = if (source == AccountSource.YouTube) runCatching { account.youTubeProfile() }.getOrNull() else null
-                val artists =
-                    runCatching {
-                        if (source == AccountSource.YouTube) account.youTubeArtists() else account.spotifyArtists()
-                    }.getOrDefault(emptyList())
+                val profile = runCatching { account.youTubeProfile() }.getOrNull()
+                val artists = runCatching { account.youTubeArtists() }.getOrDefault(emptyList())
                 mutableState.update {
                     it.copy(
-                        loadingAccount = false,
+                        loadingYouTube = false,
                         accountName = profile?.first ?: it.accountName,
                         accountAvatarUrl = profile?.second ?: it.accountAvatarUrl,
-                        artists = artists,
-                        // Everything found is preselected: the account already says you like them.
-                        selectedArtists = artists.mapTo(HashSet()) { a -> a.id },
-                    )
+                    ).withArtists(artists)
                 }
             }
+        }
+
+        /** The Spotify sign-in finished: import its followed artists and copy its playlists. */
+        fun onSpotifySignedIn() {
+            if (mutableState.value.spotifyConnected) return
+            mutableState.update { it.copy(spotifyConnected = true, loadingSpotify = true, step = OnboardingStep.Account, back = false) }
+            advanceWhenBothConnected()
+            account.importSpotifyPlaylists()
+            viewModelScope.launch {
+                val artists = runCatching { account.spotifyArtists() }.getOrDefault(emptyList())
+                mutableState.update { it.copy(loadingSpotify = false).withArtists(artists) }
+            }
+        }
+
+        /** Nothing left to connect on the Account step: go on to the artists. */
+        private fun advanceWhenBothConnected() {
+            val s = mutableState.value
+            if (s.youTubeConnected && s.spotifyConnected && s.step == OnboardingStep.Account) next()
+        }
+
+        /** Adds [found] to the artists on offer; everything found is preselected (the account already says you like them). */
+        private fun OnboardingUiState.withArtists(found: List<OnboardingArtist>): OnboardingUiState {
+            val fresh = found.filter { a -> artists.none { it.id == a.id } }
+            return copy(artists = artists + fresh, selectedArtists = selectedArtists + fresh.map { it.id })
         }
 
         fun toggleArtist(id: String) {
