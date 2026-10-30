@@ -45,6 +45,7 @@ data class YoutubeiStreamRequest(
     val requiresSongMetadata: Boolean = false,
     // Vibra: also resolve a light video-only stream (a music video shown in place of the cover).
     val artworkVideo: Boolean = false,
+    val allowCatalogReplacement: Boolean = true,
     val cookie: String? = null,
     val visitorData: String? = null,
     val dataSyncId: String? = null,

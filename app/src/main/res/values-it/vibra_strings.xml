@@ -98,4 +98,7 @@
     <string name="vibra_queue_queued">In coda</string>
     <string name="vibra_queue_next_from">Successivi da %1$s</string>
     <string name="vibra_queue_next">Successivi</string>
+    <string name="vibra_playback_final_error">Impossibile riprodurre questo brano. Riprova o passa al successivo.</string>
+    <string name="vibra_playback_next">Brano successivo</string>
+    <string name="vibra_playback_final_title">Impossibile riprodurre il brano</string>
 </resources>

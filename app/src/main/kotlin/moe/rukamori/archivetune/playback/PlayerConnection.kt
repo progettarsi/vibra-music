@@ -42,7 +42,6 @@ import moe.rukamori.archivetune.playback.queues.Queue
 import moe.rukamori.archivetune.playback.queues.isUserQueued
 import moe.rukamori.archivetune.playback.queues.userQueueRegionSize
 import moe.rukamori.archivetune.utils.isLocalMediaId
-import moe.rukamori.archivetune.utils.reportException
 
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -91,7 +90,8 @@ class PlayerConnection(
     val canSkipNext = MutableStateFlow(true)
 
     val error = MutableStateFlow<PlaybackException?>(null)
-    private var dismissedPlaybackError: PlaybackException? = null
+    val playbackAttempt = service.playbackAttempts.state
+    private var playbackAttemptJob: Job? = null
     val waitingForNetworkConnection = service.waitingForNetworkConnection
     val queueRestoreCompleted = service.queueRestoreCompleted
 
@@ -100,6 +100,12 @@ class PlayerConnection(
 
     init {
         player.addListener(this)
+        // Vibra: raw player errors are internal to the fallback chain.
+        playbackAttemptJob = scope.launch {
+            playbackAttempt.collectLatest { attempt ->
+                error.value = attempt.error?.let { it.exception ?: PlaybackException(it.message, null, it.code) }
+            }
+        }
 
         playbackState.value = player.playbackState
         _isPlaying.value = player.isPlaying
@@ -259,8 +265,13 @@ class PlayerConnection(
 
 
     fun dismissPlaybackError() {
-        dismissedPlaybackError = error.value ?: player.playerError
+        service.playbackAttempts.dismiss()
         error.value = null
+    }
+
+    fun retryPlayback() {
+        error.value = null
+        service.retryPlayback()
     }
 
     fun seekToNext() {
@@ -277,7 +288,6 @@ class PlayerConnection(
 
     override fun onPlaybackStateChanged(state: Int) {
         playbackState.value = state
-        updatePlaybackError(player.playerError)
     }
 
     override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -320,27 +330,6 @@ class PlayerConnection(
         updateCanSkipPreviousAndNext()
     }
 
-    override fun onPlayerErrorChanged(playbackError: PlaybackException?) {
-        if (playbackError != null) {
-            reportException(playbackError)
-        }
-        updatePlaybackError(playbackError)
-    }
-
-    private fun updatePlaybackError(playbackError: PlaybackException?) {
-        when {
-            playbackError == null -> {
-                dismissedPlaybackError = null
-                error.value = null
-            }
-
-            playbackError !== dismissedPlaybackError -> {
-                dismissedPlaybackError = null
-                error.value = playbackError
-            }
-        }
-    }
-
     // Vibra: Media3 raggruppa timeline, transizione e shuffle nello stesso callback.
     override fun onEvents(player: Player, events: Player.Events) {
         if (events.containsAny(Player.EVENT_TIMELINE_CHANGED, Player.EVENT_MEDIA_ITEM_TRANSITION,
@@ -371,6 +360,7 @@ class PlayerConnection(
 
     fun dispose() {
         player.removeListener(this)
+        playbackAttemptJob?.cancel()
         metadataExtractionJob?.cancel()
         metadataExtractionJob = null
     }

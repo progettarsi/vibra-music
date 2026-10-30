@@ -218,6 +218,7 @@ class YoutubeiResolver(
             .put("pinnedItag", pinnedItag)
             .put("requiresSongMetadata", requiresSongMetadata)
             .put("artworkVideo", artworkVideo)
+            .put("allowCatalogReplacement", allowCatalogReplacement)
             .put("cookie", cookie)
             .put("visitorData", visitorData)
             .put("dataSyncId", dataSyncId)

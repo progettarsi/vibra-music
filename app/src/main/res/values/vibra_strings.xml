@@ -97,4 +97,7 @@
     <string name="vibra_queue_queued">Queued</string>
     <string name="vibra_queue_next_from">Next from %1$s</string>
     <string name="vibra_queue_next">Next up</string>
+    <string name="vibra_playback_final_error">This track could not be played. Try again or choose the next track.</string>
+    <string name="vibra_playback_next">Next track</string>
+    <string name="vibra_playback_final_title">Unable to play this track</string>
 </resources>

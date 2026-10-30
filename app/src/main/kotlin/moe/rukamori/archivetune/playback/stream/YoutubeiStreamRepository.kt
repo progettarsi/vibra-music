@@ -86,6 +86,10 @@ class YoutubeiStreamRepository
                 resolveOnce(request.copy(authState = refreshedAuthState), priority)
             }
 
+        // Vibra: foreground retries belong to the shared attempt coordinator.
+        internal suspend fun resolveSingle(request: AudioStreamRequest, priority: StreamResolutionPriority): ResolvedAudioStream =
+            resolveOnce(request, priority)
+
         private suspend fun resolveOnce(
             request: AudioStreamRequest,
             priority: StreamResolutionPriority,
@@ -112,6 +116,7 @@ class YoutubeiStreamRepository
                                 pinnedItag = request.pinnedFormatId,
                                 requiresSongMetadata = request.requiresSongMetadata,
                                 artworkVideo = request.artworkVideo,
+                                allowCatalogReplacement = request.allowCatalogReplacement,
                                 cookie = authState.cookie.takeIf { authState.hasLoginCookie },
                                 visitorData = authState.visitorData,
                                 dataSyncId = authState.dataSyncId.takeIf { authState.hasLoginCookie },

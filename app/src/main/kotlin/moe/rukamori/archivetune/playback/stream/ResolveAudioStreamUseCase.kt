@@ -19,7 +19,6 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.guava.future
-import moe.rukamori.archivetune.utils.YTPlayerUtils
 import timber.log.Timber
 import java.io.InterruptedIOException
 import java.util.concurrent.ConcurrentHashMap
@@ -32,7 +31,8 @@ import kotlin.coroutines.coroutineContext
 class ResolveAudioStreamUseCase
     @Inject
     constructor(
-        private val youtubeiRepository: YoutubeiStreamRepository,
+        private val fallbackResolver: app.vibra.playback.PlaybackFallbackResolver,
+        private val playbackAttempts: app.vibra.playback.PlaybackAttemptController,
     ) {
         private data class CacheKey(
             val mediaId: String,
@@ -43,6 +43,9 @@ class ResolveAudioStreamUseCase
             val pinnedFormatId: Int?,
             val requiresSongMetadata: Boolean,
             val artworkVideo: Boolean,
+            val playbackAttemptId: Long,
+            val recoveryStage: app.vibra.playback.PlaybackStage,
+            val allowCatalogReplacement: Boolean,
         )
 
         private data class InFlightKey(
@@ -86,9 +89,20 @@ class ResolveAudioStreamUseCase
             request: AudioStreamRequest,
             consumer: ResolutionConsumer,
         ): ResolvedAudioStream {
-            val key = request.cacheKey()
-            val priority = request.resolutionPriority(consumer)
-            val lease = acquireResolution(key, request, consumer, priority)
+            // Vibra: preloads/downloads never inherit a foreground recovery or contact public relays.
+            val attempt = if (consumer == ResolutionConsumer.PLAYBACK && request.purpose == StreamPurpose.PLAYBACK) {
+                playbackAttempts.current(request.mediaId)?.takeIf {
+                    playbackAttempts.isCurrent(it.id, request.mediaId)
+                }
+            } else null
+            val effectiveRequest = request.copy(
+                playbackAttemptId = attempt?.id ?: 0L,
+                recoveryStage = attempt?.stage ?: app.vibra.playback.PlaybackStage.DIRECT,
+                allowCatalogReplacement = request.allowCatalogReplacement && request.purpose != StreamPurpose.PLAYBACK,
+            )
+            val key = effectiveRequest.cacheKey()
+            val priority = effectiveRequest.resolutionPriority(consumer)
+            val lease = acquireResolution(key, effectiveRequest, consumer, priority)
             if (lease is ResolutionLease.Cached) return lease.stream
 
             val activeLease = lease as ResolutionLease.Active
@@ -316,15 +330,7 @@ class ResolveAudioStreamUseCase
             request: AudioStreamRequest,
             priority: StreamResolutionPriority,
         ): ResolvedAudioStream {
-            val resolvedAuthState =
-                YTPlayerUtils.ensureYoutubeiPoTokensForPlayback(
-                    videoId = request.mediaId,
-                    authState = request.authState,
-                )
-            return youtubeiRepository.resolve(
-                request = request.copy(authState = resolvedAuthState),
-                priority = priority,
-            )
+            return fallbackResolver.resolve(request, priority)
         }
 
         private fun AudioStreamRequest.resolutionPriority(
@@ -346,6 +352,9 @@ class ResolveAudioStreamUseCase
                 pinnedFormatId = pinnedFormatId,
                 requiresSongMetadata = requiresSongMetadata,
                 artworkVideo = artworkVideo,
+                playbackAttemptId = playbackAttemptId,
+                recoveryStage = recoveryStage,
+                allowCatalogReplacement = allowCatalogReplacement,
             )
 
         private fun storeResolvedStream(
@@ -353,7 +362,7 @@ class ResolveAudioStreamUseCase
             resolved: ResolvedAudioStream,
         ) {
             putResolvedStream(key, resolved)
-            if (resolved.source == StreamSource.YOUTUBEI) {
+            if (resolved.source == StreamSource.YOUTUBEI && key.playbackAttemptId == 0L) {
                 val alternatePurpose =
                     when (key.purpose) {
                         StreamPurpose.PLAYBACK -> StreamPurpose.DOWNLOAD

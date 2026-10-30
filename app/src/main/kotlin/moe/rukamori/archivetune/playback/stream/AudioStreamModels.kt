@@ -17,6 +17,8 @@ enum class StreamPurpose {
 
 enum class StreamSource {
     YOUTUBEI,
+    INVIDIOUS,
+    PIPED,
 }
 
 data class AudioStreamRequest(
@@ -30,6 +32,10 @@ data class AudioStreamRequest(
     val requiresSongMetadata: Boolean = false,
     // Vibra: a music video — also resolve its picture for the player (see ArtworkVideoStreams).
     val artworkVideo: Boolean = false,
+    // Vibra: a nonzero identity enables the foreground-only fallback chain.
+    val playbackAttemptId: Long = 0,
+    val recoveryStage: app.vibra.playback.PlaybackStage = app.vibra.playback.PlaybackStage.DIRECT,
+    val allowCatalogReplacement: Boolean = true,
 )
 
 data class ResolvedAudioStream(
@@ -51,4 +57,7 @@ data class ResolvedAudioStream(
     val loudnessDb: Double? = null,
     val perceptualLoudnessDb: Double? = null,
     val playbackTrackingUrl: String? = null,
+    val playbackAttemptId: Long = 0,
+    val recoveryStage: app.vibra.playback.PlaybackStage = app.vibra.playback.PlaybackStage.DIRECT,
+    val mixedVideo: Boolean = false,
 )

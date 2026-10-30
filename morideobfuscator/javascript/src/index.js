@@ -644,6 +644,7 @@ function isSameCatalogRecording(info, identity) {
 }
 
 async function resolveCatalogReplacement(youtube, request, sourceInfo) {
+  if (request.allowCatalogReplacement === false) return undefined;
   if (!normalizedString(request.cookie)) return undefined;
   const identity = catalogIdentity(sourceInfo);
   if (!identity) return undefined;

@@ -1719,10 +1719,8 @@ private fun PlaybackErrorHost(
     PlaybackErrorDialog(
         error = activeError,
         showLoginAction = info.loginRecoveryUrl != null,
-        onRetry = {
-            connection.player.prepare()
-            connection.player.play()
-        },
+        onRetry = connection::retryPlayback,
+        onNext = if (connection.player.hasNextMediaItem()) connection::seekToNext else null,
         onClose = connection::dismissPlaybackError,
         onLogin = {
             connection.dismissPlaybackError()

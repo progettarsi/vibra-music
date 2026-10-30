@@ -52,6 +52,7 @@ fun PlayerConnection.collectNowPlaying(): NowPlaying {
     val metadata by mediaMetadata.collectAsStateWithLifecycle()
     val playing by isPlaying.collectAsStateWithLifecycle()
     val state by playbackState.collectAsStateWithLifecycle()
+    val attempt by playbackAttempt.collectAsStateWithLifecycle()
     val repeat by repeatMode.collectAsStateWithLifecycle()
     val shuffle by shuffleModeEnabled.collectAsStateWithLifecycle()
     val canPrevious by canSkipPrevious.collectAsStateWithLifecycle()
@@ -61,7 +62,7 @@ fun PlayerConnection.collectNowPlaying(): NowPlaying {
         metadata = metadata,
         isPlaying = playing,
         // Buffering only matters to the user when they asked to play.
-        isBuffering = state == Player.STATE_BUFFERING && player.playWhenReady,
+        isBuffering = (state == Player.STATE_BUFFERING || attempt.isLoading) && player.playWhenReady,
         repeatMode = repeat,
         shuffleEnabled = shuffle,
         canSkipPrevious = canPrevious,

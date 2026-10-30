@@ -68,6 +68,7 @@ fun PlaybackErrorDialog(
     onRetry: () -> Unit,
     onClose: () -> Unit,
     onLogin: () -> Unit,
+    onNext: (() -> Unit)? = null,
 ) {
     val clipboard = LocalClipboardManager.current
     val context = LocalContext.current
@@ -94,7 +95,8 @@ fun PlaybackErrorDialog(
         )
     val errorInfo = remember(error) { error.toPlaybackErrorInfo() }
     val httpCode = errorInfo.httpCode
-    val title =
+    val finalSourcesFailure = error.cause is app.vibra.playback.PlaybackSourcesExhausted
+    val title = if (finalSourcesFailure) stringResource(R.string.vibra_playback_final_title) else
         when (errorInfo.kind) {
             PlaybackErrorKind.LoginRefreshRequired -> stringResource(R.string.playback_login_refresh_required)
             PlaybackErrorKind.ConfirmationRequired -> stringResource(R.string.playback_confirmation_required)
@@ -104,7 +106,7 @@ fun PlaybackErrorDialog(
             PlaybackErrorKind.MalformedStream -> fallbackMalformedStream
             else -> fallbackUnknown
         }
-    val reason =
+    val reason = if (finalSourcesFailure) stringResource(R.string.vibra_playback_final_error) else
         when (errorInfo.kind) {
             PlaybackErrorKind.LoginRefreshRequired -> {
                 stringResource(R.string.playback_requires_youtube_music_login_refresh)
@@ -212,6 +214,7 @@ fun PlaybackErrorDialog(
                             onClose = onClose,
                             onCopy = onCopyClick,
                             onLogin = onLogin,
+                            onNext = onNext,
                         )
                     } else {
                         PlaybackErrorCompactContent(
@@ -228,6 +231,7 @@ fun PlaybackErrorDialog(
                             onClose = onClose,
                             onCopy = onCopyClick,
                             onLogin = onLogin,
+                            onNext = onNext,
                         )
                     }
                 }
@@ -251,6 +255,7 @@ private fun PlaybackErrorCompactContent(
     onClose: () -> Unit,
     onCopy: () -> Unit,
     onLogin: () -> Unit,
+    onNext: (() -> Unit)? = null,
 ) {
     Column(
         modifier =
@@ -282,6 +287,7 @@ private fun PlaybackErrorCompactContent(
             onClose = onClose,
             onCopy = onCopy,
             onLogin = onLogin,
+            onNext = onNext,
             modifier = Modifier.fillMaxWidth(),
         )
     }
@@ -302,6 +308,7 @@ private fun PlaybackErrorExpandedContent(
     onClose: () -> Unit,
     onCopy: () -> Unit,
     onLogin: () -> Unit,
+    onNext: (() -> Unit)? = null,
 ) {
     Row(
         modifier =
@@ -337,6 +344,7 @@ private fun PlaybackErrorExpandedContent(
                 onClose = onClose,
                 onCopy = onCopy,
                 onLogin = onLogin,
+                onNext = onNext,
                 modifier = Modifier.fillMaxWidth(),
             )
         }
@@ -462,6 +470,7 @@ private fun PlaybackErrorActions(
     onClose: () -> Unit,
     onCopy: () -> Unit,
     onLogin: () -> Unit,
+    onNext: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     FlowRow(
@@ -481,6 +490,12 @@ private fun PlaybackErrorActions(
                     icon = R.drawable.login,
                     label = loginText,
                 )
+            }
+        }
+        if (onNext != null) {
+            OutlinedButton(onClick = onNext) {
+                PlaybackErrorActionContent(icon = R.drawable.skip_next,
+                    label = stringResource(R.string.vibra_playback_next))
             }
         }
         FilledTonalButton(onClick = onCopy) {

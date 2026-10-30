@@ -38,6 +38,7 @@ import android.net.ConnectivityManager
 import android.net.Uri
 import android.os.Binder
 import android.os.Build
+import android.os.SystemClock
 import android.os.Handler
 import android.util.LruCache
 import android.widget.Toast
@@ -49,7 +50,6 @@ import androidx.datastore.preferences.core.edit
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
-import androidx.media3.common.ParserException
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.Player.EVENT_POSITION_DISCONTINUITY
@@ -89,6 +89,12 @@ import androidx.media3.extractor.DefaultExtractorsFactory
 import androidx.media3.session.CommandButton
 import androidx.media3.session.MediaLibraryService
 import androidx.media3.session.MediaSession
+import app.vibra.playback.PlaybackAttemptController
+import app.vibra.playback.PlaybackAttemptPhase
+import app.vibra.playback.PlaybackStage
+import androidx.media3.exoplayer.upstream.DefaultLoadErrorHandlingPolicy
+import androidx.media3.exoplayer.upstream.LoadErrorHandlingPolicy
+import kotlinx.coroutines.flow.collectLatest
 import app.vibra.power.PowerSave
 import app.vibra.power.PowerSaveLevel
 import dagger.hilt.android.AndroidEntryPoint
@@ -405,7 +411,15 @@ class MusicService :
                     requestBuilder.build(),
                 )
             }.addNetworkInterceptor { chain ->
-                val request = chain.request()
+                var request = chain.request()
+                val relay = app.vibra.playback.PublicStreamRepository.INSTANCES.firstOrNull {
+                    it.accepts(chain.call().request().url)
+                }
+                if (relay != null) {
+                    if (!relay.accepts(request.url)) throw IOException("Unsupported playback redirect")
+                    request = request.newBuilder().removeHeader("Cookie").removeHeader("Authorization")
+                        .removeHeader("X-Goog-Visitor-Id").build()
+                }
                 val response = chain.proceed(request)
                 if (response.code == 403 &&
                     (request.url.host == "googlevideo.com" || request.url.host.endsWith(".googlevideo.com"))
@@ -450,7 +464,8 @@ class MusicService :
 
     @Volatile
     private var lastLoginRecoveryPrompt: Pair<String, Long>? = null
-    private val playbackStreamRecoveryTracker = PlaybackStreamRecoveryTracker()
+    // Vibra: only this coordinator publishes errors to the presentation layer.
+    @Inject lateinit var playbackAttempts: PlaybackAttemptController
     private var playbackErrorRecoveryJob: Job? = null
     private var nextHistorySessionToken = 0L
     private var currentHistorySessionToken = 0L
@@ -739,7 +754,6 @@ class MusicService :
 
     val autoAddedMediaIds: MutableSet<String> = java.util.Collections.synchronizedSet(mutableSetOf())
 
-    private var consecutivePlaybackErr = 0
 
     val maxSafeGainFactor = MAX_AUDIO_NORMALIZATION_FACTOR
 
@@ -880,7 +894,9 @@ class MusicService :
                 .setMediaSourceFactory(createMediaSourceFactory())
                 .setRenderersFactory(createRenderersFactory())
                 .setLoadControl(createPrimaryLoadControl())
-                .setTrackSelector(DefaultTrackSelector(this, SafeTrackSelectionFactory()))
+                .setTrackSelector(DefaultTrackSelector(this, SafeTrackSelectionFactory()).apply {
+                    parameters = parameters.buildUpon().setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, true).build()
+                })
                 .setHandleAudioBecomingNoisy(true)
                 .setWakeMode(C.WAKE_MODE_NETWORK)
                 .setAudioAttributes(
@@ -992,6 +1008,27 @@ class MusicService :
             )
         setMediaNotificationProvider(mediaNotificationProvider)
         addSession(mediaSession)
+
+        // Vibra: the watchdog spans all stages, including asynchronous Media3 preparation.
+        scope.launch {
+            playbackAttempts.state.collectLatest { attempt ->
+                val deadline = attempt.deadlineMs ?: return@collectLatest
+                val mediaId = attempt.mediaId ?: return@collectLatest
+                if (attempt.phase != PlaybackAttemptPhase.RECOVERING) return@collectLatest
+                delay((deadline - SystemClock.elapsedRealtime()).coerceAtLeast(1L))
+                if (playbackAttempts.isCurrent(attempt.id, mediaId)) {
+                    playbackErrorRecoveryJob?.cancel()
+                    resolveAudioStream.invalidate(mediaId, StreamPurpose.PLAYBACK)
+                    playbackAttempts.fail(attempt.id, mediaId, PlaybackException(
+                        getString(R.string.vibra_playback_final_error), app.vibra.playback.PlaybackSourcesExhausted(),
+                        PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT,
+                    ))
+                    player.pause()
+                    player.stop()
+                }
+            }
+        }
+
 
         updateNotification()
         scope.launch {
@@ -1931,7 +1968,9 @@ class MusicService :
             .setMediaSourceFactory(createMediaSourceFactory())
             .setRenderersFactory(createRenderersFactory())
             .setLoadControl(createCrossfadeLoadControl())
-            .setTrackSelector(DefaultTrackSelector(this, SafeTrackSelectionFactory()))
+            .setTrackSelector(DefaultTrackSelector(this, SafeTrackSelectionFactory()).apply {
+                    parameters = parameters.buildUpon().setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, true).build()
+                })
             .setHandleAudioBecomingNoisy(false)
             .setWakeMode(C.WAKE_MODE_NETWORK)
             .setAudioAttributes(playbackAudioAttributes(), false)
@@ -2724,177 +2763,6 @@ class MusicService :
         bluetoothReceiverRegistered = false
     }
 
-    private fun waitOnNetworkError() {
-        waitingForNetworkConnection.value = true
-    }
-
-    private fun skipOnError() {
-        /**
-         * Auto skip to the next media item on error.
-         *
-         * To prevent a "runaway diesel engine" scenario, force the user to take action after
-         * too many errors come up too quickly. Pause to show player "stopped" state
-         */
-        consecutivePlaybackErr += 2
-        val nextWindowIndex = player.nextMediaItemIndex
-
-        if (consecutivePlaybackErr <= MAX_CONSECUTIVE_ERR && nextWindowIndex != C.INDEX_UNSET) {
-            player.seekTo(nextWindowIndex, C.TIME_UNSET)
-            player.prepare()
-            player.play()
-            return
-        }
-
-        player.pause()
-        consecutivePlaybackErr = 0
-    }
-
-    private fun stopOnError() {
-        player.pause()
-    }
-
-    private fun findStreamHttpFailure(
-        error: PlaybackException,
-    ): androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException? {
-        var throwable: Throwable? = error.cause
-        while (throwable != null) {
-            if (throwable is androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException) {
-                return throwable
-            }
-            throwable = throwable.cause
-        }
-        return null
-    }
-
-    private fun isRetryableRemoteParserFailure(error: PlaybackException): Boolean {
-        if (
-            error.errorCode == PlaybackException.ERROR_CODE_PARSING_CONTAINER_MALFORMED ||
-            error.errorCode == PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED
-        ) {
-            return true
-        }
-
-        var throwable: Throwable? = error.cause
-        while (throwable != null) {
-            if (
-                throwable.message?.contains("Skipping atom with length", ignoreCase = true) == true ||
-                    throwable.isMedia3ExtractorBoundsFailure()
-            ) {
-                return true
-            }
-            throwable = throwable.cause
-        }
-        return false
-    }
-
-    private fun isCacheCorruptionError(
-        error: PlaybackException,
-        isContentCached: Boolean,
-    ): Boolean {
-        val isContainerParseError =
-            error.errorCode == PlaybackException.ERROR_CODE_PARSING_CONTAINER_MALFORMED ||
-                error.errorCode == PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED
-        if (error.errorCode == PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND ||
-            (isContentCached && error.errorCode == PlaybackException.ERROR_CODE_IO_READ_POSITION_OUT_OF_RANGE)
-        ) {
-            return true
-        }
-
-        var throwable: Throwable? = error.cause
-        while (throwable != null) {
-            when {
-                throwable is EOFException || throwable is Cache.CacheException -> {
-                    return true
-                }
-
-                throwable is IOException &&
-                    throwable.message?.contains("unexpected end of stream", ignoreCase = true) == true -> {
-                    return true
-                }
-
-                throwable is IllegalStateException || throwable is IllegalArgumentException -> {
-                    if (throwable.stackTrace.any { it.className.startsWith("androidx.media3.extractor") }) {
-                        return true
-                    }
-                }
-
-                isContentCached && throwable.isMedia3ExtractorBoundsFailure() -> {
-                    return true
-                }
-
-                isContainerParseError && isContentCached && throwable is ParserException -> {
-                    return true
-                }
-
-                isContainerParseError && isContentCached &&
-                    throwable.message?.let {
-                        it.contains("Invalid integer size", ignoreCase = true) ||
-                            it.contains("Skipping atom with length", ignoreCase = true) ||
-                            it.contains("contentIsMalformed=true", ignoreCase = true)
-                    } == true -> {
-                    return true
-                }
-            }
-            throwable = throwable.cause
-        }
-        return false
-    }
-
-    private fun Throwable.isMedia3ExtractorBoundsFailure(): Boolean =
-        this is ArrayIndexOutOfBoundsException &&
-            stackTrace.any { it.className.startsWith("androidx.media3.extractor") }
-
-    private fun retryPlaybackAfterStreamFailure(
-        mediaId: String,
-        isFullyDownloadedMedia: Boolean,
-        responseException: androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException,
-    ): Boolean {
-        if (isFullyDownloadedMedia) return false
-
-        val recoverySnapshot = capturePlaybackRecoverySnapshot()
-
-        val failedUrl = responseException.dataSpec.uri.toString()
-        val requestProfile = StreamClientUtils.resolveRequestProfile(failedUrl)
-        val failedExpiredUrl = YTPlayerUtils.isExpiredOrNearExpiredStreamUrl(failedUrl)
-
-        resolveAudioStream.invalidate(mediaId)
-        YTPlayerUtils.invalidateCachedStreamUrls(mediaId)
-        if (!failedExpiredUrl && requestProfile.clientKey.isNotEmpty()) {
-            YTPlayerUtils.markStreamClientFailed(mediaId, requestProfile.clientKey, responseException.responseCode)
-        }
-
-        if (!playbackStreamRecoveryTracker.registerRetryAttempt(mediaId)) {
-            return false
-        }
-
-        Timber.tag("MusicService").i(
-            "Retrying playback for %s after stream HTTP %d from %s failed",
-            mediaId,
-            responseException.responseCode,
-            requestProfile.variantLabel,
-        )
-        return preparePlaybackFromSnapshot(recoverySnapshot)
-    }
-
-    private fun retryPlaybackAfterNetworkFailure(
-        mediaId: String,
-        isFullyDownloadedMedia: Boolean,
-    ): Boolean {
-        if (isFullyDownloadedMedia) return false
-
-        val recoverySnapshot = capturePlaybackRecoverySnapshot()
-
-        resolveAudioStream.invalidate(mediaId)
-        YTPlayerUtils.invalidateCachedStreamUrls(mediaId)
-
-        if (!playbackStreamRecoveryTracker.registerRetryAttempt(mediaId)) {
-            return false
-        }
-
-        Timber.tag("MusicService").i("Retrying playback for %s after a transient network failure", mediaId)
-        return preparePlaybackFromSnapshot(recoverySnapshot)
-    }
-
     private fun capturePlaybackRecoverySnapshot(): PlaybackRecoverySnapshot? {
         val mediaItem = player.currentMediaItem ?: return null
         val mediaItemIndex = player.currentMediaItemIndex
@@ -3380,6 +3248,8 @@ class MusicService :
     }
 
     fun stopAndClearPlayback(clearPersistentState: Boolean = false) {
+        playbackAttempts.cancel()
+        playbackErrorRecoveryJob?.cancel()
         cancelRestoredQueueHydration()
         cancelInfiniteQueueBootstrap()
         suppressAutoPlayback = true
@@ -3394,7 +3264,6 @@ class MusicService :
         player.clearMediaItems()
         abandonAudioFocus()
         closeAudioEffectSession()
-        consecutivePlaybackErr = 0
         if (clearPersistentState) {
             clearPersistedQueueFiles()
         }
@@ -4160,7 +4029,6 @@ class MusicService :
                 }
                 when (throwable) {
                     is YTPlayerUtils.InvalidPlaybackLoginContextException -> {
-                        promptLoginRecovery(mediaId, throwable.targetUrl)
                     }
 
                     is YTPlayerUtils.LoginRequiredForPlaybackException -> {
@@ -4196,6 +4064,10 @@ class MusicService :
         reason: Int,
     ) {
         super.onMediaItemTransition(mediaItem, reason)
+        val previousId = playbackAttempts.state.value.mediaId
+        playbackErrorRecoveryJob?.cancel()
+        previousId?.let { resolveAudioStream.invalidate(it, StreamPurpose.PLAYBACK) }
+        playbackAttempts.begin(mediaItem?.mediaId)
 
         if (sleepTimer.pauseWhenSongEnd) {
             pauseFromSleepTimer()
@@ -4319,6 +4191,18 @@ class MusicService :
         reason: Int,
     ) {
         super.onPlayWhenReadyChanged(playWhenReady, reason)
+        // Vibra: a user pause cancels recovery; a terminal pause keeps the final error latched.
+        if (!playWhenReady && reason == Player.PLAY_WHEN_READY_CHANGE_REASON_USER_REQUEST &&
+            playbackAttempts.state.value.phase == PlaybackAttemptPhase.RECOVERING
+        ) {
+            playbackErrorRecoveryJob?.cancel()
+            player.currentMediaItem?.mediaId?.let { resolveAudioStream.invalidate(it, StreamPurpose.PLAYBACK) }
+            playbackAttempts.cancel()
+        } else if (playWhenReady && playbackAttempts.state.value.phase in
+            setOf(PlaybackAttemptPhase.IDLE, PlaybackAttemptPhase.FAILED) && player.currentMediaItem != null
+        ) {
+            retryPlayback()
+        }
         secondaryCrossfadePlayer?.let { secondaryPlayer ->
             if (isCrossfading) {
                 val isEndOfOutgoingItemPause =
@@ -4431,6 +4315,8 @@ class MusicService :
                     purpose = StreamPurpose.PLAYBACK,
                     authState = configuration.authState,
                     pinnedFormatId = null,
+                    // Vibra: the upcoming song must retain its exact video ID as well.
+                    allowCatalogReplacement = false,
                     // Vibra: skips the video request in battery saver, keeping the audio preload.
                     artworkVideo = PowerSave.level.value == PowerSaveLevel.OFF && nextMediaItem.metadata?.isMusicVideo == true && !isLowDataModeActive(),
                 ),
@@ -4463,15 +4349,14 @@ class MusicService :
             playbackErrorRecoveryJob?.cancel()
             playbackErrorRecoveryJob = null
         }
-        if (events.contains(Player.EVENT_MEDIA_ITEM_TRANSITION)) {
-            playbackStreamRecoveryTracker.onMediaItemChanged(currentMediaId)
-        }
         if (
             (events.contains(Player.EVENT_PLAYBACK_STATE_CHANGED) && player.playbackState == Player.STATE_READY) ||
-            (events.contains(Player.EVENT_IS_PLAYING_CHANGED) && player.isPlaying)
+            (events.contains(Player.EVENT_IS_PLAYING_CHANGED) && player.isPlaying) ||
+            // Vibra: gapless transitions can keep both isPlaying and STATE_READY unchanged.
+            events.contains(Player.EVENT_MEDIA_ITEM_TRANSITION)
         ) {
             if (player.isPlaying || (player.playbackState == Player.STATE_READY && !player.playWhenReady)) {
-                playbackStreamRecoveryTracker.onPlaybackRecovered(currentMediaId)
+                currentMediaId?.let { id -> playbackAttempts.current(id)?.let { playbackAttempts.ready(it.id, id) } }
             }
             ensureAudiblePlaybackVolume("player_event")
         }
@@ -4712,133 +4597,64 @@ class MusicService :
     override fun onPlayerError(error: PlaybackException) {
         super.onPlayerError(error)
         val snapshot = capturePlaybackRecoverySnapshot() ?: return
+        val attempt = playbackAttempts.current(snapshot.mediaId) ?: if (player.playWhenReady) {
+            playbackAttempts.begin(snapshot.mediaId)
+        } else return
+        if (attempt.phase == PlaybackAttemptPhase.FAILED || attempt.phase == PlaybackAttemptPhase.IDLE) return
         playbackErrorRecoveryJob?.cancel()
-        playbackErrorRecoveryJob = scope.launch {
-            handlePlaybackError(error, snapshot)
-        }
+        playbackErrorRecoveryJob = scope.launch { handlePlaybackError(error, snapshot, attempt.id) }
     }
 
-    private suspend fun handlePlaybackError(
-        error: PlaybackException,
-        recoverySnapshot: PlaybackRecoverySnapshot,
-    ) {
-        val currentMediaId = recoverySnapshot.mediaId
-        val isLocalMedia = currentMediaId.isLocalMediaId() ||
+    fun bypassPlaybackCacheForDebug(mediaIds: List<String>) {
+        // Vibra: exercise real network recovery without deleting the emulator's cached songs.
+        if (BuildConfig.DEBUG) cacheBypassMediaIds.addAll(mediaIds)
+    }
+
+    /** Vibra: explicit retry starts a new identity and the full chain, at the saved time. */
+    fun retryPlayback() {
+        val snapshot = capturePlaybackRecoverySnapshot() ?: return
+        playbackErrorRecoveryJob?.cancel()
+        resolveAudioStream.invalidate(snapshot.mediaId, StreamPurpose.PLAYBACK)
+        playbackAttempts.begin(snapshot.mediaId)
+        preparePlaybackFromSnapshot(snapshot.copy(playWhenReady = true))
+    }
+
+    private suspend fun handlePlaybackError(error: PlaybackException, snapshot: PlaybackRecoverySnapshot, attemptId: Long) {
+        val mediaId = snapshot.mediaId
+        if (!playbackAttempts.isCurrent(attemptId, mediaId) || player.currentMediaItem?.mediaId != mediaId) return
+        val local = mediaId.isLocalMediaId() ||
             player.currentMediaItem?.localConfiguration?.uri?.shouldBypassPlayerCache() == true
-        val (isFullyDownloadedMedia, hasAnyCachedData) = withContext(Dispatchers.IO) {
-            if (isLocalMedia || currentMediaId in cacheBypassMediaIds) {
-                false to false
-            } else {
-                try {
-                    downloadCache.isFullyCached(currentMediaId) to
-                        (downloadCache.getCachedSpans(currentMediaId).isNotEmpty() ||
-                            playerCache.getCachedSpans(currentMediaId).isNotEmpty())
-                } catch (failure: IOException) {
-                    Timber.tag("MusicService").w(failure, "Failed to inspect playback cache for %s", currentMediaId)
-                    false to true
-                }
-            }
+        val downloaded = withContext(Dispatchers.IO) {
+            !local && runCatching { downloadCache.isFullyCached(mediaId) }.getOrDefault(false)
         }
-        if (player.currentMediaItem?.mediaId != currentMediaId || player.playerError !== error) return
-
-        if (!isLocalMedia && isCacheCorruptionError(error, hasAnyCachedData)) {
-            if (!isNetworkCurrentlyConnected()) {
-                waitOnNetworkError()
-                return
-            }
-            if (cacheBypassMediaIds.add(currentMediaId)) {
-                Timber.tag("MusicService").w(
-                    error,
-                    "Retrying %s from the network after a cache or truncated stream failure",
-                    currentMediaId,
-                )
-                resolveAudioStream.invalidate(currentMediaId)
-                YTPlayerUtils.invalidateCachedStreamUrls(currentMediaId)
-                withContext(Dispatchers.IO) {
-                    try {
-                        playerCache.removeResource(currentMediaId)
-                    } catch (failure: IOException) {
-                        Timber.tag("MusicService").w(failure, "Failed to remove damaged streaming cache for %s", currentMediaId)
-                    }
-                }
-                if (player.currentMediaItem?.mediaId != currentMediaId || player.playerError !== error) return
-                val retrySnapshot = capturePlaybackRecoverySnapshot() ?: return
-                player.stop()
-                if (preparePlaybackFromSnapshot(retrySnapshot)) return
-            }
-            skipOnError()
-            return
+        if (!playbackAttempts.isCurrent(attemptId, mediaId) || player.currentMediaItem?.mediaId != mediaId) return
+        var cause: Throwable? = error
+        var contentRestricted = false
+        while (cause != null) {
+            if (cause is YTPlayerUtils.LoginRequiredForPlaybackException) contentRestricted = true
+            cause = cause.cause
         }
-
-        if (!isLocalMedia && !isFullyDownloadedMedia && !isNetworkCurrentlyConnected()) {
-            waitOnNetworkError()
-            return
-        }
-
-        if (!isLocalMedia &&
-            !isFullyDownloadedMedia &&
-            error.isTransientNetworkFailure() &&
-            retryPlaybackAfterNetworkFailure(currentMediaId, isFullyDownloadedMedia)
+        if (!local && !downloaded && !contentRestricted && isNetworkCurrentlyConnected() &&
+            error.errorCode < PlaybackException.ERROR_CODE_DRM_UNSPECIFIED
         ) {
-            return
-        }
-
-        val streamHttpFailure = findStreamHttpFailure(error)
-        if (streamHttpFailure != null) {
-            if (streamHttpFailure.responseCode in RETRYABLE_STREAM_RESPONSE_CODES &&
-                retryPlaybackAfterStreamFailure(currentMediaId, isFullyDownloadedMedia, streamHttpFailure)
-            ) {
+            val next = playbackAttempts.advance(attemptId, mediaId,
+                YouTube.currentPlaybackAuthState().hasLoginCookie, SystemClock.elapsedRealtime())
+            if (next != null) {
+                // Never splice a new provider/representation into previously cached native bytes.
+                cacheBypassMediaIds.add(mediaId)
+                nextStreamPreloader.cancel()
+                cancelCrossfade(resetVolume = true, resetPauseAtEnd = true)
+                resolveAudioStream.invalidate(mediaId, StreamPurpose.PLAYBACK)
+                YTPlayerUtils.invalidateCachedStreamUrls(mediaId)
+                if (playbackAttempts.isCurrent(attemptId, mediaId)) preparePlaybackFromSnapshot(snapshot)
                 return
             }
         }
-
-        if (!isLocalMedia && !isFullyDownloadedMedia && YTPlayerUtils.isBotDetectionException(error)) {
-            resolveAudioStream.invalidate(currentMediaId)
-            YTPlayerUtils.invalidateCachedStreamUrls(currentMediaId)
-        }
-
-        if (!isLocalMedia && !isFullyDownloadedMedia && YTPlayerUtils.isBadStreamPlayerResponseException(error)) {
-            resolveAudioStream.invalidate(currentMediaId)
-            YTPlayerUtils.invalidateCachedStreamUrls(currentMediaId)
-            if (playbackStreamRecoveryTracker.registerRetryAttempt(currentMediaId)) {
-                withContext(Dispatchers.IO) {
-                    try {
-                        YTPlayerUtils.recoverFromBadStreamPlayerResponse(currentMediaId)
-                    } catch (cancellation: CancellationException) {
-                        throw cancellation
-                    } catch (failure: Exception) {
-                        Timber.tag("MusicService").w(
-                            failure,
-                            "Failed to refresh stream session for %s after all stream clients failed",
-                            currentMediaId,
-                        )
-                        reportException(failure)
-                    }
-                }
-                if (player.currentMediaItem?.mediaId != currentMediaId || player.playerError !== error) return
-                Timber.tag("MusicService").i(
-                    "Retrying playback for %s after refreshing stream session",
-                    currentMediaId,
-                )
-                if (preparePlaybackFromSnapshot(capturePlaybackRecoverySnapshot())) return
-            }
-        }
-
-        if (!isLocalMedia && !isFullyDownloadedMedia && isRetryableRemoteParserFailure(error)) {
-            val recoverySnapshot = capturePlaybackRecoverySnapshot()
-            resolveAudioStream.invalidate(currentMediaId)
-            YTPlayerUtils.invalidateCachedStreamUrls(currentMediaId)
-            if (playbackStreamRecoveryTracker.registerRetryAttempt(currentMediaId)) {
-                Timber.tag("MusicService").i(
-                    "Retrying playback for %s after parser source error %d",
-                    currentMediaId,
-                    error.errorCode,
-                )
-                if (preparePlaybackFromSnapshot(recoverySnapshot)) return
-            }
-        }
-
-        skipOnError()
+        // Errors stay latched until retry, dismissal or an explicit track change; no automatic skip.
+        playbackAttempts.fail(attemptId, mediaId, if (contentRestricted || local || downloaded) error else PlaybackException(
+            getString(R.string.vibra_playback_final_error), app.vibra.playback.PlaybackSourcesExhausted(), error.errorCode,
+        ))
+        player.pause()
     }
 
     private suspend fun trimPlayerCacheToBytes(limitBytes: Long) {
@@ -4905,8 +4721,14 @@ class MusicService :
         return DataSource.Factory {
             SchemeRoutingDataSource { dataSpec ->
                 val mediaId = dataSpec.key
+                if (mediaId != null && playbackAttempts.current(mediaId)?.stage?.let { it != PlaybackStage.DIRECT } == true) {
+                    cacheBypassMediaIds.add(mediaId)
+                }
                 when {
-                    dataSpec.uri.shouldBypassPlayerCache() || (mediaId != null && mediaId in cacheBypassMediaIds) -> directFactory
+                    dataSpec.uri.shouldBypassPlayerCache() -> directFactory
+                    // Vibra: completed downloads stay available offline after an earlier relay recovery.
+                    mediaId != null && downloadCache.isFullyCached(mediaId) -> downloadedFactory
+                    mediaId != null && mediaId in cacheBypassMediaIds -> directFactory
                     else -> {
                         if (mediaId != null) {
                             database.getFormatByIdBlocking(mediaId)?.let { format ->
@@ -4916,11 +4738,7 @@ class MusicService :
                             }
                             scope.launch(Dispatchers.IO) { recoverSong(mediaId) }
                         }
-                        if (mediaId != null && downloadCache.isFullyCached(mediaId)) {
-                            downloadedFactory
-                        } else {
-                            streamingFactory
-                        }
+                        streamingFactory
                     }
                 }
             }
@@ -5030,6 +4848,9 @@ class MusicService :
             return dataSpec
         }
         val mediaId = dataSpec.key ?: return dataSpec
+        if (playbackAttempts.current(mediaId)?.stage?.let { it != PlaybackStage.DIRECT } == true) {
+            cacheBypassMediaIds.add(mediaId)
+        }
         val storedFormat = database.getFormatByIdBlocking(mediaId)
         storedFormat?.let { format ->
             format.toCastMimeType()?.let { castMimeTypeCache.put(mediaId, it) }
@@ -5059,6 +4880,7 @@ class MusicService :
                             purpose = StreamPurpose.PLAYBACK,
                             authState = YouTube.currentPlaybackAuthState(),
                             pinnedFormatId = pinnedFormatId,
+                            allowCatalogReplacement = false,
                             // Vibra: also skips the video resolution on the normal audio path.
                             artworkVideo = PowerSave.level.value == PowerSaveLevel.OFF && !lowDataModeActive && isMusicVideo(mediaId),
                         ),
@@ -5069,7 +4891,6 @@ class MusicService :
                 if (throwable is CancellationException) throw throwable
                 when {
                     throwable is YTPlayerUtils.InvalidPlaybackLoginContextException -> {
-                        promptLoginRecovery(mediaId, throwable.targetUrl)
                         throw IOException(
                             getString(R.string.playback_requires_youtube_music_login_refresh),
                             throwable,
@@ -5257,7 +5078,9 @@ class MusicService :
         DefaultMediaSourceFactory(
             createDataSourceFactory(),
             DefaultExtractorsFactory(),
-        )
+        ).setLoadErrorHandlingPolicy(object : DefaultLoadErrorHandlingPolicy() {
+            override fun getRetryDelayMsFor(info: LoadErrorHandlingPolicy.LoadErrorInfo): Long = C.TIME_UNSET
+        })
 
     private class SchemeRoutingDataSource(
         private val selectFactory: (DataSpec) -> DataSource.Factory,
@@ -5754,6 +5577,8 @@ class MusicService :
         sponsorBlockPlaybackController.detach()
 
         super.onDestroy()
+        playbackAttempts.state.value.mediaId?.let { resolveAudioStream.invalidate(it, StreamPurpose.PLAYBACK) }
+        playbackAttempts.cancel()
         playbackErrorRecoveryJob?.cancel()
         effectiveVolumeRampJob?.cancel()
         effectiveVolumeRampJob = null
@@ -5957,11 +5782,9 @@ class MusicService :
         const val ERROR_CODE_NO_STREAM = 1000001
         private const val PLAYBACK_FORMAT_ID_METADATA_KEY = "archivetune_playback_format_id"
         const val CHUNK_LENGTH = 8 * 1024 * 1024L
-        val RETRYABLE_STREAM_RESPONSE_CODES = setOf(403, 404, 410, 416)
         const val PERSISTENT_QUEUE_FILE = "persistent_queue.data"
         const val PERSISTENT_AUTOMIX_FILE = "persistent_automix.data"
         const val PERSISTENT_PLAYER_STATE_FILE = "persistent_player_state.data"
-        const val MAX_CONSECUTIVE_ERR = 5
         const val AUDIO_ROUTE_CHANGE_DEBOUNCE_MS = 350L
         const val AUDIO_EFFECT_ROUTE_REBIND_DELAY_MS = 200L
         const val AUDIO_ROUTE_RECOVERY_MIN_INTERVAL_MS = 1_500L
