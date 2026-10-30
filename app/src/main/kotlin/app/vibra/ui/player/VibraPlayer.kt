@@ -15,6 +15,7 @@ import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
@@ -60,6 +61,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.structuralEqualityPolicy
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -74,12 +76,15 @@ import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.layer.GraphicsLayer
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.geometry.lerp
 import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
@@ -154,6 +159,7 @@ import app.vibra.ui.motion.rememberLiquidSheetState
 import app.vibra.ui.motion.rememberScreenCornerRadius
 import app.vibra.ui.theme.VibraDimens
 import app.vibra.ui.theme.VibraTextStyles
+import kotlin.math.roundToInt
 import kotlin.math.abs
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
@@ -315,10 +321,11 @@ fun VibraPlayerSheet(
                     Modifier
                         .layout { measurable, constraints ->
                             val p = sheet.progress.coerceIn(0f, 1f)
-                            val left = lerp(origin.left, 0f, p)
-                            val top = lerp(origin.top, 0f, p)
-                            val right = lerp(origin.right, fullWidthPx, p)
-                            val bottom = lerp(origin.bottom, fullHeightPx, p)
+                            val bounds = playerContainerRect(origin, Rect(0f, 0f, fullWidthPx, fullHeightPx), p)
+                            val left = bounds.left
+                            val top = bounds.top
+                            val right = bounds.right
+                            val bottom = bounds.bottom
                             val placeable =
                                 measurable.measure(
                                     Constraints.fixed(
@@ -378,14 +385,23 @@ fun VibraPlayerSheet(
             // The cover's content (image and video), drawn a second time, blurred, as the live
             // backdrop (see LiveCoverExtension).
             val coverContent = rememberGraphicsLayer()
+            val artworkFlight = remember { PlayerArtworkFlight() }
+            val unifiedFlight = !landscape && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+            val flightFrame = {
+                artworkFlight.sample(sheet.progress, if (sheet.isOpenOrOpening) spin?.degrees ?: 0f else 0f)
+            }
+            val cropTail by remember { derivedStateOf(structuralEqualityPolicy()) { flightFrame().tail } }
+            val unifiedSurface = { unifiedFlight }
             val lifecycleState by LocalLifecycleOwner.current.lifecycle.currentStateAsState()
-            val videoActive = {
-                sheet.progress >= 0.999f &&
-                    queueSheet.progress < 0.01f &&
-                    lyrics() < 0.99f &&
+            val videoVisibility = { if (unifiedFlight) flightFrame().videoOpacity else ((sheet.progress - VideoFadeStart) / (1f - VideoFadeStart)).coerceIn(0f, 1f) }
+            val videoAllowed = {
+                queueSheet.progress < 0.01f && lyrics() < 0.99f &&
                     lifecycleState.isAtLeast(Lifecycle.State.RESUMED)
             }
-            val videoVisibility = { ((sheet.progress - VideoFadeStart) / (1f - VideoFadeStart)).coerceIn(0f, 1f) }
+            val videoPrepare = { sheet.isOpenOrOpening && videoAllowed() }
+            val videoActive = {
+                (if (unifiedFlight) videoVisibility() > 0.001f else sheet.progress >= 0.999f) && videoAllowed()
+            }
             val swipeSide by remember { derivedStateOf { kotlin.math.sign(coverSwipe.value) } }
             // Captured when the swipe starts: the neighbours change as soon as the swipe has
             // switched track, but the page on screen must stay the one that slid in.
@@ -408,18 +424,19 @@ fun VibraPlayerSheet(
                         bottom = origin.bottom,
                     )
                 }
-            LaunchedEffect(coverSlot, fullWidthPx, fullHeightPx, metadata.thumbnailUrl, previousCover, nextCover) {
+            LaunchedEffect(coverSlot, titleSlot?.top, fullWidthPx, fullHeightPx, metadata.thumbnailUrl, previousCover, nextCover) {
                 val slot = coverSlot ?: return@LaunchedEffect
                 val size = IntSize(fullWidthPx.toInt(), fullHeightPx.toInt())
+                val titleY = titleSlot?.top ?: (slot.bottom + slot.height * 0.06f)
                 // The current backdrop is baked while the player is still closed, so the opening
                 // never waits for it (or competes with it for frames); the neighbours, needed
                 // only for a swipe, a moment after the player has settled open (each bake is a burst
                 // of GPU work: it must not land on a frame that moves).
-                backdropBaker.bake(slot = slot, size = size, urls = listOf(metadata.thumbnailUrl))
+                backdropBaker.bake(slot = slot, size = size, urls = listOf(metadata.thumbnailUrl), titleY = titleY)
                 snapshotFlow { sheet.progress >= 1f }.collectLatest { settled ->
                     if (!settled) return@collectLatest
                     delay(NeighbourBakeDelayMillis)
-                    backdropBaker.bake(slot = slot, size = size, urls = listOf(metadata.thumbnailUrl, nextCover, previousCover))
+                    backdropBaker.bake(slot = slot, size = size, urls = listOf(metadata.thumbnailUrl, nextCover, previousCover), titleY = titleY)
                 }
             }
             // Closed, only the current backdrop is kept.
@@ -442,11 +459,11 @@ fun VibraPlayerSheet(
                         .graphicsLayer {
                             // While growing, nothing may show outside the growing container.
                             val p = sheet.progress.coerceIn(0f, 1f)
-                            clip = p < 0.999f
+                            clip = p < 0.9999f
                             if (clip) {
                                 shape =
-                                    GrowingContainerShape(
-                                        bounds = lerp(origin, Rect(0f, 0f, fullWidthPx, fullHeightPx), p),
+                                    PlayerContainerShape(
+                                        bounds = playerContainerRect(origin, Rect(0f, 0f, fullWidthPx, fullHeightPx), p),
                                         cornerPx = lerp(pillCorner, screenCorner, p).toPx(),
                                     )
                             }
@@ -472,68 +489,100 @@ fun VibraPlayerSheet(
                             onDragStopped = { velocity -> sheet.settle(velocity) },
                         ),
             ) {
-                // The backdrop as the cover's own continuation (portrait, Android 12+); during
-                // a swipe the neighbouring track's page comes in beside it.
-                if (!landscape) {
-                    val backdropVisibility = { ((sheet.progress - 0.25f) / 0.6f).coerceIn(0f, 1f) }
-                    CoverExtension(
+                ArtworkFlightScene(
+                    slot = coverSlot ?: cookieOrigin,
+                    cookie = cookieOrigin,
+                    source = coverContent,
+                    frame = { if (unifiedFlight) flightFrame() else ArtworkFlightFrame(sheet.progress, 0f, videoVisibility(), 0f) },
+                    container = { playerContainerRect(origin, Rect(0f, 0f, fullWidthPx, fullHeightPx), sheet.progress) },
+                    enabled = unifiedFlight,
+                ) {
+                    // The backdrop as the cover's own continuation (portrait, Android 12+); during
+                    // a swipe the neighbouring track's page comes in beside it.
+                    if (!landscape) {
+                        val backdropVisibility = { if (unifiedSurface()) 1f else ((sheet.progress - 0.25f) / 0.6f).coerceIn(0f, 1f) }
+                        CoverExtension(
+                            url = metadata.thumbnailUrl,
+                            baker = backdropBaker,
+                            visibility = backdropVisibility,
+                            offsetX = { coverSwipe.value },
+                            // After a completed swipe the new page is already on screen: no second fade.
+                            dissolve = { coverCrossfade.fading != null },
+                        )
+                        LiveCoverExtension(
+                            video = currentVideo,
+                            content = coverContent,
+                            url = metadata.thumbnailUrl,
+                            slot = coverSlot,
+                            titleY = titleSlot?.top,
+                            visibility = backdropVisibility,
+                            videoMix = { videoVisibility() * (currentVideo.playback?.reveal?.value ?: 0f) },
+                            offsetX = { coverSwipe.value },
+                        )
+                        revealed?.let { url ->
+                            CoverExtension(url = url, baker = backdropBaker, visibility = backdropVisibility, offsetX = revealedOffset)
+                        }
+                    }
+
+                    // Until the slot is measured (first frame) the cover waits on the cookie itself.
+                    FlyingCover(
                         url = metadata.thumbnailUrl,
-                        baker = backdropBaker,
-                        visibility = backdropVisibility,
-                        offsetX = { coverSwipe.value },
-                        // After a completed swipe the new page is already on screen: no second fade.
-                        dissolve = { coverCrossfade.fading != null },
+                        from = cookieOrigin,
+                        to = coverSlot ?: cookieOrigin,
+                        progress = { sheet.progress.coerceIn(0f, 1f) },
+                        // Parked, the spin is not read, so it does not redraw the hidden cover.
+                        startRotation = { if (sheet.isOpenOrOpening) spin?.degrees ?: 0f else 0f },
+                        fullBleed = !landscape,
+                        unifiedSurface = unifiedSurface,
+                        cropProgress = { cropTail },
+                        titleY = titleSlot?.top,
+                        swipeOffset = { coverSwipe.value },
+                        lyrics = lyrics,
+                        fadingUrl = coverCrossfade.fading,
+                        fadingAlpha = coverCrossfade::fadingAlpha,
+                        onCoverDrawn = coverCrossfade::onCoverDrawn,
+                        video = artworkVideo,
+                        contentLayer = coverContent,
+                        videoLayer = { video, current, pictureAspect ->
+                            ArtworkVideoSurface(
+                                stream = video,
+                                master = connection.player,
+                                active = { current && videoActive() },
+                                prepareWhen = { current && videoPrepare() },
+                                visibility = videoVisibility,
+                                current = currentVideo.takeIf { current },
+                                pictureAspect = pictureAspect,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        },
+                        contentDescription = metadata.title,
                     )
-                    LiveCoverExtension(
-                        video = currentVideo,
-                        content = coverContent,
-                        url = metadata.thumbnailUrl,
-                        slot = coverSlot,
-                        visibility = { backdropVisibility() * videoVisibility() },
-                        offsetX = { coverSwipe.value },
-                    )
-                    revealed?.let { url ->
-                        CoverExtension(url = url, baker = backdropBaker, visibility = backdropVisibility, offsetX = revealedOffset)
+                    if (!landscape) {
+                        val slot = coverSlot
+                        if (slot != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) UnifiedCoverField(
+                            content = coverContent, slot = slot,
+                            titleY = titleSlot?.top ?: (slot.bottom + slot.height * 0.06f),
+                            crop = rememberCoverCrop(metadata.thumbnailUrl),
+                            visibility = { (if (unifiedSurface()) 1f else smoothstep((sheet.progress - 0.85f) / 0.15f)) * (1f - lyrics()) },
+                            offsetX = { coverSwipe.value },
+                        )
+                        if (revealed != null && slot != null) NeighbourCover(url = revealed, slot = slot, offsetX = revealedOffset, titleY = titleSlot?.top)
                     }
                 }
-
-                // Until the slot is measured (first frame) the cover waits on the cookie itself.
-                FlyingCover(
-                    url = metadata.thumbnailUrl,
-                    from = cookieOrigin,
-                    to = coverSlot ?: cookieOrigin,
-                    progress = { sheet.progress.coerceIn(0f, 1f) },
-                    // Parked, the spin is not read, so it does not redraw the hidden cover.
-                    startRotation = { if (sheet.isOpenOrOpening) spin?.degrees ?: 0f else 0f },
-                    fullBleed = !landscape,
-                    swipeOffset = { coverSwipe.value },
-                    lyrics = lyrics,
-                    fadingUrl = coverCrossfade.fading,
-                    fadingAlpha = coverCrossfade::fadingAlpha,
-                    onCoverDrawn = coverCrossfade::onCoverDrawn,
-                    video = artworkVideo,
-                    contentLayer = coverContent,
-                    videoLayer = { video, current ->
-                        ArtworkVideoSurface(
-                            stream = video,
-                            master = connection.player,
-                            active = { current && videoActive() },
-                            visibility = videoVisibility,
-                            current = currentVideo.takeIf { current },
-                            modifier = Modifier.fillMaxSize(),
-                        )
-                    },
-                    contentDescription = metadata.title,
-                )
                 if (!landscape) {
-                    val slot = coverSlot
-                    if (revealed != null && slot != null) NeighbourCover(url = revealed, slot = slot, offsetX = revealedOffset)
-                    // Lyrics read on a slightly darker backdrop.
+                    // Lyrics read on a darker backdrop: the darkening the whole cover needs for white
+                    // text (the backdrop itself is darkened only behind the controls), and a little more.
+                    // It changes with the track as the backdrop does, in one dissolve.
+                    val coverDim by animateFloatAsState(
+                        targetValue = rememberCoverCrop(metadata.thumbnailUrl)?.dim ?: 0f,
+                        animationSpec = tween(DissolveMillis),
+                        label = "lyricsBackdropDim",
+                    )
                     Box(
                         Modifier
                             .fillMaxSize()
                             .graphicsLayer { alpha = lyrics() }
-                            .background(Color.Black.copy(alpha = LyricsBackdropDim)),
+                            .drawBehind { drawRect(Color.Black.copy(alpha = 1f - (1f - LyricsBackdropDim) * (1f - coverDim))) },
                     )
                 }
 
@@ -649,18 +698,6 @@ private fun PlayerBackHandlers(
     }
 }
 
-/** Clips the player foreground to the container's current (growing) rounded rect. */
-private class GrowingContainerShape(
-    private val bounds: Rect,
-    private val cornerPx: Float,
-) : Shape {
-    override fun createOutline(
-        size: Size,
-        layoutDirection: LayoutDirection,
-        density: Density,
-    ): Outline = Outline.Rounded(RoundRect(bounds, CornerRadius(cornerPx)))
-}
-
 /** Layout coordinates of the slots the flying elements land in (set from onPlaced). */
 private class SlotGeometry {
     var foreground: LayoutCoordinates? = null
@@ -671,7 +708,8 @@ private class SlotGeometry {
     fun rectOf(slot: LayoutCoordinates?): Rect? {
         val parent = foreground?.takeIf { it.isAttached } ?: return null
         val child = slot?.takeIf { it.isAttached } ?: return null
-        return parent.localBoundingBoxOf(child)
+        // La maschera animata dei controlli non deve ridimensionare le coordinate canoniche.
+        return parent.localBoundingBoxOf(child, clipBounds = false)
     }
 }
 
@@ -750,6 +788,9 @@ private fun FlyingCover(
     progress: () -> Float,
     startRotation: () -> Float,
     fullBleed: Boolean,
+    unifiedSurface: () -> Boolean,
+    cropProgress: () -> Float,
+    titleY: Float?,
     swipeOffset: () -> Float,
     lyrics: () -> Float,
     fadingUrl: String?,
@@ -757,7 +798,7 @@ private fun FlyingCover(
     onCoverDrawn: (String?) -> Unit,
     video: ArtworkVideoStream?,
     contentLayer: GraphicsLayer,
-    videoLayer: @Composable (video: ArtworkVideoStream, current: Boolean) -> Unit,
+    videoLayer: @Composable (video: ArtworkVideoStream, current: Boolean, pictureAspect: Float?) -> Unit,
     contentDescription: String,
 ) {
     val density = LocalDensity.current
@@ -777,13 +818,13 @@ private fun FlyingCover(
             )
         }
     val finalShape = if (fullBleed) RectangleShape else RoundedCornerShape(CoverCorner)
+    val coverCrop = rememberCoverCrop(url)
 
     Box(
         modifier =
             Modifier
                 .layout { measurable, _ ->
-                    val p = progress()
-                    val rect = lerp(from, to, p)
+                    val rect = if (unifiedSurface()) to else lerp(from, to, progress())
                     val placeable =
                         measurable.measure(
                             Constraints.fixed(rect.width.toInt().coerceAtLeast(1), rect.height.toInt().coerceAtLeast(1)),
@@ -792,12 +833,14 @@ private fun FlyingCover(
                         placeable.place(rect.left.toInt(), rect.top.toInt())
                     }
                 }.graphicsLayer {
-                    val p = progress()
-                    // The cookie is 12-fold symmetric: un-spin the silhouette through the
-                    // shortest arc (the artwork itself is upright in the cookie too).
-                    val spun = startRotation() % 30f
-                    val unspin = if (spun > 15f) spun - 30f else spun
-                    shape = if (p >= 0.999f) finalShape else LiquidMorphShape(morph, p, unspin * (1f - p))
+                    // Nel volo comune questa superficie resta ferma e alla misura canonica.
+                    val p = if (unifiedSurface()) 1f else progress()
+                    shape = if (p >= 0.999f) finalShape else {
+                        // Solo il percorso di apertura precedente usa il suo arco breve.
+                        val spun = startRotation() % 30f
+                        val unspin = if (spun > 15f) spun - 30f else spun
+                        LiquidMorphShape(morph, p, unspin * (1f - p))
+                    }
                     clip = true
                     // Cover and backdrop are one page: it slides whole, at full opacity.
                     translationX = swipeOffset()
@@ -813,7 +856,15 @@ private fun FlyingCover(
                 }.then(
                     // As the cover lands its top and bottom dissolve into the backdrop, which
                     // continues the cover (CoverExtension) — one image, not two.
-                    if (fullBleed) Modifier.coverEdgeFade(edge = { 1f - progress() }, dim = { cachedCoverDim(url) }) else Modifier,
+                    if (fullBleed) Modifier.coverEdgeFade(
+                        edge = { if (unifiedSurface()) 1f else 1f - progress() },
+                        bottomScrim = {
+                            val unified = if (unifiedSurface()) 1f else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
+                                smoothstep((progress() - 0.85f) / 0.15f) else 0f
+                            (coverCrop?.bottomScrim ?: 0f) * (1f - unified)
+                        },
+                        titleFraction = { titleY?.let { (it - to.top) / to.height } ?: 1.06f },
+                    ) else Modifier,
                 ),
     ) {
         // One keyed layer per cover (its image, and its video if any): after a track change the
@@ -825,8 +876,23 @@ private fun FlyingCover(
             Modifier
                 .fillMaxSize()
                 .drawWithContent {
-                    contentLayer.record { this@drawWithContent.drawContent() }
-                    drawLayer(contentLayer)
+                    // Coordinate canoniche durante tutto il volo: il campo non deve conservare
+                    // la matrice della mini-copertina quando il layer diventa grande.
+                    val drawnSize = size
+                    val canonical = IntSize(to.width.roundToInt().coerceAtLeast(1), to.height.roundToInt().coerceAtLeast(1))
+                    contentLayer.record(canonical) {
+                        scale(canonical.width / drawnSize.width, canonical.height / drawnSize.height, Offset.Zero) {
+                            this@drawWithContent.drawContent()
+                        }
+                    }
+                    val unified = if (unifiedSurface()) 1f else if (fullBleed && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) smoothstep((progress() - 0.85f) / 0.15f) else 0f
+                    if (unified < 1f) {
+                        if (unified > 0f) drawContext.canvas.saveLayer(Rect(Offset.Zero, drawnSize), Paint().apply { alpha = 1f - unified })
+                        scale(drawnSize.width / canonical.width, drawnSize.height / canonical.height, Offset.Zero) {
+                            drawLayer(contentLayer)
+                        }
+                        if (unified > 0f) drawContext.canvas.restore()
+                    }
                 },
         ) {
             listOfNotNull(url, fadingUrl?.takeIf { it != url }).forEach { layerUrl ->
@@ -860,13 +926,15 @@ private fun FlyingCover(
                                     // A letterboxed thumbnail is enlarged past its black bands, so
                                     // the sharp cover shows the same square as its backdrop.
                                     val zoom = cachedCoverZoom(layerUrl)
-                                    scaleX = zoom.scale
-                                    scaleY = zoom.scale
-                                    translationX = zoom.shiftX * size.width
-                                    translationY = zoom.shiftY * size.height
+                                    // Il mini-player usa la foto originale, comprese eventuali bande.
+                                    val original = if (unifiedSurface()) cropProgress() else 0f
+                                    scaleX = lerp(zoom.scale, 1f, original)
+                                    scaleY = scaleX
+                                    translationX = zoom.shiftX * size.width * (1f - original)
+                                    translationY = zoom.shiftY * size.height * (1f - original)
                                 },
                         )
-                        layerVideos[layerUrl]?.let { layerVideo -> videoLayer(layerVideo, !isFading) }
+                        layerVideos[layerUrl]?.let { layerVideo -> videoLayer(layerVideo, !isFading, cachedCoverCrop(layerUrl)?.contentAspectRatio) }
                     }
                 }
             }
@@ -875,7 +943,7 @@ private fun FlyingCover(
         Box(
             Modifier
                 .fillMaxSize()
-                .drawBehind { drawRect(Color.Black, alpha = CookieDim * (1f - progress()).coerceIn(0f, 1f)) },
+                .drawBehind { drawRect(Color.Black, alpha = if (unifiedSurface()) 0f else CookieDim * (1f - progress()).coerceIn(0f, 1f)) },
         )
     }
 }
@@ -916,6 +984,10 @@ private fun PlayerContent(
             if (!landscape) translationY += lyrics() * ControlsSink.toPx()
         }
 
+    // On a bright cover the top bar's veil darkens as much as the backdrop's own scrim there would
+    // need, so the buttons keep their contrast without a dark band across the screen.
+    val topScrim = rememberCoverCrop(metadata.thumbnailUrl)?.topScrim ?: MinTopScrim
+    val topBarVeil = CoverScrim.copy(alpha = CoverScrim.alpha + topScrim - MinTopScrim)
     val topBar: @Composable (Modifier) -> Unit = { barModifier ->
         Row(
             modifier =
@@ -933,14 +1005,14 @@ private fun PlayerContent(
                 contentDescription = stringResource(R.string.vibra_close_player),
                 onClick = sheet::collapse,
                 size = 44.dp,
-                container = CoverScrim,
+                container = topBarVeil,
             )
             Spacer(Modifier.weight(1f))
             BackdropCircleButton(
                 icon = R.drawable.more_horiz,
                 contentDescription = stringResource(R.string.vibra_more),
                 size = 44.dp,
-                container = CoverScrim,
+                container = topBarVeil,
                 onClick = {
                     menuState.show {
                         PlayerMenu(
@@ -1673,7 +1745,7 @@ private val ArtistLinkStyles =
         pressedStyle = SpanStyle(color = OnBackdrop, textDecoration = TextDecoration.None),
     )
 
-/** Dark veil behind buttons that sit on the cover itself (top bar). */
+/** Dark veil behind buttons that sit on the cover itself (top bar); deeper on bright covers. */
 private val CoverScrim = Color.Black.copy(alpha = 0.28f)
 
 /** Accent taken from the current cover; see [artworkAccent]. */

@@ -5,6 +5,7 @@
 
 package app.vibra.ui.dock
 
+import app.vibra.ui.player.artworkInMiniPlayer
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.core.Animatable
@@ -543,7 +544,7 @@ private fun MiniPlayer(
             artworkUrl = metadata.thumbnailUrl,
             size = MiniPlayerGeometry.CookieSize,
             // The full player's cover takes over from this cookie as soon as it starts opening.
-            modifier = Modifier.graphicsLayer { alpha = if (playerProgress() > 0.001f) 0f else 1f },
+            modifier = Modifier.graphicsLayer { alpha = if (artworkInMiniPlayer(playerProgress())) 1f else 0f },
         )
         if (detailsAlpha > 0.01f) {
             val slide = Liquid.spatial<IntOffset>()

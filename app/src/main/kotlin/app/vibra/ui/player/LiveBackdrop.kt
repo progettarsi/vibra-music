@@ -15,14 +15,12 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.graphics.BlurEffect
-import androidx.compose.ui.graphics.TileMode
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.withTransform
@@ -31,7 +29,6 @@ import androidx.compose.ui.graphics.layer.GraphicsLayer
 import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.unit.IntSize
-import coil3.compose.LocalPlatformContext
 import kotlin.math.roundToInt
 import moe.rukamori.archivetune.LocalAnimationsDisabled
 
@@ -41,27 +38,28 @@ import moe.rukamori.archivetune.LocalAnimationsDisabled
  * ─────────────────────────────────────────────────────────────────────────────────────
  *
  *  The cover's content — its image and the video playing over it — is recorded once into a
- *  graphics layer (FlyingCover) and drawn here a second time as CoverExtension draws a
- *  cover: at its place, its top and bottom rows stretched to the screen edges, under a heavy
- *  and a soft blur, the contrast dim and the legibility scrims.
+ *  graphics layer (FlyingCover). Come per CoverExtension, il campo continuo dei bordi mantiene
+ *  orientamento e blur uniforme. Lo scurimento segue la copertina e la posizione del titolo
+ *  (i colori dei frame non vengono analizzati, per evitare variazioni durante il video).
  *
  *  Nothing is read back and nothing is redrawn by the app: the recording refers to the
  *  video's surface, so the render thread brings each new video frame into the backdrop in
  *  the same frame the cover shows it — in step, at the video's frame rate, no ghosting.
- *  The blurred layers are a sixth of the screen's size and drawn stretched back: a 44 dp
- *  blur leaves nothing finer, and blurring a thirty-sixth of the pixels is cheap enough to do
- *  for every video frame. When the cover does not change (a paused video), nothing is redone.
+ *  Il piano viene sfocato e composto a un sesto della risoluzione, poi disteso una sola volta.
+ *  Il blur non contiene dettagli più fini; lavorare su un
+ *  trentaseiesimo dei pixel riduce il costo per frame. Con il video in pausa non si aggiorna.
  * ─────────────────────────────────────────────────────────────────────────────────────
  */
 
 /**
  * The backdrop drawn from [content] (the cover's recorded content) while [video] shows a
- * picture: it lies over the cover's own baked backdrop (CoverExtension), dissolves in with
- * the video (it shares its reveal) and out when the video goes away. [url] is the cover's,
- * whose contrast dim it keeps (a video's frames would make it pulse).
+ * picture: it lies over the cover's own baked backdrop (CoverExtension). The source already
+ * composites the video with its cover: [videoMix] restores the cover's flat edges without
+ * multiplying the video's opacity a second time. [url] is the cover's,
+ * whose scrims it keeps (a video's frames would make them pulse).
  */
 @Composable
-fun LiveCoverExtension(
+internal fun LiveCoverExtension(
     video: CurrentArtworkVideo,
     content: GraphicsLayer,
     url: String?,
@@ -69,6 +67,8 @@ fun LiveCoverExtension(
     visibility: () -> Float,
     modifier: Modifier = Modifier,
     offsetX: () -> Float = { 0f },
+    titleY: Float? = null,
+    videoMix: () -> Float = { 1f },
 ) {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
     val playback = video.playback
@@ -89,59 +89,51 @@ fun LiveCoverExtension(
     }
     val drawn by remember { derivedStateOf { shown != null || fadeOut.value > 0f } }
     if (!drawn || slot == null) return
-    val context = LocalPlatformContext.current
-    val dim by produceState(0f, url) { value = url?.let { coverContrastDim(context, it) } ?: 0f }
-    val heavy = rememberGraphicsLayer()
-    val soft = rememberGraphicsLayer()
+    val crop = rememberCoverCrop(url)
+    val pictureLayer = rememberGraphicsLayer()
+    val surface = rememberGraphicsLayer()
     Canvas(
         modifier
             .fillMaxSize()
             .graphicsLayer {
-                alpha = visibility() * (shown?.reveal?.value ?: fadeOut.value)
+                alpha = visibility() * (if (shown != null) 1f else fadeOut.value)
                 translationX = offsetX()
             },
     ) {
-        val small = IntSize((size.width * LiveScale).roundToInt().coerceAtLeast(1), (size.height * LiveScale).roundToInt().coerceAtLeast(1))
-        val heavyRadius = HeavyBlur.toPx() * LiveScale
-        val softRadius = SoftBlur.toPx() * LiveScale
-        val full = size
-        // Heavy blur everywhere…
-        heavy.renderEffect = BlurEffect(heavyRadius, heavyRadius, TileMode.Decal)
-        heavy.record(small) { scale(LiveScale, Offset.Zero) { drawContentExtension(content, slot, full.height) } }
-        // …and a soft one around the cover's edges, where the sharp cover dissolves.
-        soft.renderEffect = BlurEffect(softRadius, softRadius, TileMode.Decal)
-        soft.record(small) {
-            scale(LiveScale, Offset.Zero) { softEdge(slot, full) { drawContentExtension(content, slot, full.height) } }
+        val canvas = size
+        val small = IntSize((canvas.width * LiveScale).roundToInt().coerceAtLeast(1), (canvas.height * LiveScale).roundToInt().coerceAtLeast(1))
+        val blur = BackdropBlur.toPx()
+        val top = crop?.topScrim ?: MinTopScrim
+        val bottom = crop?.bottomScrim ?: MinBottomScrim
+        val coverWeight = 1f - videoMix().coerceIn(0f, 1f)
+        val plainTop = crop?.plainTop?.let { it.copy(weight = it.weight * coverWeight) }
+        val plainBottom = crop?.plainBottom?.let { it.copy(weight = it.weight * coverWeight) }
+        surface.record(small) {
+            drawBackdrop(pictureLayer, slot, canvas, LiveScale, blur, plainTop, plainBottom, top, bottom, titleY ?: (slot.bottom + slot.height * 0.06f), crop?.topSpread ?: 0.2f, crop?.bottomSpread ?: 0.2f) { rect, source -> drawCoverContent(content, rect, source) }
         }
-        scale(1f / LiveScale, Offset.Zero) {
-            drawLayer(heavy)
-            drawLayer(soft)
-        }
-        drawBackdropScrims(slot, dim)
+        scale(1f / LiveScale, Offset.Zero) { drawLayer(surface) }
     }
 }
 
-/** [content] continuing the cover at [slot], like CoverExtension's image (see extensionParts). */
-private fun DrawScope.drawContentExtension(
+/** The cover's recorded [content] (a square, like the cover) drawn [into] a rectangle. */
+internal fun DrawScope.drawCoverContent(
     content: GraphicsLayer,
-    slot: Rect,
-    canvasHeight: Float,
+    into: Rect,
+    source: Rect,
+    expectedSize: IntSize = content.size,
 ) {
-    val contentSize = content.size
+    val contentSize = expectedSize
     if (contentSize.width <= 0 || contentSize.height <= 0) return
-    extensionParts(CoverCrop.centered(contentSize.width, contentSize.height), slot, canvasHeight).forEach { (source, target, mirrored) ->
+    // Il ritaglio è sul layer già presente in GPU, anche per righe molto sottili.
+    clipRect(into.left, into.top, into.right, into.bottom) {
+        val sx = into.width / (contentSize.width * source.width)
+        val sy = into.height / (contentSize.height * source.height)
         withTransform({
-            // A mirrored band is flipped: its first row lands at the target's bottom edge.
-            translate(target.left.toFloat(), if (mirrored) target.bottom.toFloat() else target.top.toFloat())
-            val scaleY = target.height.toFloat() / source.height
-            scale(target.width.toFloat() / source.width, if (mirrored) -scaleY else scaleY, Offset.Zero)
-            translate(-source.left.toFloat(), -source.top.toFloat())
-            clipRect(source.left.toFloat(), source.top.toFloat(), source.right.toFloat(), source.bottom.toFloat())
-        }) {
-            drawLayer(content)
-        }
+            translate(into.left - source.left * contentSize.width * sx, into.top - source.top * contentSize.height * sy)
+            scale(sx, sy, Offset.Zero)
+        }) { drawLayer(content) }
     }
 }
 
-/** Resolution of the live backdrop's blurred layers relative to the screen. */
+/** Resolution the live backdrop is made at, relative to the screen. */
 private const val LiveScale = 1f / 6f

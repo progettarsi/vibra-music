@@ -36,11 +36,14 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
+import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import java.util.concurrent.TimeUnit
 import kotlin.math.roundToInt
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
@@ -106,6 +109,7 @@ class CurrentArtworkVideo {
 internal class ArtworkVideoPlayback(
     private val context: Context,
     val stream: ArtworkVideoStream,
+    private val source: (ArtworkVideoStream) -> MediaSource = ::mediaSource,
 ) {
     var player by mutableStateOf<ExoPlayer?>(null)
         private set
@@ -129,8 +133,9 @@ internal class ArtworkVideoPlayback(
     suspend fun follow(
         master: Player,
         active: () -> Boolean,
-    ) {
-        snapshotFlow(active).first { it }
+        prepareWhen: () -> Boolean = active,
+    ) = coroutineScope {
+        snapshotFlow(prepareWhen).first { it }
         // It starts where the audio will be once it is ready, so its first frame — the one
         // the cover dissolves into — is already the right one (not the video's opening).
         val video = build(startAt = master.currentPosition + if (master.isPlaying) seekLead else 0L)
@@ -154,12 +159,15 @@ internal class ArtworkVideoPlayback(
                 }
             }
         master.addListener(listener)
+        // Lo stesso ciclo di sincronizzazione si sveglia anche sulla soglia di visibilità.
+        val activeChanges = launch { snapshotFlow(active).collect { nudge.trySend(Unit) } }
         try {
             while (!failed) {
                 val wait = align(video, master, active())
                 withTimeoutOrNull(wait) { nudge.receive() }
             }
         } finally {
+            activeChanges.cancel()
             master.removeListener(listener)
         }
     }
@@ -245,7 +253,7 @@ internal class ArtworkVideoPlayback(
                         }
                     },
                 )
-                setMediaSource(mediaSource(stream), startAt)
+                setMediaSource(source(stream), startAt)
                 prepare()
             }
 }
@@ -262,14 +270,19 @@ internal fun ArtworkVideoSurface(
     active: () -> Boolean,
     visibility: () -> Float,
     current: CurrentArtworkVideo?,
+    pictureAspect: Float? = null,
     modifier: Modifier = Modifier,
+    source: (ArtworkVideoStream) -> MediaSource = ::mediaSource,
+    prepareWhen: () -> Boolean = active,
 ) {
     val context = LocalContext.current.applicationContext
-    val playback = remember(stream) { ArtworkVideoPlayback(context, stream) }
+    val playback = remember(stream) { ArtworkVideoPlayback(context, stream, source) }
     DisposableEffect(playback) { onDispose(playback::release) }
     // The layer stays the same while it turns from current to fading: read the latest rule.
     val currentActive by rememberUpdatedState(active)
-    LaunchedEffect(playback) { playback.follow(master) { currentActive() } }
+    val currentPrepare by rememberUpdatedState(prepareWhen)
+    val currentVisibility by rememberUpdatedState(visibility)
+    LaunchedEffect(playback) { playback.follow(master, { currentActive() }, { currentPrepare() }) }
     val shown = playback.hasFrame && !playback.failed
     if (current != null) {
         DisposableEffect(current, playback, shown) {
@@ -281,20 +294,26 @@ internal fun ArtworkVideoSurface(
     val animationsDisabled = LocalAnimationsDisabled.current
     LaunchedEffect(playback, shown) {
         val target = if (shown) 1f else 0f
-        if (animationsDisabled) {
+        if (animationsDisabled || (shown && currentVisibility() <= 0.001f)) {
+            // Un frame pronto prima di metà apertura attende dietro la stessa curva del foglio.
             playback.reveal.snapTo(target)
         } else {
             playback.reveal.animateTo(target, tween(RevealMillis, easing = FastOutSlowInEasing))
         }
     }
     val video = playback.player ?: return
+    val bandZoom = videoBandZoom(stream.aspectRatio, pictureAspect)
     AndroidView(
         factory = { viewContext -> TextureView(viewContext).also(video::setVideoTextureView) },
         onRelease = video::clearVideoTextureView,
         modifier =
             modifier
                 .centreCrop(stream.aspectRatio)
-                .graphicsLayer { alpha = playback.reveal.value * visibility() },
+                .graphicsLayer {
+                    alpha = playback.reveal.value * visibility()
+                    scaleX = bandZoom
+                    scaleY = bandZoom
+                },
     )
 }
 
