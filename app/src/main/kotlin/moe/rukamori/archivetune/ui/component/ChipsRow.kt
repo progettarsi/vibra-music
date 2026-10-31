@@ -7,6 +7,7 @@
 
 package moe.rukamori.archivetune.ui.component
 
+import app.vibra.ui.motion.vibraControlFeedback
 import android.annotation.SuppressLint
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -100,6 +101,7 @@ fun <E> ChipsRow(
                     FilterChipDefaults.filterChipColors(
                         containerColor = containerColor,
                     ),
+                modifier = Modifier.vibraControlFeedback(enabled = true),
             )
 
             Spacer(Modifier.width(8.dp))
@@ -165,6 +167,7 @@ fun <Int> ChoiceChipsRow(
                         containerColor = containerColor,
                         labelColor = MaterialTheme.colorScheme.onSurface,
                     ),
+                modifier = Modifier.vibraControlFeedback(enabled = true),
             )
 
             AnimatedVisibility(
@@ -218,6 +221,7 @@ fun <Int> ChoiceChipsRow(
                         onClick = { onValueUpdate(value) },
                         shape = RoundedCornerShape(16.dp),
                         border = null,
+                        modifier = Modifier.vibraControlFeedback(enabled = true),
                     )
                 }
             }

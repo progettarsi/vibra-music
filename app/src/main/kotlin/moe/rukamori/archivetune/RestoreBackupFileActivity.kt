@@ -7,6 +7,7 @@
 
 package moe.rukamori.archivetune
 
+import app.vibra.ui.motion.vibraControlFeedback
 import android.net.Uri
 import android.os.Bundle
 import android.widget.Toast
@@ -311,6 +312,7 @@ private fun RestoreOptionsDialog(
                             onSelectionChanged(if (checked) selected + category else selected - category)
                         },
                         enabled = isAvailable,
+                        modifier = Modifier.vibraControlFeedback(enabled = isAvailable),
                     )
                 }
             }

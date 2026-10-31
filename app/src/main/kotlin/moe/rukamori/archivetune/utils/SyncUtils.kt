@@ -424,12 +424,14 @@ class SyncUtils
                         if (authoritative) {
                             val localLikedSongs = database.likedSongsByNameAsc().first()
                             if (!isSyncStillEnabled(gen)) return@onSuccess
+                            val importedSpotifyLikes = database.spotifyImportedIds("liked").toSet()
                             val staleLikedSongs =
                                 localLikedSongs
                                     .asSequence()
                                     .map { it.song }
                                     .filterNot { it.isLocal }
                                     .filterNot { it.id in remoteIds }
+                                    .filterNot { it.id in importedSpotifyLikes }
                                     .filterNot { it.id in pendingLikes }
                                     .map { it.copy(liked = false, likedDate = null) }
                                     .toList()
@@ -508,6 +510,7 @@ class SyncUtils
                         val remoteSongs = rawRemoteSongs.filterNot { pendingLikes[it.id] == false }
                         val remoteIds = remoteSongs.map { it.id }.toSet()
                         val localSongs = database.songsByNameAsc().first()
+                        val importedSpotifyLikes = database.spotifyImportedIds("liked").toSet()
 
                         if (!isSyncStillEnabled(gen)) return@onSuccess
                         val staleLibrarySongs =
@@ -515,6 +518,7 @@ class SyncUtils
                                 .asSequence()
                                 .filterNot { it.song.isLocal }
                                 .filterNot { it.id in remoteIds }
+                                .filterNot { it.id in importedSpotifyLikes }
                                 .filterNot { it.id in pendingLikes }
                                 .map { it.song.copy(inLibrary = null) }
                                 .toList()
@@ -662,11 +666,13 @@ class SyncUtils
                         val localArtists = database.artistsBookmarkedByNameAsc().first()
 
                         if (!isSyncStillEnabled(gen)) return@onSuccess
+                        val importedSpotifyArtists = database.spotifyImportedIds("artist").toSet()
                         val staleArtists =
                             localArtists
                                 .asSequence()
                                 .filterNot { it.artist.isLocal }
                                 .filterNot { it.id in remoteIds }
+                                .filterNot { it.id in importedSpotifyArtists }
                                 .map { it.artist.copy(bookmarkedAt = null, lastUpdateTime = now) }
                                 .toList()
                         if (staleArtists.isNotEmpty()) {

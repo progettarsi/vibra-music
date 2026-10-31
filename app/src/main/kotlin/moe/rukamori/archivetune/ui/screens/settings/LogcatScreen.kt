@@ -9,6 +9,7 @@
 
 package moe.rukamori.archivetune.ui.screens.settings
 
+import app.vibra.ui.motion.vibraControlFeedback
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -36,14 +37,14 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material3.Button
+import app.vibra.ui.motion.VibraButton as Button
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
+import app.vibra.ui.motion.VibraIconButton as IconButton
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
@@ -475,6 +476,7 @@ private fun LogcatLogContent(
                     leadingIcon = {
                         LogcatLevelBadge(level = level)
                     },
+                    modifier = Modifier.vibraControlFeedback(enabled = true),
                 )
             }
         }

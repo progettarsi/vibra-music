@@ -11,21 +11,12 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Semaphore
-import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import moe.rukamori.archivetune.constants.InnerTubeCookieKey
 import moe.rukamori.archivetune.db.MusicDatabase
 import moe.rukamori.archivetune.db.entities.ArtistEntity
-import moe.rukamori.archivetune.db.entities.PlaylistEntity
 import moe.rukamori.archivetune.innertube.YouTube
 import moe.rukamori.archivetune.innertube.models.ArtistItem
 import moe.rukamori.archivetune.innertube.utils.hasYouTubeLoginCookie
@@ -35,12 +26,11 @@ import moe.rukamori.archivetune.utils.reportException
 import java.text.Normalizer
 import java.time.LocalDateTime
 import java.util.Locale
-import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /** A YouTube Music artist to show and pick; holds no authentication data. */
-data class ImportedArtist(val browseId: String, val name: String, val thumbnailUrl: String?)
+data class ImportedArtist(val browseId: String, val name: String, val thumbnailUrl: String?, val sourceId: String = browseId)
 
 internal fun normalizedArtistName(name: String): String =
     Normalizer.normalize(name, Normalizer.Form.NFKC).trim().replace(Regex("\\s+"), " ").lowercase(Locale.ROOT)
@@ -78,7 +68,7 @@ class SpotifyOnboardingImport @Inject constructor(
             val imported = artists.filter { it.name.isNotBlank() }.mapNotNull { artist ->
                 val results = YouTube.search(artist.name, YouTube.SearchFilter.FILTER_ARTIST).getOrThrow()
                 bestExactArtist(artist.name, results.items.filterIsInstance<ArtistItem>())?.let {
-                    ImportedArtist(it.id, it.title, it.thumbnail)
+                    ImportedArtist(it.id, it.title, it.thumbnail, artist.id)
                 }
             }.distinctBy { it.browseId }
             Result.success(imported)
@@ -87,57 +77,6 @@ class SpotifyOnboardingImport @Inject constructor(
         } catch (error: Exception) {
             Result.failure(error)
         }
-    }
-
-    private val importScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val playlistsImported = AtomicBoolean(false)
-
-    /**
-     * Copies every Spotify playlist into a local playlist, each track matched on YouTube Music
-     * (tracks without a match are left out). Runs on its own scope, so it carries on after the
-     * onboarding closes; once per process.
-     */
-    fun importPlaylistsInBackground() {
-        if (!playlistsImported.compareAndSet(false, true)) return
-        importScope.launch {
-            try {
-                spotifyLibrary.refreshPlaylists().forEach { playlist ->
-                    try {
-                        importPlaylist(playlist)
-                    } catch (cancelled: CancellationException) {
-                        throw cancelled
-                    } catch (error: Exception) {
-                        reportException(error)
-                    }
-                }
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (error: Exception) {
-                reportException(error)
-            }
-        }
-    }
-
-    private suspend fun importPlaylist(source: moe.rukamori.archivetune.spotify.models.SpotifyPlaylist) {
-        val tracks = spotifyLibrary.playlistTracks(source.id)
-        val gate = Semaphore(PlaylistMatchParallelism)
-        val songs =
-            coroutineScope {
-                tracks.map { track -> async { gate.withPermit { SpotifyPlaybackResolver.resolveToMetadata(track) } } }.awaitAll()
-            }.filterNotNull().distinctBy { it.id }
-        if (songs.isEmpty()) return
-        val entity =
-            PlaylistEntity(
-                name = source.name,
-                thumbnailUrl = source.images.firstOrNull()?.url?.takeIf { it.isNotBlank() },
-                bookmarkedAt = LocalDateTime.now(),
-            )
-        database.withTransaction {
-            songs.forEach { insert(it) }
-            insert(entity)
-        }
-        val playlist = database.playlist(entity.id).first() ?: return
-        database.addSongToPlaylist(playlist, songs.map { it.id })
     }
 
     /** Idempotent bookmark, like Follow; when signed in it also subscribes on YouTube Music. */
@@ -164,5 +103,3 @@ class SpotifyOnboardingImport @Inject constructor(
     }
 }
 
-/** Track searches running at once while a playlist is matched on YouTube Music. */
-private const val PlaylistMatchParallelism = 4

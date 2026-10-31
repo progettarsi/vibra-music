@@ -9,6 +9,7 @@
 
 package moe.rukamori.archivetune.ui.screens.settings
 
+import app.vibra.ui.motion.vibraControlFeedback
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
@@ -42,7 +43,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
+import app.vibra.ui.motion.VibraButton as Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -64,7 +65,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import app.vibra.ui.motion.VibraTextButton as TextButton
 import androidx.compose.material3.WavyProgressIndicatorDefaults
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.compose.material3.toShape
@@ -1163,7 +1164,7 @@ private fun UpdatePreferencesPanel(
                         onClick = onStableSelected,
                         shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
                         icon = {},
-                    ) {
+                    modifier = Modifier.vibraControlFeedback(enabled = true), ) {
                         Text(text = channelTitle)
                     }
                     SegmentedButton(
@@ -1171,7 +1172,7 @@ private fun UpdatePreferencesPanel(
                         onClick = onArtifactSelected,
                         shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
                         icon = {},
-                    ) {
+                    modifier = Modifier.vibraControlFeedback(enabled = true), ) {
                         Text(text = stringResource(R.string.channel_artifact))
                     }
                 }

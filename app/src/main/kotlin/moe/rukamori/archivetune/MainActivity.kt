@@ -9,6 +9,7 @@
 
 package moe.rukamori.archivetune
 
+import app.vibra.ui.motion.vibraControlFeedback
 import android.annotation.SuppressLint
 import android.content.ComponentName
 import android.content.Context
@@ -1169,6 +1170,7 @@ class MainActivity : ComponentActivity() {
                                     onCheckedChange = { checked ->
                                         selected = if (checked) selected + category else selected - category
                                     },
+                                    modifier = Modifier.vibraControlFeedback(enabled = true),
                                 )
                             }
                         }

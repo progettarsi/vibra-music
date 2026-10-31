@@ -12,7 +12,7 @@ package moe.rukamori.archivetune.ui.menu
 import android.annotation.SuppressLint
 import android.content.res.Configuration
 import android.widget.Toast
-import androidx.compose.foundation.clickable
+import app.vibra.ui.motion.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
@@ -32,7 +32,7 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import app.vibra.ui.motion.VibraTextButton as TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue

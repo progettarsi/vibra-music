@@ -7,13 +7,14 @@
 
 package moe.rukamori.archivetune.ui.screens
 
+import app.vibra.ui.motion.vibraControlFeedback
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
+import app.vibra.ui.motion.clickable
+import app.vibra.ui.motion.combinedClickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.snapping.SnapLayoutInfoProvider
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
@@ -56,14 +57,14 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.FilledIconButton
-import androidx.compose.material3.FilledTonalIconButton
+import app.vibra.ui.motion.VibraFilledIconButton as FilledIconButton
+import app.vibra.ui.motion.VibraFilledTonalIconButton as FilledTonalIconButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
+import app.vibra.ui.motion.VibraIconButton as IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
+import app.vibra.ui.motion.VibraOutlinedButton as OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.carousel.HorizontalCenteredHeroCarousel
@@ -202,6 +203,7 @@ fun HomeCategoryChips(
                         selectedLeadingIconColor = MaterialTheme.colorScheme.onSecondaryContainer,
                     ),
                 border = null,
+                modifier = Modifier.vibraControlFeedback(enabled = true),
             )
         }
     }

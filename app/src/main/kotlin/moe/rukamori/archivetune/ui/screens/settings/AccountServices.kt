@@ -112,17 +112,6 @@ fun AccountServices(
 
 
 
-            PreferenceGroup(title = stringResource(R.string.external_service)) {
-                spotifyAccountPreferences(
-                    state = spotifyState,
-                    showPlaylists = showSpotifyPlaylists,
-                    onConnectClick = { showSpotifyLogin = true },
-                    onShowPlaylistsChange = onShowSpotifyPlaylistsChange,
-                    onReloadClick = spotifyAccountViewModel::reloadPlaylists,
-                    onLogoutClick = spotifyAccountViewModel::logout,
-                )
-            }
-
             PreferenceGroup(title = stringResource(R.string.scrobbling)) {
                 item {
                     PreferenceEntry(
@@ -204,7 +193,7 @@ fun AccountServices(
     }
 }
 
-private fun PreferenceGroupScope.spotifyAccountPreferences(
+internal fun PreferenceGroupScope.spotifyAccountPreferences(
     state: SpotifyAccountUiState,
     showPlaylists: Boolean,
     onConnectClick: () -> Unit,
@@ -273,16 +262,6 @@ private fun PreferenceGroupScope.spotifyAccountPreferences(
             icon = { Icon(painterResource(R.drawable.spotify_icon), null) },
             checked = showPlaylists,
             onCheckedChange = onShowPlaylistsChange,
-            isEnabled = !state.isLoading,
-        )
-    }
-
-    item {
-        PreferenceEntry(
-            title = { Text(stringResource(R.string.spotify_reload_playlist)) },
-            description = stringResource(R.string.spotify_reload_playlist_desc),
-            icon = { Icon(painterResource(R.drawable.sync), null) },
-            onClick = onReloadClick,
             isEnabled = !state.isLoading,
         )
     }

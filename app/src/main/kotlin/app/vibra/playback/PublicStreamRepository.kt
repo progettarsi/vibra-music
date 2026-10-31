@@ -1,5 +1,5 @@
 /*
- * Vibra (2026) — bounded public relay requests, used only for foreground playback recovery.
+ * Vibra (2026) — bounded public relay requests, used for playback and explicit download recovery.
  * GPL-3.0 License. Derived from ArchiveTune © Rukamori (github.com/rukamori).
  */
 package app.vibra.playback
@@ -37,6 +37,23 @@ class PublicStreamRepository @Inject constructor() {
         val now = System.currentTimeMillis()
         val instance = INSTANCES.firstOrNull { it.source == source && (unavailableUntil[it.api] ?: 0L) <= now }
             ?: throw PublicStreamFailure()
+        return resolveAt(request, instance, now)
+    }
+
+    /** Download recovery tries each configured instance once, without borrowing playback state. */
+    suspend fun resolveDownload(request: AudioStreamRequest, stage: PlaybackStage): ResolvedAudioStream {
+        val source = if (stage == PlaybackStage.INVIDIOUS) StreamSource.INVIDIOUS else StreamSource.PIPED
+        val now = System.currentTimeMillis()
+        for (instance in INSTANCES.filter { it.source == source && (unavailableUntil[it.api] ?: 0L) <= now }) {
+            try { return resolveAt(request, instance, now) }
+            catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+            catch (_: java.io.IOException) { /* Continue to the next configured instance. */ }
+        }
+        throw PublicStreamFailure()
+    }
+
+    private suspend fun resolveAt(request: AudioStreamRequest, instance: PublicStreamInstance, now: Long): ResolvedAudioStream {
+        val source = instance.source
         var transportFailure = true
         return try {
             val url = instance.api.toHttpUrl().newBuilder().apply {

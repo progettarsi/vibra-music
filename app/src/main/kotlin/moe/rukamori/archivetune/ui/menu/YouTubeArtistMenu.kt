@@ -9,7 +9,7 @@ package moe.rukamori.archivetune.ui.menu
 
 import android.content.Intent
 import android.content.res.Configuration
-import androidx.compose.foundation.clickable
+import app.vibra.ui.motion.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer

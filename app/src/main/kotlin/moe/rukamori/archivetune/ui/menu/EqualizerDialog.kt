@@ -12,6 +12,7 @@
 
 package moe.rukamori.archivetune.ui.menu
 
+import app.vibra.ui.motion.vibraControlFeedback
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
@@ -42,21 +43,21 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
+import app.vibra.ui.motion.VibraButton as Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.FilledTonalButton
+import app.vibra.ui.motion.VibraFilledTonalButton as FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
+import app.vibra.ui.motion.VibraIconButton as IconButton
 import androidx.compose.material3.LargeFlexibleTopAppBar
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
+import app.vibra.ui.motion.VibraOutlinedButton as OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -68,7 +69,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import app.vibra.ui.motion.VibraTextButton as TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -452,7 +453,7 @@ private fun EqualizerHero(
                         color = contentColor,
                     )
                 }
-                Switch(checked = enabled, onCheckedChange = onEnabledChange)
+                Switch(checked = enabled, onCheckedChange = onEnabledChange, modifier = Modifier.vibraControlFeedback(enabled = true), )
             }
             FilledTonalButton(onClick = onOpenSystemEqualizer, modifier = Modifier.fillMaxWidth(), shapes = ButtonDefaults.shapes()) {
                 Icon(painter = painterResource(R.drawable.tune), contentDescription = null)
@@ -486,7 +487,7 @@ private fun ModeSelector(
                         onClick = { onModeChange(mode) },
                         shape = SegmentedButtonDefaults.itemShape(index, EqualizerControlMode.entries.size),
                         icon = {},
-                    ) {
+                    modifier = Modifier.vibraControlFeedback(enabled = true), ) {
                         Text(text = stringResource(if (mode == EqualizerControlMode.BASIC) R.string.eq_basic else R.string.eq_advanced))
                     }
                 }
@@ -673,6 +674,7 @@ private fun PresetSection(
                         )
                     },
                     colors = FilterChipDefaults.filterChipColors(selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer),
+                    modifier = Modifier.vibraControlFeedback(enabled = model.enabled),
                 )
             }
         }
@@ -789,7 +791,7 @@ private fun ToggleSlider(
                     Text(text = title, style = MaterialTheme.typography.titleMedium)
                     Text(text = description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                Switch(checked = enabled, onCheckedChange = onEnabledChange, enabled = controlsEnabled)
+                Switch(checked = enabled, onCheckedChange = onEnabledChange, enabled = controlsEnabled, modifier = Modifier.vibraControlFeedback(enabled = controlsEnabled), )
             }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Slider(

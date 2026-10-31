@@ -32,6 +32,8 @@ import androidx.compose.ui.input.pointer.pointerInput
  * click/long-click, ripple, swipe and drag handling run unchanged. A part of the element that
  * has its own action (a ⋮ button, a checkbox) is marked with [noTapBounce] and doesn't bounce it.
  */
+private val tapOwners = mutableMapOf<PointerId, TapBounce>()
+
 class TapBounce internal constructor(
     internal val nudge: LiquidNudge,
 ) {
@@ -53,6 +55,7 @@ fun Modifier.tapBounce(
         .pointerInput(bounce) {
             awaitEachGesture {
                 val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                tapOwners[down.id] = bounce
                 bounce.skippedPointer = null
                 val slop = viewConfiguration.touchSlop
                 // Phase 1: a quick tap that lifts before the tap timeout gets the one-shot kick.
@@ -60,7 +63,7 @@ fun Modifier.tapBounce(
                 withTimeoutOrNull(TapTimeoutMillis) {
                     outcome = awaitPressEnd(down, slop)
                 }
-                if (bounce.skippedPointer == down.id) return@awaitEachGesture
+                if (tapOwners[down.id] !== bounce || bounce.skippedPointer == down.id) return@awaitEachGesture
                 when (outcome) {
                     PressOutcome.Lifted -> bounce.nudge.kick()
                     PressOutcome.Moved -> Unit

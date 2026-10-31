@@ -7,6 +7,7 @@
 
 package moe.rukamori.archivetune.ui.component
 
+import app.vibra.ui.motion.vibraControlFeedback
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -238,6 +239,7 @@ private fun SyncPlaylistSection(
                 checked = data.syncRequested,
                 onCheckedChange = onSyncRequestedChange,
                 enabled = enabled,
+                modifier = Modifier.vibraControlFeedback(enabled = enabled),
             )
         }
     }

@@ -9,6 +9,7 @@
 
 package moe.rukamori.archivetune.ui.screens.settings
 
+import app.vibra.ui.motion.vibraControlFeedback
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -885,6 +886,7 @@ private fun BackupOptionsDialog(
                         onCheckedChange = { checked ->
                             selected = if (checked) selected + category else selected - category
                         },
+                        modifier = Modifier.vibraControlFeedback(enabled = true),
                     )
                 }
             }

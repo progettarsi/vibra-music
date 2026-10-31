@@ -17,6 +17,8 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.emitAll
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -83,6 +85,12 @@ internal fun <T> validatedNetworkStatusFlow(
         }
     }.distinctUntilChanged()
 
+/** Read the active networks at collection time, including short-lived first() consumers. */
+internal fun <T> currentValidatedNetworkStatusFlow(
+    current: () -> Set<T>,
+    register: (NetworkEvents<T>) -> AutoCloseable,
+): Flow<Boolean> = flow { emitAll(validatedNetworkStatusFlow(current(), register)) }
+
 @Singleton
 class NetworkMonitor
     @Inject
@@ -93,7 +101,7 @@ class NetworkMonitor
             requireNotNull(context.getSystemService(ConnectivityManager::class.java))
 
         val isOnline: Flow<Boolean> =
-            validatedNetworkStatusFlow(initialValidatedNetworks = currentValidatedNetworks()) { events ->
+            currentValidatedNetworkStatusFlow(current = ::currentValidatedNetworks) { events ->
                 val callback =
                     object : ConnectivityManager.NetworkCallback() {
                         override fun onCapabilitiesChanged(

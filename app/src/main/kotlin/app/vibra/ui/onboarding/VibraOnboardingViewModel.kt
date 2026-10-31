@@ -75,6 +75,8 @@ data class OnboardingUiState(
  * following. Implemented over the engine by [EngineOnboardingAccount].
  */
 interface OnboardingAccount {
+    suspend fun connections(): Pair<Boolean, Boolean> = false to false
+
     /** Name and picture of the signed-in YouTube Music account (null if not available). */
     suspend fun youTubeProfile(): Pair<String?, String?>
 
@@ -97,6 +99,14 @@ class VibraOnboardingViewModel
         private val mutableState = MutableStateFlow(OnboardingUiState())
         val state: StateFlow<OnboardingUiState> = mutableState.asStateFlow()
 
+        init {
+            viewModelScope.launch {
+                val connections = runCatching { account.connections() }.getOrDefault(false to false)
+                if (connections.first) onYouTubeSignedIn()
+                if (connections.second) onSpotifySignedIn()
+            }
+        }
+
         fun next() = move(+1)
 
         fun back() = move(-1)
@@ -113,7 +123,6 @@ class VibraOnboardingViewModel
         fun onYouTubeSignedIn() {
             if (mutableState.value.youTubeConnected) return
             mutableState.update { it.copy(youTubeConnected = true, loadingYouTube = true, step = OnboardingStep.Account, back = false) }
-            advanceWhenBothConnected()
             viewModelScope.launch {
                 val profile = runCatching { account.youTubeProfile() }.getOrNull()
                 val artists = runCatching { account.youTubeArtists() }.getOrDefault(emptyList())
@@ -131,7 +140,6 @@ class VibraOnboardingViewModel
         fun onSpotifySignedIn() {
             if (mutableState.value.spotifyConnected) return
             mutableState.update { it.copy(spotifyConnected = true, loadingSpotify = true, step = OnboardingStep.Account, back = false) }
-            advanceWhenBothConnected()
             account.importSpotifyPlaylists()
             viewModelScope.launch {
                 val artists = runCatching { account.spotifyArtists() }.getOrDefault(emptyList())

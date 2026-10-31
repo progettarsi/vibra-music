@@ -167,14 +167,15 @@ fun rememberCoverCrossfade(
     if (url != crossfade.current) {
         val previous = crossfade.current
         crossfade.current = url
-        crossfade.fading = if (handoff.fromSwipe || previous == null) null else previous
+        crossfade.fading = if (handoff.fromSwipe || previous == null) null else crossfade.drawn ?: crossfade.fading ?: previous
         handoff.fromSwipe = false
     }
     val spec = Liquid.effects<Float>(LiquidSpeed.Slow)
     LaunchedEffect(url) {
         if (crossfade.fading == null) return@LaunchedEffect
         crossfade.alpha.snapTo(1f)
-        crossfade.awaitDrawn(url)
+        // A timeout must not reveal an unanalysed or failed incoming image.
+        snapshotFlow { crossfade.drawn }.first { it == url }
         crossfade.alpha.animateTo(0f, spec)
         crossfade.fading = null
         crossfade.alpha.snapTo(1f)

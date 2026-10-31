@@ -7,6 +7,11 @@
 
 package app.vibra.ui.home
 
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.compose.ui.platform.LocalContext
+import android.widget.Toast
+import moe.rukamori.archivetune.LocalPlayerConnection
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -26,7 +31,7 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.FilledTonalButton
+import app.vibra.ui.motion.VibraFilledTonalButton as FilledTonalButton
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -112,12 +117,18 @@ fun VibraHomeScreen(
     navController: NavController,
     viewModel: HomeViewModel,
 ) {
+    val forYou: ForYouViewModel = hiltViewModel()
+    val connection = LocalPlayerConnection.current
+    val context = LocalContext.current
+    val online by forYou.online.collectAsStateWithLifecycle()
+    val downloaded by forYou.hasDownloads.collectAsStateWithLifecycle()
     val state by viewModel.screenState.collectAsStateWithLifecycle()
     val actions = rememberVibraItemActions(navController)
     val listState = rememberLazyListState()
     val bottomPadding = LocalPlayerAwareWindowInsets.current.asPaddingValues().calculateBottomPadding()
     val topPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val success = state as? HomeScreenState.Success
+    val playForYou = { forYou.play(success?.uiState, connection) { Toast.makeText(context, R.string.vibra_for_you_unavailable, Toast.LENGTH_SHORT).show() } }
     val feedSections by rememberUpdatedState(success?.uiState?.homePage?.sections.orEmpty())
 
     // Endless home: tell the feed which recommendations were really on
@@ -151,6 +162,7 @@ fun VibraHomeScreen(
                 success?.let {
                     homeBlocks(
                         ui = it.uiState,
+                        onForYou = playForYou,
                         actions = actions,
                         navController = navController,
                     )
@@ -170,6 +182,9 @@ fun VibraHomeScreen(
                 // Room for the logo, which is drawn outside the list (see above).
                 item(key = LogoKey) { Spacer(Modifier.fillMaxWidth().height(LogoRowHeight)) }
 
+                if (success == null && downloaded) item(key = "offline_for_you") {
+                    ForYouBlock(null, stringResource(R.string.vibra_for_you), stringResource(R.string.vibra_for_you_downloads), emptyList(), playForYou)
+                }
                 when (val current = state) {
                     HomeScreenState.Loading -> homeSkeleton()
                     HomeScreenState.Empty ->
@@ -264,6 +279,7 @@ private val LogoRowHeight = LogoTopGap + 35.dp + 12.dp
 @Composable
 private fun homeBlocks(
     ui: HomeUiState,
+    onForYou: () -> Unit,
     actions: VibraItemActions,
     navController: NavController,
 ): List<VibraBlock> {
@@ -299,14 +315,7 @@ private fun homeBlocks(
                     (localPicks.mapNotNull { it.song.thumbnailUrl } + remotePicks.mapNotNull { it.thumbnail })
                         .distinct()
                         .take(6),
-                onClick = {
-                    when {
-                        localPicks.isNotEmpty() -> actions.playSongs(localPicks, 0)
-                        remotePicks.isNotEmpty() -> actions.play(remotePicks.first())
-                        // Nothing to recommend yet (new user / offline): explore moods.
-                        else -> navController.navigate(Screens.MoodAndGenres.route)
-                    }
-                },
+                onClick = onForYou,
                 modifier = modifier,
             )
         }

@@ -9,6 +9,7 @@
 
 package moe.rukamori.archivetune.ui.component
 
+import app.vibra.ui.motion.vibraControlFeedback
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -19,7 +20,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import app.vibra.ui.motion.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -37,8 +38,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.selection.toggleable
+import app.vibra.ui.motion.selectable
+import app.vibra.ui.motion.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Card
@@ -61,7 +62,7 @@ import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import app.vibra.ui.motion.VibraTextButton as TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
@@ -185,7 +186,7 @@ fun PreferenceEntry(
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(
-        targetValue = if (isPressed) 0.98f else 1f,
+        targetValue = 1f,
         animationSpec = spring(stiffness = Spring.StiffnessHigh),
         label = "prefScale",
     )
@@ -266,8 +267,8 @@ fun PreferenceEntry(
                     horizontal = if (inGroup) 0.dp else 16.dp,
                     vertical = if (inGroup) 0.dp else 3.dp,
                 ).graphicsLayer {
-                    scaleX = scale
-                    scaleY = scale
+                    scaleX = 1f
+                    scaleY = 1f
                 },
     ) {
         rowContent()
@@ -311,7 +312,7 @@ fun <T> SegmentedPreference(
                                 inactiveContainerColor = MaterialTheme.colorScheme.surface,
                                 inactiveContentColor = MaterialTheme.colorScheme.onSurface,
                             ),
-                    ) {
+                    modifier = Modifier.vibraControlFeedback(enabled = isEnabled), ) {
                         Text(
                             text = valueText(value),
                             maxLines = 1,
@@ -842,6 +843,7 @@ fun SwitchPreference(
                         uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant,
                         uncheckedIconColor = MaterialTheme.colorScheme.surfaceVariant,
                     ),
+                modifier = Modifier.vibraControlFeedback(enabled = isEnabled),
             )
         },
         onClick = { onCheckedChange(!checked) },

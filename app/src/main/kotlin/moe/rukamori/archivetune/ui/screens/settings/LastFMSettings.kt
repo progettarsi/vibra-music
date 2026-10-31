@@ -9,6 +9,7 @@
 
 package moe.rukamori.archivetune.ui.screens.settings
 
+import app.vibra.ui.motion.vibraControlFeedback
 import androidx.annotation.StringRes
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -32,7 +33,7 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
+import app.vibra.ui.motion.VibraOutlinedButton as OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
@@ -509,6 +510,7 @@ private fun LastFmServiceEditorDialog(
                             onClick = { onProviderChange(provider) },
                             enabled = !editor.isSaving,
                             label = { Text(stringResource(provider.titleResId())) },
+                            modifier = Modifier.vibraControlFeedback(enabled = !editor.isSaving),
                         )
                     }
                 }

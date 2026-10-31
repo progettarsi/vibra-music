@@ -13,6 +13,7 @@
 
 package moe.rukamori.archivetune.ui.component
 
+import app.vibra.ui.motion.vibraControlFeedback
 import android.content.Context
 import android.content.Intent
 import android.os.Build
@@ -21,7 +22,7 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import app.vibra.ui.motion.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -44,7 +45,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.BasicAlertDialog
-import androidx.compose.material3.Button
+import app.vibra.ui.motion.VibraButton as Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LoadingIndicator
@@ -53,7 +54,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import app.vibra.ui.motion.VibraTextButton as TextButton
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.runtime.Composable
@@ -694,6 +695,7 @@ private fun ControlsSection(
                             Switch(
                                 checked = options.showArtwork,
                                 onCheckedChange = { onOptionsChange(options.copy(showArtwork = it)) },
+                                modifier = Modifier.vibraControlFeedback(enabled = true),
                             )
                         }
                     }

@@ -10,8 +10,8 @@ import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.blur
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
+import app.vibra.ui.motion.clickable
+import app.vibra.ui.motion.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -113,6 +114,26 @@ fun ForYouBlock(
         ForYouMosaic(urls = mosaicUrls, title = title, subtitle = subtitle, onClick = onClick, modifier = modifier)
         return
     }
+    if (moods.size == 1) {
+        BoxWithConstraints(modifier) {
+            val stacked = maxWidth < 340.dp || androidx.compose.ui.platform.LocalDensity.current.fontScale >= 1.3f
+            val main: @Composable (Modifier) -> Unit = { area ->
+                ForYouMosaic(mosaicUrls.ifEmpty { listOfNotNull(artworkUrl) }, title, subtitle, onClick, area, if (stacked) 180.dp * androidx.compose.ui.platform.LocalDensity.current.fontScale else ForYouHeight, compact = true)
+            }
+            val mix: @Composable (Modifier) -> Unit = { area ->
+                Box(area.clip(VibraShapes.Card).background(MaterialTheme.colorScheme.secondaryContainer)
+                    .clickable(role = Role.Button, onClick = moods.single().onClick).padding(16.dp), contentAlignment = Alignment.Center) {
+                    Text(moods.single().label, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSecondaryContainer, textAlign = TextAlign.Center)
+                }
+            }
+            if (stacked) Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                main(Modifier.fillMaxWidth()); mix(Modifier.fillMaxWidth().heightIn(min = 88.dp))
+            } else Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                main(Modifier.weight(0.6f)); mix(Modifier.weight(0.4f).height(ForYouHeight))
+            }
+        }
+        return
+    }
     VibraCard(modifier = modifier.height(ForYouHeight)) {
         Row(
             modifier = Modifier.fillMaxSize().padding(9.dp),
@@ -191,13 +212,15 @@ private fun ForYouMosaic(
     subtitle: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    height: androidx.compose.ui.unit.Dp = ForYouHeight,
+    compact: Boolean = false,
 ) {
     val haptics = rememberVibraHaptics()
     val blurSupported = android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S
     Box(
         modifier =
             modifier
-                .height(ForYouHeight)
+                .height(height)
                 .clip(VibraShapes.Card)
                 .background(MaterialTheme.colorScheme.surfaceContainer)
                 .clickable(role = Role.Button) {
@@ -237,11 +260,11 @@ private fun ForYouMosaic(
                 .background(Brush.verticalGradient(0.35f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.45f))),
         )
         Column(
-            modifier = Modifier.align(Alignment.BottomStart).padding(20.dp),
+            modifier = Modifier.align(Alignment.BottomStart).padding(start = 20.dp, end = 20.dp, top = 20.dp, bottom = if (compact) 88.dp else 20.dp),
         ) {
             Text(
                 text = "✦ $title",
-                style = MaterialTheme.typography.headlineMedium,
+                style = if (compact) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
                 color = Color.White,
                 modifier = Modifier.semantics { heading() },

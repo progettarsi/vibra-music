@@ -78,6 +78,16 @@ import java.util.Locale
 
 @Dao
 interface DatabaseDao {
+    // Vibra: persistent import provenance, kept separate from YouTube account membership.
+    @Query("SELECT * FROM spotify_import WHERE accountId = :accountId AND kind = :kind AND sourceId = :sourceId")
+    suspend fun spotifyImport(accountId: String, kind: String, sourceId: String): app.vibra.spotify.SpotifyImportMap?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun saveSpotifyImport(entry: app.vibra.spotify.SpotifyImportMap)
+
+    @Query("SELECT DISTINCT localId FROM spotify_import WHERE kind = :kind")
+    suspend fun spotifyImportedIds(kind: String): List<String>
+
     @Transaction
     @Query("SELECT song.* FROM song INNER JOIN format ON format.id = song.id WHERE song.isLocal = 0")
     fun downloadedSongsList(): List<Song>

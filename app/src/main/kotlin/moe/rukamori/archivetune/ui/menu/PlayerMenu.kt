@@ -9,6 +9,7 @@
 
 package moe.rukamori.archivetune.ui.menu
 
+import app.vibra.ui.motion.vibraControlFeedback
 import android.content.Intent
 import android.media.audiofx.AudioEffect
 import android.widget.Toast
@@ -16,7 +17,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
-import androidx.compose.foundation.clickable
+import app.vibra.ui.motion.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -44,7 +45,7 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
+import app.vibra.ui.motion.VibraIconButton as IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
@@ -52,7 +53,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import app.vibra.ui.motion.VibraTextButton as TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -1121,6 +1122,7 @@ fun TempoPitchDialog(onDismiss: () -> Unit) {
                                 applyPlaybackParameters(tempo, pitch)
                             },
                             label = { Text("x${formatMultiplier(preset)}") },
+                            modifier = Modifier.vibraControlFeedback(enabled = true),
                         )
                     }
                 }
@@ -1173,11 +1175,13 @@ fun TempoPitchDialog(onDismiss: () -> Unit) {
                         selected = pitchMode == PitchMode.Semitones,
                         onClick = { pitchMode = PitchMode.Semitones },
                         label = { Text(stringResource(R.string.pitch_mode_semitones_short)) },
+                        modifier = Modifier.vibraControlFeedback(enabled = true),
                     )
                     FilterChip(
                         selected = pitchMode == PitchMode.Multiplier,
                         onClick = { pitchMode = PitchMode.Multiplier },
                         label = { Text(stringResource(R.string.pitch_mode_multiplier_short)) },
+                        modifier = Modifier.vibraControlFeedback(enabled = true),
                     )
                 }
 
@@ -1218,6 +1222,7 @@ fun TempoPitchDialog(onDismiss: () -> Unit) {
                                         applyPlaybackParameters(tempo, pitch)
                                     },
                                     label = { Text("${if (preset > 0) "+" else ""}$preset") },
+                                    modifier = Modifier.vibraControlFeedback(enabled = true),
                                 )
                             }
                         }
@@ -1288,6 +1293,7 @@ fun TempoPitchDialog(onDismiss: () -> Unit) {
                                         applyPlaybackParameters(tempo, pitch)
                                     },
                                     label = { Text("x${formatMultiplier(preset)}") },
+                                    modifier = Modifier.vibraControlFeedback(enabled = true),
                                 )
                             }
                         }

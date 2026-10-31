@@ -93,4 +93,11 @@ class PublicStreamParserTest {
         assertTrue(stream.mixedVideo)
         assertTrue(stream.url.endsWith("/small"))
     }
+    @Test fun downloadRejectsVideoOnlyFallbackInsteadOfSavingAMovie() {
+        val body = """{"audioStreams":[],"videoStreams":[{"mimeType":"video/mp4","url":"https://relay.example.test/video","videoOnly":false}]}"""
+        assertThrows(java.io.IOException::class.java) {
+            PublicStreamParser.parse(body, request.copy(purpose = StreamPurpose.DOWNLOAD), piped, 0L)
+        }
+    }
+
 }

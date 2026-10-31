@@ -93,6 +93,8 @@ class App :
     @Inject
     lateinit var powerSaveController: app.vibra.power.PowerSaveController
 
+    @Inject lateinit var spotifySync: app.vibra.spotify.SpotifySyncRepository
+
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
     @Volatile private var isInitialized = false
@@ -120,6 +122,7 @@ class App :
         }
         BotGuardTokenGenerator.initialize(this)
         PreferenceStore.start(this)
+        spotifySync.start()
         LeakCanaryController.initialize(this)
         Timber.plant(Timber.DebugTree())
         try {

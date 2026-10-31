@@ -25,17 +25,26 @@ class EngineOnboardingAccount
     constructor(
         private val youTube: OnboardingAccountData,
         private val spotify: SpotifyOnboardingImport,
+        private val sync: app.vibra.spotify.SpotifySyncRepository,
+        private val library: moe.rukamori.archivetune.spotify.SpotifyLibraryRepository,
     ) : OnboardingAccount {
+        private var importedSpotifyArtists = emptySet<String>()
+        override suspend fun connections() = (youTube.accountProfile() != null) to library.restoreSession().isAuthenticated
+
         override suspend fun youTubeProfile(): Pair<String?, String?> = youTube.accountProfile()?.let { it.name to it.avatarUrl } ?: (null to null)
 
         override suspend fun youTubeArtists(): List<OnboardingArtist> = youTube.youTubeLibraryArtists().map { it.toOnboarding() }
 
-        override suspend fun spotifyArtists(): List<OnboardingArtist> = spotify.importFollowedArtists().getOrThrow().map { it.toOnboarding() }
+        override suspend fun spotifyArtists(): List<OnboardingArtist> {
+            val artists = spotify.importFollowedArtists().getOrThrow()
+            importedSpotifyArtists = artists.map { it.browseId }.toSet()
+            return artists.map { it.toOnboarding() }
+        }
 
-        override fun importSpotifyPlaylists() = spotify.importPlaylistsInBackground()
+        override fun importSpotifyPlaylists() = sync.sync()
 
         override suspend fun follow(artists: List<OnboardingArtist>) {
-            spotify.followArtists(artists.map { it.id })
+            spotify.followArtists(artists.map { it.id }.filterNot { it in importedSpotifyArtists })
         }
 
         private fun ImportedArtist.toOnboarding() = OnboardingArtist(id = browseId, name = name, thumbnailUrl = thumbnailUrl)

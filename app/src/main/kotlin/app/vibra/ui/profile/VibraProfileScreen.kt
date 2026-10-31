@@ -18,7 +18,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import app.vibra.ui.motion.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -34,6 +34,9 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -43,7 +46,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.FilledTonalButton
+import app.vibra.ui.motion.VibraFilledTonalButton as FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -169,28 +172,12 @@ fun VibraProfileScreen(
                 },
             )
             if (weekSongs.isNotEmpty()) {
-                add(
-                    VibraBlock(key = "summary", relevance = 0.5f, maxSize = BlockSize.Small) { _, modifier ->
-                        StatTile(
-                            title = statsTitle,
-                            value = weekMinutes.toString(),
-                            unit = stringResource(R.string.vibra_minutes_this_week),
-                            onClick = openStats,
-                            modifier = modifier,
-                        )
-                    },
-                )
-                add(
-                    VibraBlock(key = "summary_songs", relevance = 0.5f, maxSize = BlockSize.Small) { _, modifier ->
-                        StatTile(
-                            title = stringResource(R.string.songs),
-                            value = weekSongs.size.toString(),
-                            unit = stringResource(R.string.vibra_songs_this_week),
-                            onClick = openStats,
-                            modifier = modifier,
-                        )
-                    },
-                )
+                add(VibraBlock(key = "summary_pair", relevance = 0.6f, minSize = BlockSize.Medium) { _, modifier ->
+                    Row(modifier = modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        StatTile(statsTitle, weekMinutes.toString(), stringResource(R.string.vibra_minutes_this_week), openStats, Modifier.weight(1f))
+                        StatTile(stringResource(R.string.songs), weekSongs.size.toString(), stringResource(R.string.vibra_songs_this_week), openStats, Modifier.weight(1f))
+                    }
+                })
             }
             addAll(libraryBlocks(library, actions, navController, openList, compact = true))
         }
@@ -449,9 +436,9 @@ private fun StatTile(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    VibraCard(modifier = modifier.clickable(role = Role.Button, onClick = onClick)) {
-        Column(modifier = Modifier.fillMaxSize().padding(18.dp), verticalArrangement = Arrangement.SpaceBetween) {
-            Text(text = title, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+    VibraCard(modifier = modifier.fillMaxHeight().clickable(role = Role.Button, onClick = onClick)) {
+        Column(modifier = Modifier.fillMaxWidth().heightIn(min = 128.dp).padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(text = title, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
             Column {
                 Text(text = value, style = MaterialTheme.typography.displayMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                 Text(text = unit, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface)

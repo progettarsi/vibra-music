@@ -34,7 +34,7 @@ object PublicStreamParser {
         ) throw IOException("Public stream unavailable")
         val audio = json.objects(if (invidious) "adaptiveFormats" else "audioStreams")
             .filter { it.text(if (invidious) "type" else "mimeType")?.startsWith("audio/") == true }
-        val mixed = if (invidious) emptyList() else json.objects("videoStreams").filter {
+        val mixed = if (invidious || request.purpose == moe.rukamori.archivetune.playback.stream.StreamPurpose.DOWNLOAD) emptyList() else json.objects("videoStreams").filter {
             it.text("mimeType") == "video/mp4" && it["videoOnly"] == JsonPrimitive(false) &&
                 it.text("quality")?.contains("LBRY", ignoreCase = true) != true
         }

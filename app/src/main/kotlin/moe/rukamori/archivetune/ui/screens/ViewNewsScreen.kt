@@ -12,6 +12,7 @@
 
 package moe.rukamori.archivetune.ui.screens
 
+import app.vibra.ui.motion.vibraControlFeedback
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -19,7 +20,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import app.vibra.ui.motion.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -43,7 +44,7 @@ import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularWavyProgressIndicator
-import androidx.compose.material3.ElevatedButton
+import app.vibra.ui.motion.VibraElevatedButton as ElevatedButton
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -354,6 +355,7 @@ private fun ViewNewsMetaRow(
                     ),
                 border = null,
                 shape = MaterialTheme.shapes.large,
+                modifier = Modifier.vibraControlFeedback(enabled = true),
             )
         }
 
@@ -384,7 +386,7 @@ private fun ViewNewsMetaRow(
                 ),
             border = null,
             shape = MaterialTheme.shapes.large,
-            modifier = Modifier.weight(1f, fill = false),
+            modifier = (Modifier.weight(1f, fill = false)).vibraControlFeedback(enabled = true),
         )
     }
 }

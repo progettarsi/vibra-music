@@ -9,6 +9,7 @@
 
 package moe.rukamori.archivetune.ui.component
 
+import app.vibra.ui.motion.vibraControlFeedback
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -16,6 +17,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
+import app.vibra.ui.motion.VibraTextButton as TextButton
+import app.vibra.ui.motion.VibraButton as Button
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -211,6 +214,7 @@ fun ThumbnailCornerRadiusModal(
                                     selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
                                     selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
                                 ),
+                            modifier = Modifier.vibraControlFeedback(enabled = true),
                         )
 
                         Spacer(modifier = Modifier.width(12.dp))
@@ -407,6 +411,7 @@ private fun ChipsGrid(
                                 selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
                                 selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
                             ),
+                        modifier = Modifier.vibraControlFeedback(enabled = true),
                     )
                     if (index < rowValues.size - 1) {
                         Spacer(modifier = Modifier.width(8.dp))

@@ -165,22 +165,9 @@ fun Modifier.liquidPress(
     interactionSource: InteractionSource,
     pressedScale: Float = 0.92f,
 ): Modifier {
-    val pressed by interactionSource.collectIsPressedAsState()
-    val scale =
-        animateFloatAsState(
-            targetValue = if (pressed) pressedScale else 1f,
-            // Pressing is a short, direct movement → fast spatial spring. Releasing uses the
-            // default spatial spring, whose expressive damping (0.8) lets the surface overshoot
-            // and settle like a liquid drop.
-            animationSpec = Liquid.spatial(if (pressed) LiquidSpeed.Fast else LiquidSpeed.Default),
-            label = "liquidPress",
-        )
-    // Read in the layer block, not here: each animation frame then only redraws the layer
-    // instead of recomposing the pressed element (and everything it contains).
-    return graphicsLayer {
-        scaleX = scale.value
-        scaleY = scale.value
-    }
+    // Clickable/combinedClickable own feedback and know whether the action is enabled.
+    return this
+
 }
 
 /**

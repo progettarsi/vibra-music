@@ -7,6 +7,7 @@
 
 package moe.rukamori.archivetune.playback
 
+import app.vibra.playback.downloadRepresentationSignature
 import app.vibra.power.PowerSave
 import app.vibra.power.PowerSaveLevel
 import androidx.media3.exoplayer.offline.DownloadRequest
@@ -48,6 +49,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
@@ -94,6 +96,8 @@ class DownloadUtil
         @PlayerCache val playerCache: Cache,
         private val downloadedArtworkRepository: DownloadedArtworkRepository,
         private val resolveAudioStream: ResolveAudioStreamUseCase,
+        private val downloadFallback: app.vibra.playback.DownloadFallbackResolver,
+        private val networkMonitor: moe.rukamori.archivetune.network.NetworkMonitor,
     ) {
         private val audioQuality by enumPreference(context, AudioQualityKey, AudioQuality.AUTO)
         private val downloadScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -101,6 +105,7 @@ class DownloadUtil
         private val artworkJobs = mutableMapOf<String, Job>()
         private val downloadPreloadLock = Any()
         private val playbackCacheReuseIds = ConcurrentHashMap.newKeySet<String>()
+        private val recoveryPlans = ConcurrentHashMap<String, app.vibra.playback.DownloadRecoveryPlan>()
         private val persistedMetadata = ConcurrentHashMap<String, DownloadMetadataSignature>()
 
         private var downloadPreloadTargetId: String? = null
@@ -223,6 +228,7 @@ class DownloadUtil
                     playbackCacheDataSourceFactory = playbackCacheDataSourceFactory,
                     networkDataSourceFactory = invalidatingNetworkDataSourceFactory,
                     playbackCacheReuseIds = playbackCacheReuseIds,
+                    canReusePlaybackCache = { recoveryPlans[it]?.stage?.let { stage -> stage == app.vibra.playback.PlaybackStage.DIRECT } != false },
                 )
             }
 
@@ -248,7 +254,22 @@ class DownloadUtil
                 context,
                 DefaultDownloadIndex(databaseProvider),
                 DownloaderFactory { request ->
-                    ResumingDownloader(request, downloaderFactory, ::resetDownloadContent)
+                    val plan = app.vibra.playback.DownloadRecoveryPlan(YouTube.currentPlaybackAuthState().hasLoginCookie)
+                    recoveryPlans[request.id] = plan
+                    ResumingDownloader(request, downloaderFactory, ::resetDownloadContent) { failure ->
+                        var cause: Throwable? = failure
+                        var restricted = false
+                        while (cause != null) {
+                            if (cause is YTPlayerUtils.LoginRequiredForPlaybackException) restricted = true
+                            cause = cause.cause
+                        }
+                        if (restricted || !kotlinx.coroutines.runBlocking { networkMonitor.isOnline.first() }) false else plan.advance().also { advanced ->
+                            if (advanced) {
+                                invalidateResolvedStream(request.id)
+                                Timber.tag(TAG).i("Download recovery for %s: %s", request.id, plan.stage.name)
+                            }
+                        }
+                    }
                 },
             ).apply {
                 maxParallelDownloads = MAX_PARALLEL_DOWNLOADS
@@ -271,9 +292,11 @@ class DownloadUtil
                                 }
                             }
                             if (download.state == Download.STATE_COMPLETED) {
+                                recoveryPlans.remove(download.request.id)
                                 scheduleDownloadedArtwork(download.request.id)
                                 playbackCacheReuseIds.remove(download.request.id)
                             } else if (download.state == Download.STATE_FAILED) {
+                                recoveryPlans.remove(download.request.id)
                                 playbackCacheReuseIds.remove(download.request.id)
                                 invalidateResolvedStream(download.request.id)
                                 Timber.tag(TAG).e(
@@ -293,6 +316,7 @@ class DownloadUtil
                             download: Download,
                         ) {
                             downloads.update { map -> map - download.request.id }
+                            recoveryPlans.remove(download.request.id)
                             cancelDownloadedArtworkJob(download.request.id)
                             playbackCacheReuseIds.remove(download.request.id)
                             persistedMetadata.remove(download.request.id)
@@ -352,6 +376,7 @@ class DownloadUtil
                 ContentMetadataMutations()
                     .remove(DOWNLOAD_FORMAT_ID_METADATA_KEY)
                     .remove(DOWNLOAD_CONTENT_LENGTH_METADATA_KEY)
+                    .remove(DOWNLOAD_REPRESENTATION_METADATA_KEY)
             ContentMetadataMutations.setContentLength(mutations, C.LENGTH_UNSET.toLong())
             ContentMetadataMutations.setRedirectedUri(mutations, null)
             downloadCache.applyContentMetadataMutations(mediaId, mutations)
@@ -364,11 +389,25 @@ class DownloadUtil
             val request = createDownloadStreamRequest(mediaId)
             val resolved =
                 try {
-                    resolveAudioStream.resolveBlocking(request)
+                    val plan = recoveryPlans[mediaId]
+                    if (plan?.exhausted == true) throw IOException("Download sources exhausted")
+                    if (plan == null || plan.stage == app.vibra.playback.PlaybackStage.DIRECT) {
+                        resolveAudioStream.resolveBlocking(request.copy(allowCatalogReplacement = false))
+                    } else kotlinx.coroutines.runBlocking(Dispatchers.IO) {
+                        downloadFallback.resolve(request, plan.stage)
+                    }
                 } catch (exception: YTPlayerUtils.BotDetectionPlaybackException) {
                     throw IOException("Download stream token resolution failed", exception)
                 } catch (exception: YTPlayerUtils.BadStreamPlayerResponseException) {
                     throw IOException("Download stream response was invalid", exception)
+                } catch (exception: kotlinx.coroutines.TimeoutCancellationException) {
+                    throw IOException("Download source timed out", exception)
+                } catch (exception: CancellationException) {
+                    throw exception
+                } catch (exception: InterruptedException) {
+                    throw exception
+                } catch (exception: Exception) {
+                    throw IOException("Download source unavailable", exception)
                 }
             val metadata = downloadCache.getContentMetadata(mediaId)
             val previousLength =
@@ -381,10 +420,13 @@ class DownloadUtil
             val lengthChanged =
                 previousLength > 0L && resolved.contentLength > 0L &&
                     previousLength != resolved.contentLength
-            if (formatChanged || lengthChanged) {
+            val signature = downloadRepresentationSignature(resolved)
+            val previousSignature = metadata.get(DOWNLOAD_REPRESENTATION_METADATA_KEY, "")
+            val representationChanged = downloadCache.getCachedSpans(mediaId).isNotEmpty() && previousSignature != signature
+            if (formatChanged || lengthChanged || representationChanged) {
                 throw DownloadContentChangedException()
             }
-            val mutations = ContentMetadataMutations()
+            val mutations = ContentMetadataMutations().set(DOWNLOAD_REPRESENTATION_METADATA_KEY, signature)
             if (resolved.formatId > 0) {
                 mutations.set(DOWNLOAD_FORMAT_ID_METADATA_KEY, resolved.formatId.toLong())
             }
@@ -716,6 +758,7 @@ class DownloadUtil
             private val playbackCacheDataSourceFactory: DataSource.Factory,
             private val networkDataSourceFactory: DataSource.Factory,
             private val playbackCacheReuseIds: MutableSet<String>,
+            private val canReusePlaybackCache: (String) -> Boolean,
         ) : DataSource {
             private val transferListeners = mutableListOf<TransferListener>()
             private var delegate: DataSource? = null
@@ -728,7 +771,7 @@ class DownloadUtil
             override fun open(dataSpec: DataSpec): Long {
                 val mediaId = dataSpec.key
                 val selectedFactory =
-                    if (mediaId != null && shouldUsePlaybackCache(mediaId)) {
+                    if (mediaId != null && canReusePlaybackCache(mediaId) && shouldUsePlaybackCache(mediaId)) {
                         playbackCacheDataSourceFactory
                     } else {
                         networkDataSourceFactory
@@ -785,6 +828,7 @@ class DownloadUtil
         companion object {
             private const val TAG = "DownloadUtil"
             private const val DOWNLOAD_FORMAT_ID_METADATA_KEY = "archivetune_download_format_id"
+            private const val DOWNLOAD_REPRESENTATION_METADATA_KEY = "vibra_download_representation"
             private const val DOWNLOAD_CONTENT_LENGTH_METADATA_KEY = "archivetune_download_content_length"
             private const val MAX_PARALLEL_DOWNLOADS = 3
             private const val DOWNLOAD_MIN_RETRY_COUNT = 10

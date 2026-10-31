@@ -1,5 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application>
+        <activity android:name="app.vibra.ui.V140QaActivity" android:exported="true" />
         <activity android:name="app.vibra.playback.PlaybackFallbackQaActivity" android:exported="true" android:launchMode="singleTop" />
         <!-- Harness locale, compilato solo in debug; nessun intent-filter pubblico. -->
         <activity android:name="app.vibra.ui.player.ArtworkFlightQaActivity" android:exported="true" android:launchMode="singleTop" />

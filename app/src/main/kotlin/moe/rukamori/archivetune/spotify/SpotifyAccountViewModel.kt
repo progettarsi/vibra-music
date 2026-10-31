@@ -26,6 +26,7 @@ class SpotifyAccountViewModel
     @Inject
     constructor(
         private val repository: SpotifyLibraryRepository,
+        private val sync: app.vibra.spotify.SpotifySyncRepository,
     ) : ViewModel() {
         private val _uiState = MutableStateFlow(SpotifyAccountUiState(isLoading = true))
         val uiState: StateFlow<SpotifyAccountUiState> = _uiState.asStateFlow()
@@ -33,6 +34,10 @@ class SpotifyAccountViewModel
         init {
             restoreSession()
         }
+
+        val syncState = sync.state
+
+        fun syncAll() = sync.sync()
 
         fun restoreSession() {
             viewModelScope.launch(Dispatchers.IO) {
@@ -79,6 +84,7 @@ class SpotifyAccountViewModel
                             )
                         }
                         reloadPlaylists()
+                        sync.sync()
                     }.onFailure { error ->
                         if (error is CancellationException) throw error
                         reportException(error)

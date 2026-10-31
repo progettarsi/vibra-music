@@ -101,4 +101,10 @@
     <string name="vibra_playback_final_error">Impossibile riprodurre questo brano. Riprova o passa al successivo.</string>
     <string name="vibra_playback_next">Brano successivo</string>
     <string name="vibra_playback_final_title">Impossibile riprodurre il brano</string>
+    <string name="vibra_for_you_unavailable">Nessun brano disponibile. Collegati a Internet o scarica della musica.</string>
+    <string name="vibra_for_you_downloads">Musica scaricata</string>
+    <string name="vibra_spotify_sync_all">Sincronizza tutto</string>
+    <string name="vibra_spotify_sync_status">Elaborati: %1$d · Importati: %2$d · Non abbinati: %3$d · Errori: %4$d</string>
+    <string name="vibra_spotify_sync_running">Sincronizzazione in corso</string>
+    <string name="vibra_spotify_connection_error">Collegamento Spotify non riuscito. Riprova.</string>
 </resources>

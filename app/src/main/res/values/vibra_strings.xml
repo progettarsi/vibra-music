@@ -100,4 +100,10 @@
     <string name="vibra_playback_final_error">This track could not be played. Try again or choose the next track.</string>
     <string name="vibra_playback_next">Next track</string>
     <string name="vibra_playback_final_title">Unable to play this track</string>
+    <string name="vibra_for_you_unavailable">No songs available. Connect to the internet or download some music.</string>
+    <string name="vibra_for_you_downloads">Downloaded music</string>
+    <string name="vibra_spotify_sync_all">Sync everything</string>
+    <string name="vibra_spotify_sync_status">Processed: %1$d · Imported: %2$d · Unmatched: %3$d · Errors: %4$d</string>
+    <string name="vibra_spotify_sync_running">Syncing</string>
+    <string name="vibra_spotify_connection_error">Could not connect to Spotify. Please retry.</string>
 </resources>

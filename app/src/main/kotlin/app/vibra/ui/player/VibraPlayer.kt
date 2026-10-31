@@ -17,7 +17,7 @@ import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import app.vibra.ui.motion.clickable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
@@ -385,6 +385,7 @@ fun VibraPlayerSheet(
             // The cover's content (image and video), drawn a second time, blurred, as the live
             // backdrop (see LiveCoverExtension).
             val coverContent = rememberGraphicsLayer()
+            val artworkLayers = remember { androidx.compose.runtime.mutableStateMapOf<String, GraphicsLayer>() }
             val artworkFlight = remember { PlayerArtworkFlight() }
             val unifiedFlight = !landscape && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
             val flightFrame = {
@@ -543,6 +544,7 @@ fun VibraPlayerSheet(
                         onCoverDrawn = coverCrossfade::onCoverDrawn,
                         video = artworkVideo,
                         contentLayer = coverContent,
+                        artworkLayers = artworkLayers,
                         videoLayer = { video, current, pictureAspect ->
                             ArtworkVideoSurface(
                                 stream = video,
@@ -559,13 +561,22 @@ fun VibraPlayerSheet(
                     )
                     if (!landscape) {
                         val slot = coverSlot
-                        if (slot != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) UnifiedCoverField(
-                            content = coverContent, slot = slot,
-                            titleY = titleSlot?.top ?: (slot.bottom + slot.height * 0.06f),
-                            crop = rememberCoverCrop(metadata.thumbnailUrl),
-                            visibility = { (if (unifiedSurface()) 1f else smoothstep((sheet.progress - 0.85f) / 0.15f)) * (1f - lyrics()) },
-                            offsetX = { coverSwipe.value },
-                        )
+                        if (slot != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                            // Each image keeps its own warp while the complete fields dissolve.
+                            listOfNotNull(metadata.thumbnailUrl, coverCrossfade.fading?.takeIf { it != metadata.thumbnailUrl }).forEach { layerUrl ->
+                                key(layerUrl) {
+                                    artworkLayers[layerUrl]?.let { layer ->
+                                        UnifiedCoverField(
+                                            content = layer, slot = slot,
+                                            titleY = titleSlot?.top ?: (slot.bottom + slot.height * 0.06f),
+                                            crop = rememberCoverCrop(layerUrl),
+                                            visibility = { (if (layerUrl == metadata.thumbnailUrl) 1f else coverCrossfade.fadingAlpha()) * (1f - lyrics()) },
+                                            offsetX = { coverSwipe.value },
+                                        )
+                                    }
+                                }
+                            }
+                        }
                         if (revealed != null && slot != null) NeighbourCover(url = revealed, slot = slot, offsetX = revealedOffset, titleY = titleSlot?.top)
                     }
                 }
@@ -798,6 +809,7 @@ private fun FlyingCover(
     onCoverDrawn: (String?) -> Unit,
     video: ArtworkVideoStream?,
     contentLayer: GraphicsLayer,
+    artworkLayers: MutableMap<String, GraphicsLayer>,
     videoLayer: @Composable (video: ArtworkVideoStream, current: Boolean, pictureAspect: Float?) -> Unit,
     contentDescription: String,
 ) {
@@ -897,7 +909,17 @@ private fun FlyingCover(
         ) {
             listOfNotNull(url, fadingUrl?.takeIf { it != url }).forEach { layerUrl ->
                 key(layerUrl) {
+                    val sourceLayer = rememberGraphicsLayer()
+                    artworkLayers[layerUrl] = sourceLayer
+                    androidx.compose.runtime.DisposableEffect(layerUrl) {
+                        onDispose { artworkLayers.remove(layerUrl) }
+                    }
                     val isFading = layerUrl != url
+                    val layerCrop = rememberCoverCrop(layerUrl)
+                    var imageLoaded by remember { mutableStateOf(false) }
+                    LaunchedEffect(imageLoaded, layerCrop, isFading) {
+                        if (imageLoaded && layerCrop != null && !isFading) onCoverDrawn(layerUrl)
+                    }
                     Box(
                         Modifier
                             .fillMaxSize()
@@ -914,13 +936,17 @@ private fun FlyingCover(
                                 },
                             ),
                     ) {
+                        Box(Modifier.fillMaxSize().drawWithContent {
+                            sourceLayer.record { this@drawWithContent.drawContent() }
+                            drawLayer(sourceLayer)
+                        }) {
                         VibraArtwork(
                             url = layerUrl,
                             shape = RectangleShape,
                             sizePx = PlayerArtworkPx,
                             placeholderSizePx = SmallArtworkPx,
                             contentDescription = if (isFading) null else contentDescription,
-                            onLoaded = { if (!isFading) onCoverDrawn(layerUrl) },
+                            onLoaded = { imageLoaded = true },
                             modifier =
                                 Modifier.fillMaxSize().graphicsLayer {
                                     // A letterboxed thumbnail is enlarged past its black bands, so
@@ -935,6 +961,7 @@ private fun FlyingCover(
                                 },
                         )
                         layerVideos[layerUrl]?.let { layerVideo -> videoLayer(layerVideo, !isFading, cachedCoverCrop(layerUrl)?.contentAspectRatio) }
+                        }
                     }
                 }
             }
