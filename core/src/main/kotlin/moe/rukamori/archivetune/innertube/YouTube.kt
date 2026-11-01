@@ -261,7 +261,7 @@ object YouTube {
     }
 
     suspend fun searchSuggestions(query: String): Result<SearchSuggestions> =
-        runCatching {
+        runCatchingCancellable {
             val response = innerTube.getSearchSuggestions(WEB_REMIX, query).body<GetSearchSuggestionsResponse>()
             SearchSuggestions(
                 queries =
@@ -289,7 +289,7 @@ object YouTube {
         }
 
     suspend fun searchSummary(query: String): Result<SearchSummaryPage> =
-        runCatching {
+        runCatchingCancellable {
             val response = innerTube.search(WEB_REMIX, query).body<SearchResponse>()
             val contents =
                 response.contents

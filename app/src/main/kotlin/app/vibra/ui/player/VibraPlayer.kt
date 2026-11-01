@@ -18,6 +18,8 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import app.vibra.ui.motion.clickable
+import androidx.compose.foundation.clickable as foundationClickable
+import app.vibra.ui.motion.interactiveSurface
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
@@ -130,7 +132,9 @@ import androidx.media3.common.Player.REPEAT_MODE_ALL
 import androidx.media3.common.Player.REPEAT_MODE_OFF
 import androidx.media3.common.Player.REPEAT_MODE_ONE
 import androidx.navigation.NavController
+import app.vibra.canvas.CanvasArtwork
 import app.vibra.ui.motion.LocalAmbientMotion
+import app.vibra.ui.motion.ambientMotionAllowed
 import app.vibra.ui.components.ArtworkAccent
 import app.vibra.ui.components.ArtworkAtmosphere
 import app.vibra.ui.components.MarqueeScroll
@@ -179,7 +183,9 @@ import moe.rukamori.archivetune.ui.component.LocalMenuState
 import moe.rukamori.archivetune.ui.menu.PlayerMenu
 import moe.rukamori.archivetune.ui.player.LyricsScreen
 import moe.rukamori.archivetune.ui.player.PlaybackErrorDialog
-import moe.rukamori.archivetune.ui.player.SleepTimerDialog
+import app.vibra.ui.components.SleepTimerPopup
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import moe.rukamori.archivetune.ui.player.toPlaybackErrorInfo
 import moe.rukamori.archivetune.ui.screens.buildLoginRoute
 import moe.rukamori.archivetune.ui.utils.ShowMediaInfo
@@ -382,6 +388,21 @@ fun VibraPlayerSheet(
                     request = connection.service::requestArtworkVideo,
                 )
             val currentVideo = remember { CurrentArtworkVideo() }
+            // A Canvas (see CanvasVideo) is looked up as soon as the player opens, independently of
+            // the cover and the audio. It never replaces a music video, belongs to this track only,
+            // and gives way to the still cover in battery saver.
+            val ambient = ambientMotionAllowed
+            val canvasArtwork =
+                canvasForSurface(
+                    canvas = rememberCanvasArtwork(metadata, enabled = sheet.isOpenOrOpening && ambient),
+                    mediaId = metadata.id,
+                    hasMusicVideo = artworkVideo != null,
+                    ambientAllowed = ambient,
+                )
+            // A vertical Canvas runs full screen behind the controls (portrait); every other one
+            // lives inside the cover.
+            val screenCanvas = canvasArtwork?.takeIf { it.portraitUrl != null && !landscape }
+            val coverCanvas = canvasArtwork?.takeIf { screenCanvas == null }
             // The cover's content (image and video), drawn a second time, blurred, as the live
             // backdrop (see LiveCoverExtension).
             val coverContent = rememberGraphicsLayer()
@@ -543,6 +564,17 @@ fun VibraPlayerSheet(
                         fadingAlpha = coverCrossfade::fadingAlpha,
                         onCoverDrawn = coverCrossfade::onCoverDrawn,
                         video = artworkVideo,
+                        canvas = coverCanvas,
+                        canvasLayer = { layerCanvas, current ->
+                            CanvasSurface(
+                                canvas = layerCanvas,
+                                // A Canvas keeps looping while the audio is paused: only visibility and lifecycle stop it.
+                                active = { current && videoActive() },
+                                prepareWhen = { current && videoPrepare() },
+                                visibility = videoVisibility,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        },
                         contentLayer = coverContent,
                         artworkLayers = artworkLayers,
                         videoLayer = { video, current, pictureAspect ->
@@ -578,6 +610,23 @@ fun VibraPlayerSheet(
                             }
                         }
                         if (revealed != null && slot != null) NeighbourCover(url = revealed, slot = slot, offsetX = revealedOffset, titleY = titleSlot?.top)
+                    }
+                    // A vertical Canvas, in the scene: it shrinks into the mini-player and grows back with the
+                    // cover and the backdrop (the cover's still image takes over in the cookie).
+                    screenCanvas?.let { fullCanvas ->
+                        key(fullCanvas.mediaId) {
+                            CanvasSurface(
+                                canvas = fullCanvas,
+                                portrait = true,
+                                // Runs while its decoder is kept (see CanvasVideo): a frame is ready when the player reopens.
+                                active = { videoAllowed() },
+                                prepareWhen = { videoPrepare() },
+                                // The scene already hides everything while the cookie is the mini-player.
+                                visibility = { if (unifiedFlight) 1f else videoVisibility() },
+                                // Like the cover page, it slides with a swipe.
+                                modifier = Modifier.fillMaxSize().graphicsLayer { translationX = coverSwipe.value },
+                            )
+                        }
                     }
                 }
                 if (!landscape) {
@@ -808,6 +857,8 @@ private fun FlyingCover(
     fadingAlpha: () -> Float,
     onCoverDrawn: (String?) -> Unit,
     video: ArtworkVideoStream?,
+    canvas: CanvasArtwork?,
+    canvasLayer: @Composable (canvas: CanvasArtwork, current: Boolean) -> Unit,
     contentLayer: GraphicsLayer,
     artworkLayers: MutableMap<String, GraphicsLayer>,
     videoLayer: @Composable (video: ArtworkVideoStream, current: Boolean, pictureAspect: Float?) -> Unit,
@@ -820,6 +871,13 @@ private fun FlyingCover(
         if (video != null) layerVideos[url] = video else layerVideos.remove(url)
     }
     layerVideos.keys.retainAll(setOfNotNull(url, fadingUrl))
+    // Same for a Canvas, but a cover URL is shared by a whole album: each Canvas is keyed below by
+    // the track it was found for, so one never outlives its track on a shared cover.
+    val layerCanvases = remember { HashMap<String, CanvasArtwork>() }
+    if (url != null) {
+        if (canvas != null) layerCanvases[url] = canvas else layerCanvases.remove(url)
+    }
+    layerCanvases.keys.retainAll(setOfNotNull(url, fadingUrl))
     val cornerPx = if (fullBleed) 0f else with(density) { CoverCorner.toPx() }
     val morph =
         remember(to.width, cornerPx) {
@@ -960,6 +1018,7 @@ private fun FlyingCover(
                                     translationY = zoom.shiftY * size.height * (1f - original)
                                 },
                         )
+                        layerCanvases[layerUrl]?.let { layerCanvas -> key(layerCanvas.mediaId) { canvasLayer(layerCanvas, !isFading) } }
                         layerVideos[layerUrl]?.let { layerVideo -> videoLayer(layerVideo, !isFading, cachedCoverCrop(layerUrl)?.contentAspectRatio) }
                         }
                     }
@@ -995,7 +1054,6 @@ private fun PlayerContent(
     val menuState = LocalMenuState.current
     val bottomSheetPageState = LocalBottomSheetPageState.current
     val density = LocalDensity.current
-    var showSleepDialog by remember { mutableStateOf(false) }
     val sleepTimer = connection.service.sleepTimer
     val haptics = rememberVibraHaptics()
 
@@ -1046,8 +1104,7 @@ private fun PlayerContent(
                             mediaMetadata = metadata,
                             navController = navController,
                             onCollapsePlayer = sheet::collapse,
-                            sleepTimerEnabled = sleepTimer.isActive,
-                            onSleepTimerClick = { showSleepDialog = true },
+
                             onShowDetailsDialog = { bottomSheetPageState.show { ShowMediaInfo(metadata.id) } },
                             onDismiss = menuState::dismiss,
                         )
@@ -1091,7 +1148,6 @@ private fun PlayerContent(
             nowPlaying = nowPlaying,
             metadata = metadata,
             onShowLyrics = onShowLyrics,
-            onShowSleepDialog = { showSleepDialog = true },
             compact = landscape,
             lyrics = lyrics,
             shown = { sheet.isOpenOrOpening },
@@ -1173,21 +1229,7 @@ private fun PlayerContent(
         }
     }
 
-    if (showSleepDialog) {
-        SleepTimerDialog(
-            onDismiss = { showSleepDialog = false },
-            onConfirm = { minutes ->
-                showSleepDialog = false
-                sleepTimer.start(minutes)
-                haptics.confirm()
-            },
-            onEndOfSong = {
-                showSleepDialog = false
-                sleepTimer.start(-1)
-                haptics.confirm()
-            },
-        )
-    }
+
 }
 
 /**
@@ -1343,7 +1385,6 @@ private fun PlayerControls(
     nowPlaying: NowPlaying,
     metadata: MediaMetadata,
     onShowLyrics: () -> Unit,
-    onShowSleepDialog: () -> Unit,
     compact: Boolean,
     lyrics: () -> Float,
     shown: () -> Boolean,
@@ -1460,7 +1501,7 @@ private fun PlayerControls(
             },
         )
         Spacer(Modifier.weight(1f))
-        SleepTimerButton(timer = connection.service.sleepTimer, onStart = onShowSleepDialog)
+        SleepTimerButton(timer = connection.service.sleepTimer)
         BackdropCircleButton(
             icon = R.drawable.playlist_add,
             contentDescription = stringResource(R.string.add_to_playlist),
@@ -1501,10 +1542,14 @@ private fun SkipButton(
  * showing the time left (or "End of song"). Tapping a running timer cancels it.
  */
 @Composable
-private fun SleepTimerButton(
+internal fun SleepTimerButton(
     timer: SleepTimer,
-    onStart: () -> Unit,
 ) {
+    var popup by remember { mutableStateOf(false) }
+    var anchor by remember { mutableStateOf(androidx.compose.ui.geometry.Rect.Zero) }
+    // The player moves on every frame while it opens, closes or swipes. Keep the button's
+    // coordinates outside snapshot state and publish bounds only for the popup that uses them.
+    val anchorCoordinates = remember { arrayOfNulls<LayoutCoordinates>(1) }
     val haptics = rememberVibraHaptics()
     val accent = LocalPlayerAccent.current
     val active = timer.isActive
@@ -1525,22 +1570,29 @@ private fun SleepTimerButton(
     val content by animateColorAsState(if (active) accent.on else OnBackdrop, Liquid.effects(), label = "sleepContent")
     val interactionSource = remember { MutableInteractionSource() }
     val description = stringResource(if (active) R.string.vibra_sleep_timer_active else R.string.sleep_timer)
+    val onTimerPress: () -> Unit = {
+        if (timer.isActive) {
+            timer.clear()
+            popup = false
+            haptics.toggle(on = false)
+        } else {
+            if (!popup) anchorCoordinates[0]?.takeIf { it.isAttached }?.let { anchor = it.boundsInWindow() }
+            popup = !popup
+        }
+    }
+    Box {
     Row(
         modifier =
             Modifier
+                .onGloballyPositioned {
+                    anchorCoordinates[0] = it
+                    if (popup) anchor = it.boundsInWindow()
+                }
                 .height(44.dp)
                 .defaultMinSize(minWidth = 44.dp)
                 .liquidPress(interactionSource, pressedScale = 0.92f)
-                .clip(CircleShape)
-                .background(container)
-                .clickable(interactionSource = interactionSource, indication = ripple(), role = Role.Button) {
-                    if (active) {
-                        timer.clear()
-                        haptics.toggle(on = false)
-                    } else {
-                        onStart()
-                    }
-                }.semantics { contentDescription = description }
+                .interactiveSurface(CircleShape, container, interactionSource = interactionSource, onClick = onTimerPress)
+                .semantics { contentDescription = description }
                 .animateContentSize(Liquid.spatial())
                 .padding(horizontal = 11.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -1551,6 +1603,11 @@ private fun SleepTimerButton(
             Spacer(Modifier.width(6.dp))
             Text(text = label, style = MaterialTheme.typography.labelLarge, color = content, maxLines = 1)
         }
+    }
+
+        SleepTimerPopup(expanded = popup, anchor = anchor, anchorColor = container, anchorContentColor = content,
+            onDismiss = { popup = false }, onAnchorClick = onTimerPress, onConfirm = { timer.start(it); popup = false },
+            onEndOfSong = { timer.start(-1); popup = false })
     }
 }
 
@@ -1583,9 +1640,11 @@ private fun PlayerBottomRow(
                 Modifier
                     .weight(1f)
                     .height(53.dp)
-                    .clip(CircleShape)
-                    .background(if (queueOpen) MaterialTheme.colorScheme.surfaceContainerHighest else BackdropContainer)
-                    .clickable(role = Role.Button, onClick = toggleQueue)
+                    .interactiveSurface(
+                        shape = CircleShape,
+                        containerColor = if (queueOpen) MaterialTheme.colorScheme.surfaceContainerHighest else BackdropContainer,
+                        onClick = toggleQueue,
+                    )
                     .padding(horizontal = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -1690,13 +1749,11 @@ private fun BackdropCircleButton(
                 .size(size)
                 .graphicsLayer { alpha = if (enabled) 1f else 0.4f }
                 .liquidPress(interactionSource, pressedScale = 0.88f)
-                .clip(CircleShape)
-                .background(containerColor)
-                .clickable(
-                    interactionSource = interactionSource,
-                    indication = ripple(),
+                .interactiveSurface(
+                    shape = CircleShape,
+                    containerColor = containerColor,
                     enabled = enabled,
-                    role = Role.Button,
+                    interactionSource = interactionSource,
                     onClick = onClick,
                 ).semantics { this.contentDescription = contentDescription },
         contentAlignment = Alignment.Center,
@@ -1718,9 +1775,7 @@ private fun BackdropPill(
             Modifier
                 .height(44.dp)
                 .liquidPress(interactionSource, pressedScale = 0.94f)
-                .clip(CircleShape)
-                .background(BackdropContainer)
-                .clickable(interactionSource = interactionSource, indication = ripple(), role = Role.Button, onClick = onClick)
+                .interactiveSurface(CircleShape, BackdropContainer, interactionSource = interactionSource, onClick = onClick)
                 .padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

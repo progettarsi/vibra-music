@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Vibra (2026) - GPL-3.0 License. Derived from ArchiveTune c Rukamori. -->
+<resources>
+    <string name="canvas_section">Canvas</string>
+    <string name="canvas_enabled">Animated covers</string>
+    <string name="canvas_enabled_desc">Plays a short looping video in place of the cover when one exists for the track. It is looked up online: turning this off also stops those requests.</string>
+</resources>

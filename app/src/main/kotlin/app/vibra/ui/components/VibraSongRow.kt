@@ -28,9 +28,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.vibra.ui.motion.Liquid
+import app.vibra.ui.motion.TapBounceHost
+import app.vibra.ui.motion.TapBounceHostContent
 import app.vibra.ui.motion.noTapBounce
-import app.vibra.ui.motion.rememberTapBounce
-import app.vibra.ui.motion.tapBounce
+import app.vibra.ui.motion.tapBounceInput
+import app.vibra.ui.motion.tapBounceLayer
 import app.vibra.ui.theme.VibraDimens
 import app.vibra.ui.theme.VibraShapes
 
@@ -69,7 +71,6 @@ fun VibraRow(
     background: RowBackground = RowBackground.Card,
     bounceOnTap: Boolean = false,
 ) {
-    val bounce = if (bounceOnTap) rememberTapBounce() else null
     val containerColor by animateColorAsState(
         targetValue =
             when {
@@ -89,56 +90,63 @@ fun VibraRow(
             MaterialTheme.colorScheme.onSurfaceVariant
         }
 
-    Row(
-        modifier =
-            modifier
-                .then(if (bounce != null) Modifier.tapBounce(bounce) else Modifier)
-                .clip(VibraShapes.Row)
-                .background(containerColor)
-                .then(interactionModifier)
-                .heightIn(min = VibraDimens.RowHeight)
-                .padding(start = 8.dp, end = 12.dp, top = 8.dp, bottom = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(
+    // The row owns the bounce of the caller's click modifier: it scales outside the rounded clip
+    // and background, so card, ripple and content move as one. Trailing controls keep their own.
+    TapBounceHost { bounce ->
+        Row(
             modifier =
-                Modifier
-                    .size(VibraDimens.RowThumbnail)
-                    .clip(VibraShapes.RowThumbnail),
-            contentAlignment = Alignment.Center,
-        ) { thumbnail() }
-
-        Column(
-            modifier =
-                Modifier
-                    .weight(1f)
-                    .padding(horizontal = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(2.dp),
+                modifier
+                    .tapBounceLayer(bounce)
+                    .clip(VibraShapes.Row)
+                    .background(containerColor)
+                    .then(if (bounceOnTap && bounce != null) Modifier.tapBounceInput(bounce) else Modifier)
+                    .then(interactionModifier)
+                    .heightIn(min = VibraDimens.RowHeight)
+                    .padding(start = 8.dp, end = 12.dp, top = 8.dp, bottom = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleLarge,
-                color = titleColor,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            if (subtitle != null) {
+            TapBounceHostContent {
+                Box(
+                    modifier =
+                        Modifier
+                            .size(VibraDimens.RowThumbnail)
+                            .clip(VibraShapes.RowThumbnail),
+                    contentAlignment = Alignment.Center,
+                ) { thumbnail() }
+
+                Column(
+                    modifier =
+                        Modifier
+                            .weight(1f)
+                            .padding(horizontal = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleLarge,
+                        color = titleColor,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    if (subtitle != null) {
+                        CompositionLocalProvider(LocalContentColor provides secondaryColor) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                content = subtitle,
+                            )
+                        }
+                    }
+                }
+
                 CompositionLocalProvider(LocalContentColor provides secondaryColor) {
                     Row(
+                        modifier = if (bounce != null) Modifier.noTapBounce(bounce) else Modifier,
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        content = subtitle,
+                        content = trailing,
                     )
                 }
             }
-        }
-
-        CompositionLocalProvider(LocalContentColor provides secondaryColor) {
-            Row(
-                modifier = if (bounce != null) Modifier.noTapBounce(bounce) else Modifier,
-                verticalAlignment = Alignment.CenterVertically,
-                content = trailing,
-            )
         }
     }
 }

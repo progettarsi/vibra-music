@@ -44,7 +44,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.BasicAlertDialog
+import app.vibra.ui.components.VibraBasicAlertDialog as BasicAlertDialog
 import app.vibra.ui.motion.VibraButton as Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -74,7 +74,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
+import app.vibra.ui.components.VibraWindowDialog as Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.palette.graphics.Palette
 import androidx.window.core.layout.WindowSizeClass

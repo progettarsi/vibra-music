@@ -39,6 +39,7 @@ class CreatePlaylistUseCase
         suspend operator fun invoke(
             name: String,
             syncRequested: Boolean,
+            coverStyle: String = "Pentagon",
         ) {
             val normalizedName = name.trim()
             require(normalizedName.isNotEmpty())
@@ -58,6 +59,7 @@ class CreatePlaylistUseCase
             repository.createLocalPlaylist(
                 name = normalizedName,
                 browseId = browseId,
+                coverStyle = coverStyle,
             )
         }
     }

@@ -28,7 +28,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.AlertDialogDefaults
-import androidx.compose.material3.BasicAlertDialog
+import app.vibra.ui.components.VibraBasicAlertDialog as BasicAlertDialog
 import app.vibra.ui.motion.VibraButton as Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api

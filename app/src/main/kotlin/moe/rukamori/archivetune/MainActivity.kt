@@ -46,7 +46,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
+import app.vibra.ui.components.VibraAlertDialog as AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -765,12 +765,10 @@ class MainActivity : ComponentActivity() {
 
                         BottomSheetMenu(
                             state = LocalMenuState.current,
-                            modifier = Modifier.align(Alignment.BottomCenter),
                         )
 
                         BottomSheetPage(
                             state = LocalBottomSheetPageState.current,
-                            modifier = Modifier.align(Alignment.BottomCenter),
                         )
 
                         NetworkStatusBanner(

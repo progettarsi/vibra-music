@@ -9,7 +9,7 @@ package moe.rukamori.archivetune.ui.component
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import app.vibra.ui.motion.combinedClickable
+import app.vibra.ui.motion.interactiveLongSurface
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.sizeIn
@@ -44,19 +44,13 @@ fun IconButton(
             modifier
                 .minimumInteractiveComponentSize()
                 .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
-                .clip(CircleShape)
-                .background(color = colors.containerColor)
-                .combinedClickable(
-                    onClick = onClick,
+                .interactiveLongSurface(
+                    shape = CircleShape,
                     onLongClick = onLongClick,
+                    containerColor = colors.containerColor,
                     enabled = enabled,
-                    role = Role.Button,
                     interactionSource = interactionSource,
-                    indication =
-                        ripple(
-                            bounded = false,
-                            radius = 24.dp,
-                        ),
+                    onClick = onClick,
                 ),
         contentAlignment = Alignment.Center,
     ) {

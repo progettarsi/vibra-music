@@ -12,6 +12,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import app.vibra.ui.motion.clickable
 import app.vibra.ui.motion.combinedClickable
+import app.vibra.ui.motion.interactiveSurface
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -121,9 +122,11 @@ fun ForYouBlock(
                 ForYouMosaic(mosaicUrls.ifEmpty { listOfNotNull(artworkUrl) }, title, subtitle, onClick, area, if (stacked) 180.dp * androidx.compose.ui.platform.LocalDensity.current.fontScale else ForYouHeight, compact = true)
             }
             val mix: @Composable (Modifier) -> Unit = { area ->
-                Box(area.clip(VibraShapes.Card).background(MaterialTheme.colorScheme.secondaryContainer)
-                    .clickable(role = Role.Button, onClick = moods.single().onClick).padding(16.dp), contentAlignment = Alignment.Center) {
-                    Text(moods.single().label, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSecondaryContainer, textAlign = TextAlign.Center)
+                Box(area.interactiveSurface(
+                    shape = VibraShapes.Card,
+                    onClick = moods.single().onClick,
+                ).background(moodGradient(MoodPalette.Warm)).padding(16.dp), contentAlignment = Alignment.Center) {
+                    Text(moods.single().label, style = MaterialTheme.typography.titleLarge, color = Color.White, textAlign = TextAlign.Center)
                 }
             }
             if (stacked) Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -160,8 +163,7 @@ fun ForYouBlock(
                         Modifier
                             .fillMaxHeight()
                             .aspectRatio(1f)
-                            .clip(shape)
-                            .clickable(role = Role.Button, onClick = onClick),
+                            .interactiveSurface(shape = shape, onClick = onClick),
                     contentAlignment = Alignment.Center,
                 ) {
                     // A lighter blur than the player's backdrop: the cover stays recognisable.
@@ -304,6 +306,8 @@ private enum class MoodPalette(
     Cool(listOf(Color(0xFF7B2CBF), Color(0xFF3F2A8C), Color(0xFF14213D))),
 }
 
+private fun moodGradient(palette: MoodPalette) = Brush.linearGradient(palette.colors)
+
 @Composable
 private fun MoodCookie(
     mood: MoodEntry,
@@ -319,7 +323,7 @@ private fun MoodCookie(
                     .fillMaxHeight()
                     .aspectRatio(1f)
                     .clip(shape)
-                    .background(androidx.compose.ui.graphics.Brush.linearGradient(palette.colors))
+                    .background(moodGradient(palette))
                     .clickable(role = Role.Button) {
                         haptics.toggle(on = !mood.selected)
                         mood.onClick()
@@ -696,7 +700,7 @@ fun PlaylistBlock(
     onMore: (() -> Unit)? = null,
     shape: Shape = VibraShapes.SoftBurst,
 ) {
-    VibraCard(modifier = modifier.clickable(role = Role.Button, onClick = onOpen)) {
+    VibraCard(modifier = modifier, onClick = onOpen) {
         if (size == BlockSize.Small) {
             Column(
                 modifier = Modifier.fillMaxSize().padding(12.dp),

@@ -130,8 +130,8 @@ fun MusicRecognitionScreen(
     val screenState by viewModel.screenState.collectAsStateWithLifecycle()
     val historySheetState by viewModel.historySheetState.collectAsStateWithLifecycle()
     val settingsState by viewModel.settingsState.collectAsStateWithLifecycle()
-    val historyModalSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val settingsModalSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val historyModalSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
+    val settingsModalSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
     val onNavigateBack =
         remember(navController) {
             {

@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Strings introduced by the Vibra presentation layer. -->
 <resources>
+    <string name="vibra_menu_playlist_name_hint">My playlist</string>
     <string name="pause">Pause</string>
     <string name="vibra_open_player">Open player</string>
     <string name="vibra_close_player">Close player</string>
@@ -106,4 +107,47 @@
     <string name="vibra_spotify_sync_status">Processed: %1$d · Imported: %2$d · Unmatched: %3$d · Errors: %4$d</string>
     <string name="vibra_spotify_sync_running">Syncing</string>
     <string name="vibra_spotify_connection_error">Could not connect to Spotify. Please retry.</string>
+
+    <string name="vibra_compact_menus">Compact menus</string>
+    <string name="vibra_compact_menus_description">Use compact menus for songs, albums and playlists</string>
+    <string name="vibra_search_online_error">Online search is unavailable</string>
+    <string name="vibra_search_retry">Retry</string>
+    <string name="vibra_search_library">From your library</string>
+    <string name="vibra_cover_shape">Cover shape</string>
+    <string name="vibra_shape_pentagon">Pentagon</string>
+    <string name="vibra_shape_round">Rounded square</string>
+    <string name="vibra_shape_circle">Circle</string>
+    <string name="vibra_toggle_saved">Toggle saved state</string>
+    <string name="vibra_more_actions">More actions</string>
+    <string name="vibra_change_cover">Change image</string>
+    <string name="vibra_remove_cover">Remove image</string>
+    <string name="vibra_menu_go_to">Go to</string>
+    <string name="vibra_menu_album">Album</string>
+    <string name="vibra_menu_done">Done</string>
+    <string name="vibra_menu_decrease">Decrease</string>
+    <string name="vibra_menu_increase">Increase</string>
+    <string name="vibra_menu_minutes_short">%1$d min</string>
+    <string name="vibra_menu_duration">Duration</string>
+    <string name="vibra_menu_start_timer">Start</string>
+    <string name="vibra_menu_create">Create</string>
+    <string name="vibra_menu_next">Next</string>
+    <string name="vibra_menu_queue">Queue</string>
+    <string name="vibra_menu_playlist">Playlist</string>
+    <string name="vibra_menu_download">Download</string>
+    <string name="vibra_menu_downloaded">Downloaded</string>
+    <string name="vibra_menu_radio">Radio</string>
+    <string name="vibra_menu_semitones">Semitones</string>
+    <string name="vibra_menu_profile">Profile: %1$s</string>
+    <string name="vibra_menu_artist">Artist</string>
+    <string name="vibra_menu_tempo_pitch">Speed and pitch</string>
+    <string name="vibra_menu_pitch">Pitch</string>
+    <string name="vibra_menu_shuffle">Shuffle</string>
+    <string name="vibra_menu_search">Search</string>
+    <string name="vibra_menu_bass">Bass</string>
+    <string name="vibra_menu_output_gain_description">Trim or amplify the final equalizer output</string>
+    <string name="vibra_menu_headroom_description">Reduce gain automatically to prevent clipping</string>
+    <string name="vibra_menu_lyrics_sync">Synchronization</string>
+    <string name="vibra_menu_show_translation">Show translation</string>
+    <string name="vibra_menu_headroom_title">Automatic headroom</string>
+    <string name="vibra_menu_system_equalizer">Open system equalizer</string>
 </resources>

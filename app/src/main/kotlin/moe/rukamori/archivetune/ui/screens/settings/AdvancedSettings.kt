@@ -72,6 +72,9 @@ fun AdvancedSettings(navController: NavController) {
     val (streamBypassProxy, onStreamBypassProxyChange) = rememberPreference(key = StreamBypassProxyKey, defaultValue = false)
 
     val (reorderWobble, onReorderWobbleChange) = rememberPreference(app.vibra.ui.motion.ReorderWobbleKey, true)
+    val (canvasEnabled, onCanvasEnabledChange) = rememberPreference(app.vibra.canvas.CanvasEnabledKey, true)
+
+    val (compactMenus, onCompactMenusChange) = rememberPreference(app.vibra.ui.components.CompactMediaMenusKey, false)
 
     var testingProxy by remember { mutableStateOf(false) }
     var testResult by remember { mutableStateOf<String?>(null) }
@@ -105,6 +108,14 @@ fun AdvancedSettings(navController: NavController) {
             PreferenceGroup(title = stringResource(R.string.settings_advanced)) {
                 item {
                     SwitchPreference(
+                        title = { Text(stringResource(R.string.vibra_compact_menus)) },
+                        description = stringResource(R.string.vibra_compact_menus_description),
+                        checked = compactMenus,
+                        onCheckedChange = onCompactMenusChange,
+                    )
+                }
+                item {
+                    SwitchPreference(
                         title = { Text(stringResource(R.string.reorder_wobble)) },
                         checked = reorderWobble,
                         onCheckedChange = onReorderWobbleChange,
@@ -129,6 +140,17 @@ fun AdvancedSettings(navController: NavController) {
                 item {
                     PreferenceEntry(title = { Text(stringResource(R.string.debug_logs)) },
                         onClick = { navController.navigate("settings/logcat") })
+                }
+            }
+
+            PreferenceGroup(title = stringResource(R.string.canvas_section)) {
+                item {
+                    SwitchPreference(
+                        title = { Text(stringResource(R.string.canvas_enabled)) },
+                        description = stringResource(R.string.canvas_enabled_desc),
+                        checked = canvasEnabled,
+                        onCheckedChange = onCanvasEnabledChange,
+                    )
                 }
             }
 

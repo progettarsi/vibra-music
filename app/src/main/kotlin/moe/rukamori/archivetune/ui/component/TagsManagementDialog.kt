@@ -37,7 +37,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialogDefaults
-import androidx.compose.material3.BasicAlertDialog
+import app.vibra.ui.components.VibraBasicAlertDialog as BasicAlertDialog
 import app.vibra.ui.motion.VibraButton as Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api

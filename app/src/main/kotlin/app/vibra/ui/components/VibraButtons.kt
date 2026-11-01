@@ -12,6 +12,10 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.clickable as playbackClickable
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.graphics.shapes.Morph
+import app.vibra.ui.motion.LiquidMorphShape
 import androidx.compose.foundation.background
 import app.vibra.ui.motion.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -55,10 +59,12 @@ import app.vibra.ui.motion.Liquid
 import app.vibra.ui.motion.LiquidSpeed
 import app.vibra.ui.motion.LocalPlaybackSpin
 import app.vibra.ui.motion.liquidPress
+import app.vibra.ui.motion.independentTapFeedback
 import app.vibra.ui.motion.nudge
 import app.vibra.ui.motion.rememberLiquidMorphShape
 import app.vibra.ui.motion.rememberLiquidNudge
 import app.vibra.ui.motion.rememberPlaybackSpin
+import app.vibra.ui.motion.interactiveSurface
 import app.vibra.ui.theme.VibraDimens
 import moe.rukamori.archivetune.R
 
@@ -91,11 +97,12 @@ fun VibraPlayButton(
     val interactionSource = remember { MutableInteractionSource() }
     val spin = LocalPlaybackSpin.current ?: rememberPlaybackSpin(isPlaying)
     val pressed by interactionSource.collectIsPressedAsState()
-    val shape =
-        rememberLiquidMorphShape(
-            target = if (pressed) MaterialShapes.Cookie9Sided else MaterialShapes.Cookie12Sided,
-            speed = LiquidSpeed.Fast,
-        )
+    // One fixed morph is traversed in both directions: reversing a press must not
+    // re-normalise the polygon correspondence and change the apparent angular phase.
+    val pressMorph = remember { Morph(MaterialShapes.Cookie12Sided, MaterialShapes.Cookie9Sided) }
+    val pressProgress by animateFloatAsState(if (pressed) 1f else 0f, Liquid.spatial(LiquidSpeed.Fast), label = "playPressShape")
+    val pressScale by animateFloatAsState(if (pressed) 0.9f else 1f, Liquid.spatial(LiquidSpeed.Fast), label = "playPressScale")
+    val shape = LiquidMorphShape(pressMorph, pressProgress)
     val loader = rememberShapeTracingLoaderState(active = isBuffering)
     val bounce = rememberLiquidNudge()
     val onArtwork = artworkUrl != null
@@ -106,7 +113,9 @@ fun VibraPlayButton(
         modifier =
             modifier
                 .size(size)
-                .liquidPress(interactionSource, pressedScale = 0.9f)
+                .independentTapFeedback()
+                .nudge(bounce, squash = 0.12f)
+                .graphicsLayer { scaleX = pressScale; scaleY = pressScale }
                 .graphicsLayer { rotationZ = spin.degrees }
                 .clip(shape)
                 .background(containerColor)
@@ -115,7 +124,7 @@ fun VibraPlayButton(
                     shape = shape,
                     color = if (onArtwork) Color.White else contentColor,
                     strokeWidth = if (size < 60.dp) 2.5.dp else 4.dp,
-                ).clickable(
+                ).playbackClickable(
                     interactionSource = interactionSource,
                     indication = null,
                     role = Role.Button,
@@ -284,13 +293,10 @@ fun VibraGlyphButton(
         modifier =
             modifier
                 .size(size)
-                .liquidPress(interactionSource, pressedScale = 0.82f)
-                .clip(CircleShape)
-                .clickable(
-                    interactionSource = interactionSource,
-                    indication = ripple(bounded = false),
+                .interactiveSurface(
+                    shape = CircleShape,
                     enabled = enabled,
-                    role = Role.Button,
+                    interactionSource = interactionSource,
                 ) {
                     haptics.press()
                     onClick()

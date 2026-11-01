@@ -591,7 +591,7 @@ private fun ModelPickerPreference(
     onModelSelected: (String) -> Unit,
     onFetch: () -> Unit,
 ) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
 
     val description =
         when {

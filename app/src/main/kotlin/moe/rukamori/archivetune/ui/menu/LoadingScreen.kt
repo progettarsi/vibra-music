@@ -29,7 +29,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
+import app.vibra.ui.components.VibraWindowDialog as Dialog
 
 @Composable
 fun LoadingScreen(

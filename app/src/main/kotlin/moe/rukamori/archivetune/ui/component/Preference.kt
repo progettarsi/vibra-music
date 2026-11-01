@@ -20,7 +20,9 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
+import app.vibra.ui.motion.TapBounceHost
 import app.vibra.ui.motion.clickable
+import app.vibra.ui.motion.tapBounceLayer
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -370,7 +372,7 @@ fun <T> ListPreference(
     var showBottomSheet by remember {
         mutableStateOf(false)
     }
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
     val coroutineScope = rememberCoroutineScope()
 
     if (showBottomSheet) {
@@ -434,7 +436,7 @@ fun <T : Any> MultiSelectListPreference(
     onConfirm: () -> Unit,
     isEnabled: Boolean = true,
 ) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
     val coroutineScope = rememberCoroutineScope()
     val hideSheet: (() -> Unit) -> Unit =
         remember(coroutineScope, sheetState) {
@@ -576,34 +578,38 @@ private fun MultiSelectPreferenceOption(
             MaterialTheme.colorScheme.onSurface
         }
 
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .heightIn(min = 64.dp)
-                .clip(MaterialTheme.shapes.extraLarge)
-                .background(containerColor)
-                .toggleable(
-                    value = checked,
-                    onValueChange = onCheckedChange,
-                    role = Role.Checkbox,
-                ).padding(horizontal = 20.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = if (checked) FontWeight.Bold else FontWeight.Normal,
-            color = contentColor,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f),
-        )
-        Spacer(Modifier.width(16.dp))
-        Checkbox(
-            checked = checked,
-            onCheckedChange = null,
-        )
+    // The row owns the bounce of its selection, outside the rounded clip and background.
+    TapBounceHost { bounce ->
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 64.dp)
+                    .tapBounceLayer(bounce)
+                    .clip(MaterialTheme.shapes.extraLarge)
+                    .background(containerColor)
+                    .toggleable(
+                        value = checked,
+                        onValueChange = onCheckedChange,
+                        role = Role.Checkbox,
+                    ).padding(horizontal = 20.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = text,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = if (checked) FontWeight.Bold else FontWeight.Normal,
+                color = contentColor,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            Spacer(Modifier.width(16.dp))
+            Checkbox(
+                checked = checked,
+                onCheckedChange = null,
+            )
+        }
     }
 }
 
@@ -711,54 +717,58 @@ private fun PreferenceSelectionOption(
     val descriptionColor =
         if (selected) contentColor.copy(alpha = 0.78f) else MaterialTheme.colorScheme.onSurfaceVariant
 
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .heightIn(min = if (description == null) 72.dp else 96.dp)
-                .alpha(if (enabled) 1f else 0.5f)
-                .clip(MaterialTheme.shapes.extraLarge)
-                .background(containerColor)
-                .selectable(
-                    selected = selected,
-                    enabled = enabled,
-                    onClick = onClick,
-                    role = Role.RadioButton,
-                ).padding(horizontal = 24.dp, vertical = 20.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(
-            verticalArrangement = Arrangement.Center,
-            modifier = Modifier.weight(1f),
+    // The row owns the bounce of its selection, outside the rounded clip and background.
+    TapBounceHost { bounce ->
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = if (description == null) 72.dp else 96.dp)
+                    .alpha(if (enabled) 1f else 0.5f)
+                    .tapBounceLayer(bounce)
+                    .clip(MaterialTheme.shapes.extraLarge)
+                    .background(containerColor)
+                    .selectable(
+                        selected = selected,
+                        enabled = enabled,
+                        onClick = onClick,
+                        role = Role.RadioButton,
+                    ).padding(horizontal = 24.dp, vertical = 20.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                text = text,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                color = contentColor,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-            if (description != null) {
-                Spacer(Modifier.height(4.dp))
+            Column(
+                verticalArrangement = Arrangement.Center,
+                modifier = Modifier.weight(1f),
+            ) {
                 Text(
-                    text = description,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = descriptionColor,
-                    maxLines = 3,
+                    text = text,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                    color = contentColor,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
+                if (description != null) {
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = description,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = descriptionColor,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
-        }
 
-        if (selected) {
-            Spacer(Modifier.width(16.dp))
-            Icon(
-                painter = painterResource(R.drawable.check),
-                contentDescription = null,
-                tint = contentColor,
-                modifier = Modifier.size(28.dp),
-            )
+            if (selected) {
+                Spacer(Modifier.width(16.dp))
+                Icon(
+                    painter = painterResource(R.drawable.check),
+                    contentDescription = null,
+                    tint = contentColor,
+                    modifier = Modifier.size(28.dp),
+                )
+            }
         }
     }
 }

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Vibra (2026) - GPL-3.0 License. Derived from ArchiveTune c Rukamori. -->
+<resources>
+    <string name="canvas_section">Canvas</string>
+    <string name="canvas_enabled">Copertine animate</string>
+    <string name="canvas_enabled_desc">Riproduce un breve video in loop al posto della copertina quando esiste per il brano. Viene cercato online: disattivandolo si fermano anche queste richieste.</string>
+</resources>

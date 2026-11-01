@@ -26,7 +26,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
+import app.vibra.ui.components.VibraAlertDialog as AlertDialog
 import androidx.compose.material3.AlertDialogDefaults
 import app.vibra.ui.motion.VibraButton as Button
 import androidx.compose.material3.ButtonDefaults
@@ -49,7 +49,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
+import app.vibra.ui.components.VibraWindowDialog as Dialog
 import androidx.compose.ui.window.DialogProperties
 import app.vibra.ui.components.VibraDialogButton
 import app.vibra.ui.components.VibraFieldShape

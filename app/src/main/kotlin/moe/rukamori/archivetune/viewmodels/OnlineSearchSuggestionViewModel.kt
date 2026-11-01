@@ -12,100 +12,58 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import app.vibra.search.LiveSearchController
+import app.vibra.search.observeLocalSearchPreview
 import moe.rukamori.archivetune.aicontentfilter.FilterAiContentUseCase
 import moe.rukamori.archivetune.aicontentfilter.LoadAiContentFilterPolicyUseCase
-import moe.rukamori.archivetune.constants.HideExplicitKey
-import moe.rukamori.archivetune.constants.HideVideoKey
+import moe.rukamori.archivetune.constants.*
 import moe.rukamori.archivetune.db.MusicDatabase
 import moe.rukamori.archivetune.db.entities.SearchHistory
+import moe.rukamori.archivetune.db.entities.LocalItem
 import moe.rukamori.archivetune.innertube.YouTube
 import moe.rukamori.archivetune.innertube.models.YTItem
 import moe.rukamori.archivetune.innertube.models.filterExplicit
 import moe.rukamori.archivetune.innertube.models.filterVideo
 import moe.rukamori.archivetune.utils.dataStore
-import moe.rukamori.archivetune.utils.get
 import javax.inject.Inject
 
-@OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
-class OnlineSearchSuggestionViewModel
-    @Inject
-    constructor(
-        @ApplicationContext val context: Context,
-        private val database: MusicDatabase,
-        private val loadAiContentFilterPolicy: LoadAiContentFilterPolicyUseCase,
-        private val filterAiContent: FilterAiContentUseCase,
-    ) : ViewModel() {
-        private val query = MutableStateFlow("")
-        private val _viewState = MutableStateFlow(SearchSuggestionViewState())
-        val viewState = _viewState.asStateFlow()
+class OnlineSearchSuggestionViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
+    private val database: MusicDatabase,
+    private val loadAiContentFilterPolicy: LoadAiContentFilterPolicyUseCase,
+    private val filterAiContent: FilterAiContentUseCase,
+) : ViewModel() {
+    private val search = LiveSearchController<SearchHistory, LocalItem, YTItem>(
+        scope = viewModelScope,
+        history = { query -> if (query.isEmpty()) database.searchHistory() else database.searchHistory(query).map { it.take(3) } },
+        localItems = { observeLocalSearchPreview(database, it) },
+        suggestions = { YouTube.searchSuggestions(it).getOrThrow().queries },
+        results = { query ->
+            val result = YouTube.searchSummary(query).getOrThrow()
+            val prefs = context.dataStore.data.first()
+            val policy = loadAiContentFilterPolicy()
+            filterAiContent(
+                result.filterExplicit(prefs[HideExplicitKey] ?: false).filterVideo(prefs[HideVideoKey] ?: false)
+                    .summaries.flatMap { it.items }.distinctBy { it::class to it.id }, policy,
+            )
+        },
+    )
+    val viewState = search.state
 
-        init {
-            viewModelScope.launch {
-                query
-                    .flatMapLatest { query ->
-                        if (query.isEmpty()) {
-                            database.searchHistory().map { history ->
-                                SearchSuggestionViewState(
-                                    history = history,
-                                )
-                            }
-                        } else {
-                            val result = YouTube.searchSuggestions(query).getOrNull()
-                            val aiContentFilterPolicy = loadAiContentFilterPolicy()
-                            database
-                                .searchHistory(query)
-                                .map { it.take(3) }
-                                .map { history ->
-                                    SearchSuggestionViewState(
-                                        history = history,
-                                        suggestions =
-                                            result
-                                                ?.queries
-                                                ?.filter { query ->
-                                                    history.none { it.query == query }
-                                                }.orEmpty(),
-                                        items =
-                                            filterAiContent(
-                                                result
-                                                    ?.recommendedItems
-                                                    ?.filterExplicit(
-                                                        context.dataStore.get(
-                                                            HideExplicitKey,
-                                                            false,
-                                                        ),
-                                                    )?.filterVideo(context.dataStore.get(HideVideoKey, false))
-                                                    .orEmpty(),
-                                                aiContentFilterPolicy,
-                                            ),
-                                    )
-                                }
-                        }
-                    }.collect {
-                        _viewState.value = it
-                    }
-            }
-        }
-
-        fun updateQuery(query: String) {
-            this.query.value = query
-        }
-
-        fun deleteHistory(history: SearchHistory) {
-            database.query {
-                delete(history)
-            }
+    init {
+        // These values remain local; a change invalidates cached results and current requests.
+        viewModelScope.launch {
+            context.dataStore.data.map { prefs ->
+                prefs.asMap().filterKeys { key -> key in setOf(InnerTubeCookieKey, DataSyncIdKey, HideExplicitKey, HideVideoKey) ||
+                    key.name.contains("aiContent", ignoreCase = true) || key.name.contains("language", ignoreCase = true) }
+            }.distinctUntilChanged().drop(1).collect { search.invalidate() }
         }
     }
-
-data class SearchSuggestionViewState(
-    val history: List<SearchHistory> = emptyList(),
-    val suggestions: List<String> = emptyList(),
-    val items: List<YTItem> = emptyList(),
-)
+    fun updateQuery(query: String) = search.updateQuery(query)
+    fun retry() = search.retry()
+    fun cancel() = search.cancel()
+    fun deleteHistory(history: SearchHistory) { database.query { delete(history) } }
+}

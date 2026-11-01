@@ -2,6 +2,7 @@
 <!-- Vibra (2026) - GPL-3.0 License. Derived from ArchiveTune c Rukamori. -->
 <!-- Italian translations of the Vibra presentation layer. -->
 <resources>
+    <string name="vibra_menu_playlist_name_hint">La mia playlist</string>
     <string name="pause">Pausa</string>
     <string name="vibra_open_player">Apri il player</string>
     <string name="vibra_close_player">Chiudi il player</string>
@@ -107,4 +108,47 @@
     <string name="vibra_spotify_sync_status">Elaborati: %1$d · Importati: %2$d · Non abbinati: %3$d · Errori: %4$d</string>
     <string name="vibra_spotify_sync_running">Sincronizzazione in corso</string>
     <string name="vibra_spotify_connection_error">Collegamento Spotify non riuscito. Riprova.</string>
+
+    <string name="vibra_compact_menus">Menu compatti</string>
+    <string name="vibra_compact_menus_description">Usa menu più compatti per canzoni, album e playlist</string>
+    <string name="vibra_search_online_error">La ricerca online non è disponibile</string>
+    <string name="vibra_search_retry">Riprova</string>
+    <string name="vibra_search_library">Dalla tua libreria</string>
+    <string name="vibra_cover_shape">Forma della copertina</string>
+    <string name="vibra_shape_pentagon">Pentagono</string>
+    <string name="vibra_shape_round">Quadrato arrotondato</string>
+    <string name="vibra_shape_circle">Cerchio</string>
+    <string name="vibra_toggle_saved">Cambia stato salvato</string>
+    <string name="vibra_more_actions">Altre azioni</string>
+    <string name="vibra_change_cover">Cambia immagine</string>
+    <string name="vibra_remove_cover">Rimuovi immagine</string>
+    <string name="vibra_menu_go_to">Vai a</string>
+    <string name="vibra_menu_album">Album</string>
+    <string name="vibra_menu_done">Fatto</string>
+    <string name="vibra_menu_decrease">Diminuisci</string>
+    <string name="vibra_menu_increase">Aumenta</string>
+    <string name="vibra_menu_minutes_short">%1$d min</string>
+    <string name="vibra_menu_duration">Durata</string>
+    <string name="vibra_menu_start_timer">Avvia</string>
+    <string name="vibra_menu_create">Crea</string>
+    <string name="vibra_menu_next">Dopo</string>
+    <string name="vibra_menu_queue">In coda</string>
+    <string name="vibra_menu_playlist">Playlist</string>
+    <string name="vibra_menu_download">Scarica</string>
+    <string name="vibra_menu_downloaded">Scaricato</string>
+    <string name="vibra_menu_radio">Radio</string>
+    <string name="vibra_menu_semitones">Semitoni</string>
+    <string name="vibra_menu_profile">Profilo: %1$s</string>
+    <string name="vibra_menu_artist">Artista</string>
+    <string name="vibra_menu_tempo_pitch">Velocità e tono</string>
+    <string name="vibra_menu_pitch">Tono</string>
+    <string name="vibra_menu_shuffle">Casuale</string>
+    <string name="vibra_menu_search">Cerca</string>
+    <string name="vibra_menu_bass">Bassi</string>
+    <string name="vibra_menu_output_gain_description">Riduci o amplifica il livello di uscita dell\'equalizzatore</string>
+    <string name="vibra_menu_headroom_description">Riduci automaticamente il guadagno per evitare la distorsione</string>
+    <string name="vibra_menu_lyrics_sync">Sincronizzazione</string>
+    <string name="vibra_menu_show_translation">Mostra traduzione</string>
+    <string name="vibra_menu_headroom_title">Headroom automatico</string>
+    <string name="vibra_menu_system_equalizer">Apri equalizzatore di sistema</string>
 </resources>

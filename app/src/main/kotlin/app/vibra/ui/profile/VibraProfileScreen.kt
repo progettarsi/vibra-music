@@ -19,6 +19,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import app.vibra.ui.motion.clickable
+import app.vibra.ui.motion.interactiveSurface
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -381,7 +382,7 @@ private fun FavouriteArtistBlock(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    VibraCard(modifier = modifier.clickable(role = Role.Button, onClick = onClick)) {
+    VibraCard(modifier = modifier, onClick = onClick) {
         Row(modifier = Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(modifier = Modifier.size(104.dp).clip(VibraShapes.Star).background(MaterialTheme.colorScheme.primaryContainer)) {
                 if (artworkUrl != null) {
@@ -436,7 +437,7 @@ private fun StatTile(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    VibraCard(modifier = modifier.fillMaxHeight().clickable(role = Role.Button, onClick = onClick)) {
+    VibraCard(modifier = modifier.fillMaxHeight(), onClick = onClick) {
         Column(modifier = Modifier.fillMaxWidth().heightIn(min = 128.dp).padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(text = title, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
             Column {
@@ -458,7 +459,7 @@ private fun ProfileEditSheet(
     val haptics = rememberVibraHaptics()
     VibraBottomSheet(
         onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false),
     ) {
         Column(
             modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = VibraDimens.Gutter, vertical = 8.dp),
@@ -480,12 +481,15 @@ private fun ProfileEditSheet(
                         modifier =
                             Modifier
                                 .size(56.dp)
-                                .clip(option.polygon.toShape())
-                                .background(if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHighest)
-                                .clickable(role = Role.RadioButton, indication = ripple(), interactionSource = null) {
-                                    haptics.tick()
-                                    style.setShape(option)
-                                }.semantics { contentDescription = label },
+                                .interactiveSurface(
+                                    shape = option.polygon.toShape(),
+                                    containerColor = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHighest,
+                                    role = Role.RadioButton,
+                                    onClick = {
+                                        haptics.tick()
+                                        style.setShape(option)
+                                    },
+                                ).semantics { contentDescription = label },
                     )
                 }
             }
@@ -505,12 +509,15 @@ private fun ProfileEditSheet(
                                 .then(
                                     if (selected) Modifier.border(BorderStroke(3.dp, MaterialTheme.colorScheme.onSurface), CircleShape) else Modifier,
                                 ).padding(if (selected) 6.dp else 0.dp)
-                                .clip(CircleShape)
-                                .background(color)
-                                .clickable(role = Role.RadioButton) {
-                                    haptics.toggle(on = true)
-                                    style.setColor(color)
-                                },
+                                .interactiveSurface(
+                                    shape = CircleShape,
+                                    containerColor = color,
+                                    role = Role.RadioButton,
+                                    onClick = {
+                                        haptics.toggle(on = true)
+                                        style.setColor(color)
+                                    },
+                                ),
                     )
                 }
             }

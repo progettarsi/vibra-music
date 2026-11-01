@@ -329,7 +329,7 @@ fun SpotifyLoginSheet(
     onDismiss: () -> Unit,
     onCookiesCaptured: (spDc: String, spKey: String) -> Unit,
 ) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
     var webView by remember { mutableStateOf<WebView?>(null) }
     var mainWebView by remember { mutableStateOf<WebView?>(null) }
     var captured by remember { mutableStateOf(false) }

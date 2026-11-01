@@ -43,7 +43,7 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.BasicAlertDialog
+import app.vibra.ui.components.VibraBasicAlertDialog as BasicAlertDialog
 import app.vibra.ui.motion.VibraButton as Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -755,7 +755,7 @@ private fun LyricsSelectionBottomSheet(
     onDismissRequest: () -> Unit,
     onShareSelected: () -> Unit,
 ) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
     val firstSelectedIndex =
         remember(lines, selectedLineKeys) {
             lines

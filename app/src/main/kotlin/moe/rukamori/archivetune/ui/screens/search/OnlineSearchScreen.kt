@@ -53,6 +53,16 @@ import moe.rukamori.archivetune.ui.menu.*
 import moe.rukamori.archivetune.ui.utils.navigateToAlbum
 import moe.rukamori.archivetune.ui.utils.navigateToArtist
 import moe.rukamori.archivetune.viewmodels.OnlineSearchSuggestionViewModel
+import moe.rukamori.archivetune.db.entities.LocalItem
+import moe.rukamori.archivetune.db.entities.Song
+import moe.rukamori.archivetune.db.entities.Album
+import moe.rukamori.archivetune.db.entities.Artist
+import moe.rukamori.archivetune.db.entities.Playlist
+import moe.rukamori.archivetune.ui.component.SongListItem
+import moe.rukamori.archivetune.ui.component.AlbumListItem
+import moe.rukamori.archivetune.ui.component.ArtistListItem
+import moe.rukamori.archivetune.ui.component.PlaylistListItem
+import app.vibra.ui.navigation.rememberVibraItemActions
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalComposeUiApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -76,8 +86,15 @@ fun OnlineSearchScreen(
     val isPlaying by playerConnection.isPlaying.collectAsStateWithLifecycle()
     val mediaMetadata by playerConnection.mediaMetadata.collectAsStateWithLifecycle()
 
+    val localActions = rememberVibraItemActions(navController)
+    DisposableEffect(viewModel) { onDispose { viewModel.cancel() } }
     val coroutineScope = rememberCoroutineScope()
-    val viewState by viewModel.viewState.collectAsStateWithLifecycle()
+    val receivedState by viewModel.viewState.collectAsStateWithLifecycle()
+    val normalizedQuery = remember(query) { query.trim().replace(Regex("\\s+"), " ") }
+    val viewState = if (receivedState.query == normalizedQuery) receivedState else receivedState.copy(
+        query = normalizedQuery, history = emptyList(), localItems = emptyList(), items = emptyList(), suggestions = emptyList(),
+        isLoading = normalizedQuery.length >= 2, hasError = false, suggestionsError = false)
+
 
     val lazyListState = rememberLazyListState()
 
@@ -94,7 +111,7 @@ fun OnlineSearchScreen(
     }
 
     val backgroundColor = if (pureBlack) Color.Black else MaterialTheme.colorScheme.background
-    val distinctResultItems = remember(viewState.items) { viewState.items.distinctBy { it.id } }
+    val distinctResultItems = remember(viewState.items) { viewState.items.distinctBy { it::class to it.id } }
     // While results are on screen, keep the text rows short so results stay in reach.
     val typing = distinctResultItems.isNotEmpty()
     val shownSuggestions = if (typing) viewState.suggestions.take(MaxSuggestionsWithResults) else viewState.suggestions
@@ -301,6 +318,42 @@ fun OnlineSearchScreen(
                     .widthIn(max = SearchContentMaxWidth)
                     .fillMaxSize(),
         ) {
+            if (viewState.localItems.isNotEmpty()) {
+                item(key = "local_header") { SearchSectionHeader(stringResource(R.string.vibra_search_library), pureBlack) }
+                items(viewState.localItems, key = { "local_${it::class.simpleName}_${it.id}" }) { local ->
+                    val rowModifier = Modifier.combinedClickable(onClick = { localActions.open(local); onDismiss() },
+                        onLongClick = { localActions.showMenu(local) })
+                    val more: @Composable RowScope.() -> Unit = {
+                        IconButton(onClick = { localActions.showMenu(local) }) {
+                            Icon(painterResource(R.drawable.more_vert), stringResource(R.string.vibra_more_actions))
+                        }
+                    }
+                    when (local) {
+                        is Song -> SongListItem(song = local, modifier = rowModifier, trailingContent = more,
+                            isActive = mediaMetadata?.id == local.id, isPlaying = isPlaying)
+                        is Album -> AlbumListItem(album = local, modifier = rowModifier, trailingContent = more)
+                        is Artist -> ArtistListItem(artist = local, modifier = rowModifier, trailingContent = more)
+                        is Playlist -> PlaylistListItem(playlist = local, modifier = rowModifier, trailingContent = more)
+                    }
+                }
+            }
+            if (viewState.isLoading) {
+                item(key = "loading") {
+                    Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(Modifier.size(28.dp))
+                    }
+                }
+            }
+            if (viewState.hasError || (viewState.suggestionsError && query.trim().length < 2)) {
+                item(key = "search_error") {
+                    Row(Modifier.fillMaxWidth().padding(horizontal = SearchHorizontalPadding), verticalAlignment = Alignment.CenterVertically) {
+                        Text(stringResource(R.string.vibra_search_online_error), modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                        app.vibra.ui.components.VibraDialogButton(onClick = viewModel::retry) { Text(stringResource(R.string.vibra_search_retry)) }
+                    }
+                }
+            } else if (query.trim().length >= 2 && !viewState.isLoading && viewState.items.isEmpty() && viewState.localItems.isEmpty()) {
+                item(key = "no_results") { Text(stringResource(R.string.no_results_found), Modifier.padding(20.dp)) }
+            }
             // Vibra: the best matches come first so results are reachable without
             // scrolling; then a short list of history/suggestions; then everything else.
             if (distinctResultItems.isNotEmpty()) {
@@ -316,7 +369,7 @@ fun OnlineSearchScreen(
                 }
                 items(
                     items = distinctResultItems.take(TopResultCount),
-                    key = { item -> "item_${item.id}" },
+                    key = { item -> "item_${item::class.simpleName}_${item.id}" },
                     contentType = { item -> item::class },
                 ) { item -> resultRow(item) }
             }
@@ -346,6 +399,7 @@ fun OnlineSearchScreen(
                         query = history.query,
                         online = false,
                         onClick = {
+                            viewModel.cancel()
                             onSearch(history.query)
                             onDismiss()
                         },
@@ -387,6 +441,7 @@ fun OnlineSearchScreen(
                         query = suggestion,
                         online = true,
                         onClick = {
+                            viewModel.cancel()
                             onSearch(suggestion)
                             onDismiss()
                         },
@@ -413,7 +468,7 @@ fun OnlineSearchScreen(
                 }
                 items(
                     items = distinctResultItems.drop(TopResultCount),
-                    key = { item -> "item_${item.id}" },
+                    key = { item -> "item_${item::class.simpleName}_${item.id}" },
                     contentType = { item -> item::class },
                 ) { item -> resultRow(item) }
             }

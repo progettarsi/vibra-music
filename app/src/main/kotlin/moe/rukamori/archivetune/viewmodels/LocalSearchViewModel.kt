@@ -45,17 +45,7 @@ class LocalSearchViewModel
                 } else {
                     when (filter) {
                         LocalFilter.ALL -> {
-                            combine(
-                                database.searchSongs(query, PREVIEW_SIZE),
-                                database.searchAlbums(query, PREVIEW_SIZE),
-                                database.searchArtists(query, PREVIEW_SIZE),
-                                database.searchPlaylists(query, PREVIEW_SIZE),
-                            ) { songs, albums, artists, playlists ->
-                                songs.filter { song -> song.artists.none { it.blockedAt != null } } +
-                                    albums.filter { album -> album.artists.none { it.blockedAt != null } } +
-                                    artists.filter { artist -> artist.artist.blockedAt == null } +
-                                    playlists
-                            }
+                            app.vibra.search.observeLocalSearchPreview(database, query, PREVIEW_SIZE)
                         }
 
                         LocalFilter.SONG -> {

@@ -375,6 +375,7 @@ private fun homeBlocks(
                 PlaylistBlock(
                     title = localPlaylist?.title ?: accountPlaylist?.title.orEmpty(),
                     subtitle = byYou,
+                    shape = app.vibra.ui.components.rememberPlaylistCoverShape(localPlaylist?.id ?: accountPlaylist?.id.orEmpty()),
                     thumbnailUrl = localPlaylist?.coverUrl ?: accountPlaylist?.thumbnail,
                     size = size,
                     onOpen = { localPlaylist?.let(actions::open) ?: accountPlaylist?.let(actions::open) },

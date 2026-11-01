@@ -9,8 +9,10 @@
 
 package moe.rukamori.archivetune.ui.menu
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -21,9 +23,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import app.vibra.ui.motion.VibraTextButton as TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -35,10 +37,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import app.vibra.ui.components.VibraBottomSheet
+import app.vibra.ui.components.*
 import app.vibra.ui.components.VibraDialogButton
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -63,323 +66,349 @@ import timber.log.Timber
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun AddToPlaylistDialogOnline(
-    isVisible: Boolean,
-    allowSyncing: Boolean = true,
-    initialTextFieldValue: String? = null,
-    songs: SnapshotStateList<Song>, // list of song ids. Songs should be inserted to database in this function.
-    onDismiss: () -> Unit,
-    onProgressStart: (Boolean) -> Unit,
-    onPercentageChange: (Int) -> Unit,
-    onStatusChange: (String) -> Unit = {},
+  isVisible: Boolean,
+  allowSyncing: Boolean = true,
+  initialTextFieldValue: String? = null,
+  songs:
+    SnapshotStateList<
+      Song
+    >, // list of song ids. Songs should be inserted to database in this function.
+  onDismiss: () -> Unit,
+  onProgressStart: (Boolean) -> Unit,
+  onPercentageChange: (Int) -> Unit,
+  onStatusChange: (String) -> Unit = {},
 ) {
-    val context = LocalContext.current
-    val downloadUtil = moe.rukamori.archivetune.LocalDownloadUtil.current
-    val database = LocalDatabase.current
-    val syncUtils = LocalSyncUtils.current
-    val coroutineScope = rememberCoroutineScope()
-    val importResolver = remember { ImportSongResolver() }
-    val (importLocalFirst) = rememberPreference(ImportSourcePriorityKey, false)
-    var allPlaylists by remember { mutableStateOf(emptyList<Playlist>()) }
-    var playlistQuery by rememberSaveable { mutableStateOf("") }
-    val haptics = app.vibra.ui.haptics.rememberVibraHaptics()
-    val available = remember(allPlaylists) { playlistsForAddToPlaylist(allPlaylists) }
-    val playlists = remember(available, playlistQuery) {
-        visiblePlaylistsForAddToPlaylist(available, AddToPlaylistSortOption.RECENTLY_MODIFIED, playlistQuery)
+  val context = LocalContext.current
+  val downloadUtil = moe.rukamori.archivetune.LocalDownloadUtil.current
+  val database = LocalDatabase.current
+  val syncUtils = LocalSyncUtils.current
+  val coroutineScope = rememberCoroutineScope()
+  val importResolver = remember { ImportSongResolver() }
+  val (importLocalFirst) = rememberPreference(ImportSourcePriorityKey, false)
+  var allPlaylists by remember { mutableStateOf(emptyList<Playlist>()) }
+  var playlistQuery by rememberSaveable { mutableStateOf("") }
+  val haptics = app.vibra.ui.haptics.rememberVibraHaptics()
+  val available = remember(allPlaylists) { playlistsForAddToPlaylist(allPlaylists) }
+  val playlists =
+    remember(available, playlistQuery) {
+      visiblePlaylistsForAddToPlaylist(
+        available,
+        AddToPlaylistSortOption.RECENTLY_MODIFIED,
+        playlistQuery,
+      )
     }
-    LaunchedEffect(isVisible, available.size) { if (!isVisible || available.size <= 8) playlistQuery = "" }
+  LaunchedEffect(isVisible, available.size) {
+    if (!isVisible || available.size <= 8) playlistQuery = ""
+  }
 
-    var showCreatePlaylistDialog by rememberSaveable {
-        mutableStateOf(false)
-    }
+  var showCreatePlaylistDialog by rememberSaveable { mutableStateOf(false) }
 
-    var showResultDialog by remember { mutableStateOf(false) }
-    var processingSummary by remember { mutableStateOf<ProcessingSummary?>(null) }
-    var reviewResults by remember { mutableStateOf<List<ImportedSongResult>?>(null) }
-    var reviewLocalLibrary by remember { mutableStateOf(emptyList<Song>()) }
-    var pendingTargetPlaylist by remember { mutableStateOf<Playlist?>(null) }
-    var pendingAddToLiked by remember { mutableStateOf(false) }
+  var showResultDialog by remember { mutableStateOf(false) }
+  var processingSummary by remember { mutableStateOf<ProcessingSummary?>(null) }
+  var reviewResults by remember { mutableStateOf<List<ImportedSongResult>?>(null) }
+  var reviewLocalLibrary by remember { mutableStateOf(emptyList<Song>()) }
+  var pendingTargetPlaylist by remember { mutableStateOf<Playlist?>(null) }
+  var pendingAddToLiked by remember { mutableStateOf(false) }
 
-    LaunchedEffect(Unit) {
-        database.playlistsByCreateDateAsc().collect {
-            allPlaylists = it
+  LaunchedEffect(Unit) { database.playlistsByCreateDateAsc().collect { allPlaylists = it } }
+
+  fun prepareSongsForReview(targetPlaylist: Playlist?, addToLiked: Boolean) {
+    coroutineScope.launch(Dispatchers.IO) {
+      val snapshotSongs = songs.toList()
+      val total = snapshotSongs.size
+      if (total == 0) {
+        withContext(Dispatchers.Main) {
+          onProgressStart(false)
+          onPercentageChange(0)
+          onDismiss()
         }
+        return@launch
+      }
+
+      try {
+        withContext(Dispatchers.Main) {
+          onProgressStart(true)
+          onPercentageChange(0)
+          onStatusChange(context.getString(R.string.import_preparing))
+          onDismiss()
+        }
+
+        val localLibrary = database.importSongCandidates().first()
+        val resolved =
+          importResolver.resolve(
+            songs = snapshotSongs,
+            localLibrary = localLibrary,
+            localFirst = importLocalFirst,
+            onProgress = { completed, count ->
+              val percent = ((completed.toDouble() / count) * 100).toInt().coerceIn(0, 100)
+              withContext(Dispatchers.Main) {
+                onPercentageChange(percent)
+                onStatusChange(
+                  context.getString(R.string.import_matching_progress, completed, count)
+                )
+              }
+            },
+          )
+
+        withContext(Dispatchers.Main) {
+          onPercentageChange(100)
+          pendingTargetPlaylist = targetPlaylist
+          pendingAddToLiked = addToLiked
+          reviewLocalLibrary = localLibrary
+          reviewResults = resolved
+        }
+      } catch (error: CancellationException) {
+        throw error
+      } catch (error: Exception) {
+        Timber.e(error, "Import matching failed")
+        withContext(Dispatchers.Main) {
+          processingSummary =
+            ProcessingSummary(
+              total = total,
+              success = 0,
+              failed = total,
+              failedItems = snapshotSongs.map { it.title },
+            )
+          showResultDialog = true
+        }
+      } finally {
+        withContext(Dispatchers.Main) { onProgressStart(false) }
+      }
     }
+  }
 
-    fun prepareSongsForReview(
-        targetPlaylist: Playlist?,
-        addToLiked: Boolean,
-    ) {
-        coroutineScope.launch(Dispatchers.IO) {
-            val snapshotSongs = songs.toList()
-            val total = snapshotSongs.size
-            if (total == 0) {
-                withContext(Dispatchers.Main) {
-                    onProgressStart(false)
-                    onPercentageChange(0)
-                    onDismiss()
-                }
-                return@launch
-            }
+  fun saveReviewedSongs(confirmedResults: List<ImportedSongResult>) {
+    val targetPlaylist = pendingTargetPlaylist
+    val addToLiked = pendingAddToLiked
+    coroutineScope.launch(Dispatchers.IO) {
+      val failedSongs = mutableListOf<String>()
+      val preparedResults = mutableListOf<ImportedSongResult>()
+      val total = confirmedResults.size
 
+      try {
+        withContext(Dispatchers.Main) {
+          onProgressStart(true)
+          onPercentageChange(0)
+          onStatusChange(context.getString(R.string.import_saving))
+        }
+
+        confirmedResults.forEachIndexed { index, result ->
+          val resolvedSong = result.resolvedSong
+          if (resolvedSong == null || result.resolvedId == null) {
+            failedSongs += result.originalSong.title
+          } else {
             try {
-                withContext(Dispatchers.Main) {
-                    onProgressStart(true)
-                    onPercentageChange(0)
-                    onStatusChange(context.getString(R.string.import_preparing))
-                    onDismiss()
-                }
-
-                val localLibrary = database.importSongCandidates().first()
-                val resolved =
-                    importResolver.resolve(
-                        songs = snapshotSongs,
-                        localLibrary = localLibrary,
-                        localFirst = importLocalFirst,
-                        onProgress = { completed, count ->
-                            val percent = ((completed.toDouble() / count) * 100).toInt().coerceIn(0, 100)
-                            withContext(Dispatchers.Main) {
-                                onPercentageChange(percent)
-                                onStatusChange(context.getString(R.string.import_matching_progress, completed, count))
-                            }
-                        },
-                    )
-
-                withContext(Dispatchers.Main) {
-                    onPercentageChange(100)
-                    pendingTargetPlaylist = targetPlaylist
-                    pendingAddToLiked = addToLiked
-                    reviewLocalLibrary = localLibrary
-                    reviewResults = resolved
-                }
-            } catch (error: CancellationException) {
-                throw error
+              if (result.source == ImportSource.YOUTUBE) {
+                database.insert(resolvedSong.toMediaMetadata())
+              }
+              preparedResults += result
             } catch (error: Exception) {
-                Timber.e(error, "Import matching failed")
-                withContext(Dispatchers.Main) {
-                    processingSummary =
-                        ProcessingSummary(
-                            total = total,
-                            success = 0,
-                            failed = total,
-                            failedItems = snapshotSongs.map { it.title },
-                        )
-                    showResultDialog = true
-                }
-            } finally {
-                withContext(Dispatchers.Main) {
-                    onProgressStart(false)
-                }
+              Timber.e(error, "Failed to prepare imported song: %s", result.originalSong.title)
+              failedSongs += result.originalSong.title
             }
+          }
+
+          val percent = (((index + 1).toDouble() / total.coerceAtLeast(1)) * 80).toInt()
+          withContext(Dispatchers.Main) {
+            onPercentageChange(percent)
+            onStatusChange(context.getString(R.string.import_saving_progress, index + 1, total))
+          }
         }
-    }
 
-    fun saveReviewedSongs(confirmedResults: List<ImportedSongResult>) {
-        val targetPlaylist = pendingTargetPlaylist
-        val addToLiked = pendingAddToLiked
-        coroutineScope.launch(Dispatchers.IO) {
-            val failedSongs = mutableListOf<String>()
-            val preparedResults = mutableListOf<ImportedSongResult>()
-            val total = confirmedResults.size
-
+        val savedResults =
+          if (targetPlaylist != null) {
             try {
-                withContext(Dispatchers.Main) {
-                    onProgressStart(true)
-                    onPercentageChange(0)
-                    onStatusChange(context.getString(R.string.import_saving))
-                }
-
-                confirmedResults.forEachIndexed { index, result ->
-                    val resolvedSong = result.resolvedSong
-                    if (resolvedSong == null || result.resolvedId == null) {
-                        failedSongs += result.originalSong.title
-                    } else {
-                        try {
-                            if (result.source == ImportSource.YOUTUBE) {
-                                database.insert(resolvedSong.toMediaMetadata())
-                            }
-                            preparedResults += result
-                        } catch (error: Exception) {
-                            Timber.e(error, "Failed to prepare imported song: %s", result.originalSong.title)
-                            failedSongs += result.originalSong.title
-                        }
-                    }
-
-                    val percent = (((index + 1).toDouble() / total.coerceAtLeast(1)) * 80).toInt()
-                    withContext(Dispatchers.Main) {
-                        onPercentageChange(percent)
-                        onStatusChange(context.getString(R.string.import_saving_progress, index + 1, total))
-                    }
-                }
-
-                val savedResults =
-                    if (targetPlaylist != null) {
-                        try {
-                            val snapshot = downloadUtil.playlistDownloadSnapshot(targetPlaylist.id)
-                            database.addSongToPlaylist(targetPlaylist, preparedResults.mapNotNull { it.resolvedId })
-                            downloadUtil.downloadPlaylistAdditions(snapshot, preparedResults.mapNotNull { it.resolvedId })
-                            preparedResults
-                        } catch (error: Exception) {
-                            Timber.e(error, "Failed to add imported songs to playlist")
-                            failedSongs += preparedResults.map { it.originalSong.title }
-                            emptyList()
-                        }
-                    } else if (addToLiked) {
-                        val missingSongIds = mutableSetOf<String>()
-                        val likeRequests =
-                            preparedResults.mapNotNull { result ->
-                                val resolvedId = checkNotNull(result.resolvedId)
-                                val storedSong = database.getSongById(resolvedId)?.song
-                                if (storedSong == null) {
-                                    missingSongIds += resolvedId
-                                    failedSongs += result.originalSong.title
-                                    null
-                                } else if (storedSong.liked) {
-                                    null
-                                } else {
-                                    storedSong.toggleLike()
-                                }
-                            }
-                        val failedSongIds = syncUtils.likeSongs(likeRequests) + missingSongIds
-                        if (failedSongIds.isNotEmpty()) {
-                            preparedResults
-                                .filter { it.resolvedId in failedSongIds && it.resolvedId !in missingSongIds }
-                                .forEach { result -> failedSongs += result.originalSong.title }
-                        }
-                        preparedResults.filterNot { result -> result.resolvedId in failedSongIds }
-                    } else {
-                        preparedResults
-                    }
-
-                withContext(Dispatchers.Main) {
-                    val distinctFailedSongs = failedSongs.distinct()
-                    onPercentageChange(100)
-                    processingSummary =
-                        ProcessingSummary(
-                            total = total,
-                            success = savedResults.size,
-                            failed = distinctFailedSongs.size,
-                            failedItems = distinctFailedSongs,
-                        )
-                    showResultDialog = true
-                }
-            } finally {
-                withContext(Dispatchers.Main) {
-                    onProgressStart(false)
-                }
+              val snapshot = downloadUtil.playlistDownloadSnapshot(targetPlaylist.id)
+              database.addSongToPlaylist(
+                targetPlaylist,
+                preparedResults.mapNotNull { it.resolvedId },
+              )
+              downloadUtil.downloadPlaylistAdditions(
+                snapshot,
+                preparedResults.mapNotNull { it.resolvedId },
+              )
+              preparedResults
+            } catch (error: Exception) {
+              Timber.e(error, "Failed to add imported songs to playlist")
+              failedSongs += preparedResults.map { it.originalSong.title }
+              emptyList()
             }
-        }
-    }
-
-    if (isVisible) {
-        VibraBottomSheet(onDismissRequest = onDismiss) {
-            Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp)) {
-                Text(stringResource(R.string.add_to_playlist), style = MaterialTheme.typography.headlineSmall)
-                androidx.compose.material3.Button(
-                    onClick = { showCreatePlaylistDialog = true },
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
-                    shape = MaterialTheme.shapes.extraLarge,
-                ) { Text(stringResource(R.string.new_playlist)) }
-                if (available.size > 8) {
-                    androidx.compose.material3.OutlinedTextField(
-                        value = playlistQuery,
-                        onValueChange = { playlistQuery = it },
-                        label = { Text(stringResource(R.string.search)) },
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
-                        singleLine = true,
-                    )
+          } else if (addToLiked) {
+            val missingSongIds = mutableSetOf<String>()
+            val likeRequests =
+              preparedResults.mapNotNull { result ->
+                val resolvedId = checkNotNull(result.resolvedId)
+                val storedSong = database.getSongById(resolvedId)?.song
+                if (storedSong == null) {
+                  missingSongIds += resolvedId
+                  failedSongs += result.originalSong.title
+                  null
+                } else if (storedSong.liked) {
+                  null
+                } else {
+                  storedSong.toggleLike()
                 }
-                LazyColumn(
-                    modifier = Modifier.fillMaxWidth().heightIn(max = 480.dp),
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 24.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    items(playlists, key = { it.id }) { playlist ->
-                        PlaylistMembershipRow(playlist = playlist, checked = false) {
-                            haptics.press()
-                            prepareSongsForReview(targetPlaylist = playlist, addToLiked = false)
-                        }
-                    }
-                    item {
-                        TextButton(
-                            onClick = { prepareSongsForReview(targetPlaylist = null, addToLiked = true) },
-                            modifier = Modifier.fillMaxWidth(),
-                        ) { Text(stringResource(R.string.liked_songs)) }
-                    }
-                }
+              }
+            val failedSongIds = syncUtils.likeSongs(likeRequests) + missingSongIds
+            if (failedSongIds.isNotEmpty()) {
+              preparedResults
+                .filter { it.resolvedId in failedSongIds && it.resolvedId !in missingSongIds }
+                .forEach { result -> failedSongs += result.originalSong.title }
             }
+            preparedResults.filterNot { result -> result.resolvedId in failedSongIds }
+          } else {
+            preparedResults
+          }
+
+        withContext(Dispatchers.Main) {
+          val distinctFailedSongs = failedSongs.distinct()
+          onPercentageChange(100)
+          processingSummary =
+            ProcessingSummary(
+              total = total,
+              success = savedResults.size,
+              failed = distinctFailedSongs.size,
+              failedItems = distinctFailedSongs,
+            )
+          showResultDialog = true
         }
+      } finally {
+        withContext(Dispatchers.Main) { onProgressStart(false) }
+      }
     }
+  }
 
-    if (showCreatePlaylistDialog) {
-        CreatePlaylistDialog(
-            onDismiss = { showCreatePlaylistDialog = false },
-            initialTextFieldValue = initialTextFieldValue,
-            allowSyncing = allowSyncing,
-        )
+  if (isVisible) {
+    VibraDialog(
+      onDismissRequest = onDismiss,
+      groupContent = false,
+      contentPadding = PaddingValues(0.dp),
+    ) {
+      Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        ControlSheetHeader(stringResource(R.string.add_to_playlist), "", R.drawable.playlist_add)
+        MenuCard {
+          if (available.size > 8)
+            androidx.compose.material3.TextField(
+              value = playlistQuery,
+              onValueChange = { playlistQuery = it },
+              label = { Text(stringResource(R.string.search)) },
+              modifier = Modifier.fillMaxWidth().padding(14.dp),
+              singleLine = true,
+              shape = VibraFieldShape,
+              colors = vibraTextFieldColors(),
+            )
+          LazyColumn(
+            Modifier.fillMaxWidth().heightIn(max = 480.dp),
+            contentPadding = PaddingValues(vertical = 12.dp),
+          ) {
+            item {
+              MediaMenuRow(
+                headlineContent = { Text(stringResource(R.string.new_playlist)) },
+                leadingContent = { Icon(painterResource(R.drawable.add), null) },
+                modifier = Modifier.clickable { showCreatePlaylistDialog = true },
+              )
+            }
+            items(playlists, key = { it.id }) { playlist ->
+              PlaylistMembershipRow(playlist = playlist, checked = false) {
+                haptics.press()
+                prepareSongsForReview(targetPlaylist = playlist, addToLiked = false)
+              }
+            }
+            item {
+              MediaMenuRow(
+                headlineContent = { Text(stringResource(R.string.liked_songs)) },
+                modifier =
+                  Modifier.clickable {
+                    prepareSongsForReview(targetPlaylist = null, addToLiked = true)
+                  },
+              )
+            }
+          }
+        }
+        VibraDialogButton(onClick = onDismiss, primary = true, modifier = Modifier.fillMaxWidth()) {
+          Text(stringResource(R.string.vibra_menu_done))
+        }
+      }
     }
+  }
 
-    reviewResults?.let { results ->
-        ImportReviewScreen(
-            results = results,
-            localLibrary = reviewLocalLibrary,
-            onCancel = {
-                reviewResults = null
-                reviewLocalLibrary = emptyList()
-                pendingTargetPlaylist = null
-                pendingAddToLiked = false
-            },
-            onConfirm = { confirmedResults ->
-                reviewResults = null
-                reviewLocalLibrary = emptyList()
-                saveReviewedSongs(confirmedResults)
-                pendingTargetPlaylist = null
-                pendingAddToLiked = false
-            },
-        )
-    }
+  if (showCreatePlaylistDialog) {
+    CreatePlaylistDialog(
+      onDismiss = { showCreatePlaylistDialog = false },
+      initialTextFieldValue = initialTextFieldValue,
+      allowSyncing = allowSyncing,
+    )
+  }
 
-    // Result Dialog
-    if (showResultDialog && processingSummary != null) {
-        val summary = processingSummary!!
-        DefaultDialog(
-            title = { Text("Import Complete") },
-            onDismiss = { showResultDialog = false },
-            buttons = {
-                VibraDialogButton(primary = true, onClick = { showResultDialog = false }, shapes = ButtonDefaults.shapes()) {
-                    Text("OK")
-                }
-            },
+  reviewResults?.let { results ->
+    ImportReviewScreen(
+      results = results,
+      localLibrary = reviewLocalLibrary,
+      onCancel = {
+        reviewResults = null
+        reviewLocalLibrary = emptyList()
+        pendingTargetPlaylist = null
+        pendingAddToLiked = false
+      },
+      onConfirm = { confirmedResults ->
+        reviewResults = null
+        reviewLocalLibrary = emptyList()
+        saveReviewedSongs(confirmedResults)
+        pendingTargetPlaylist = null
+        pendingAddToLiked = false
+      },
+    )
+  }
+
+  // Result Dialog
+  if (showResultDialog && processingSummary != null) {
+    val summary = processingSummary!!
+    DefaultDialog(
+      title = { Text("Import Complete") },
+      onDismiss = { showResultDialog = false },
+      buttons = {
+        VibraDialogButton(
+          primary = true,
+          onClick = { showResultDialog = false },
+          shapes = ButtonDefaults.shapes(),
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Total Processed: ${summary.total}")
-                Text("Successfully Imported: ${summary.success}", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
-                if (summary.failed > 0) {
-                    Text("Failed: ${summary.failed}", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-                    Text("Failed Items:", style = MaterialTheme.typography.labelLarge)
-                    LazyColumn(
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .height(150.dp),
-                    ) {
-                        items(summary.failedItems) { title ->
-                            Text(
-                                text = "• $title",
-                                style = MaterialTheme.typography.bodySmall,
-                                modifier = Modifier.padding(vertical = 2.dp),
-                            )
-                        }
-                    }
-                }
-            }
+          Text("OK")
         }
+      },
+    ) {
+      Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("Total Processed: ${summary.total}")
+        Text(
+          "Successfully Imported: ${summary.success}",
+          color = MaterialTheme.colorScheme.primary,
+          fontWeight = FontWeight.Bold,
+        )
+        if (summary.failed > 0) {
+          Text(
+            "Failed: ${summary.failed}",
+            color = MaterialTheme.colorScheme.error,
+            fontWeight = FontWeight.Bold,
+          )
+          HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+          Text("Failed Items:", style = MaterialTheme.typography.labelLarge)
+          LazyColumn(modifier = Modifier.fillMaxWidth().height(150.dp)) {
+            items(summary.failedItems) { title ->
+              Text(
+                text = "• $title",
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(vertical = 2.dp),
+              )
+            }
+          }
+        }
+      }
     }
+  }
 }
 
 data class ProcessingSummary(
-    val total: Int,
-    val success: Int,
-    val failed: Int,
-    val failedItems: List<String>,
+  val total: Int,
+  val success: Int,
+  val failed: Int,
+  val failedItems: List<String>,
 )

@@ -51,8 +51,11 @@ internal class DeviceMusicVolumeController(
             (minVolume + (safeFraction * volumeRange).roundToInt())
                 .coerceIn(minVolume, maxVolume)
 
-        audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, targetVolume, 0)
-        refresh()
+        // Skip redundant Binder writes for positions within the same device volume step.
+        if (audioManager.getStreamVolume(AudioManager.STREAM_MUSIC) != targetVolume) {
+            audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, targetVolume, 0)
+        }
+        volumeFraction = readVolumeFraction()
     }
 
     private fun readVolumeFraction(): Float {

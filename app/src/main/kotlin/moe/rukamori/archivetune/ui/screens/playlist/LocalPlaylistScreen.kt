@@ -337,7 +337,7 @@ fun LocalPlaylistScreen(
 
     if (showEditDialog) {
         playlist?.let { playlistData ->
-            EditPlaylistDialog(
+            EditPlaylistDialog(playlistId = playlist?.id,
                 initialName = playlistData.playlist.name,
                 onDismiss = { showEditDialog = false },
                 onSave = { name ->
@@ -589,6 +589,7 @@ fun LocalPlaylistScreen(
                             val isBookmarked = playlist.playlist.bookmarkedAt != null
 
                             MediaDetailHero(
+                                playlistId = playlist.id,
                                 title = playlist.playlist.name,
                                 thumbnailUrl =
                                     playlist.playlist.thumbnailUrl

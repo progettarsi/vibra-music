@@ -7,6 +7,8 @@
 
 package moe.rukamori.archivetune.repository
 
+import androidx.datastore.preferences.core.edit
+import app.vibra.ui.components.playlistCoverStyleKey
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -57,16 +59,11 @@ class PlaylistCreationRepository
         suspend fun createLocalPlaylist(
             name: String,
             browseId: String?,
+            coverStyle: String = "Pentagon",
         ) = withContext(Dispatchers.IO) {
-            database.withTransaction {
-                insert(
-                    PlaylistEntity(
-                        name = name,
-                        browseId = browseId,
-                        bookmarkedAt = LocalDateTime.now(),
-                        isEditable = true,
-                    ),
-                )
-            }
+            val entity = PlaylistEntity(name = name, browseId = browseId, bookmarkedAt = LocalDateTime.now(), isEditable = true)
+            val style = app.vibra.ui.components.parsePlaylistCoverStyle(coverStyle).name
+            database.withTransaction { insert(entity) }
+            context.dataStore.edit { it[playlistCoverStyleKey(entity.id)] = style }
         }
     }

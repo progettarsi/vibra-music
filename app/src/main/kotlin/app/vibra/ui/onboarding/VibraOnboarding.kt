@@ -41,6 +41,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import app.vibra.ui.motion.clickable
+import app.vibra.ui.motion.interactiveSurface
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -908,9 +909,7 @@ private fun AnimatedVisibilityScope.StyleScene(
                             val r = ring.value.coerceIn(0f, 1f)
                             if (r > 0f) drawCircle(colour, radius = size.minDimension / 2, alpha = 0.5f * r, style = androidx.compose.ui.graphics.drawscope.Stroke(width = 3.dp.toPx()))
                         }.padding(6.dp)
-                        .clip(CircleShape)
-                        .background(colour)
-                        .clickable(role = Role.RadioButton) {
+                        .interactiveSurface(CircleShape, colour, role = Role.RadioButton) {
                             haptics.toggle(on = true)
                             onColor(colour)
                         }.semantics { selected = on },

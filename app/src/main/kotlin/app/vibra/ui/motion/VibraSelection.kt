@@ -9,18 +9,14 @@ import androidx.compose.ui.composed
 import androidx.compose.ui.semantics.Role
 
 fun Modifier.toggleable(value: Boolean, enabled: Boolean = true, role: Role? = null, onValueChange: (Boolean) -> Unit): Modifier = composed {
-    val bounce = rememberTapBounce()
-    then(if (enabled) Modifier.tapBounce(bounce) else Modifier).foundationToggleable(value = value, enabled = enabled, role = role, onValueChange = onValueChange)
+    sharedTapBounce(enabled).foundationToggleable(value = value, enabled = enabled, role = role, onValueChange = onValueChange)
 }
 fun Modifier.toggleable(value: Boolean, interactionSource: MutableInteractionSource?, indication: Indication?, enabled: Boolean = true, role: Role? = null, onValueChange: (Boolean) -> Unit): Modifier = composed {
-    val bounce = rememberTapBounce()
-    then(if (enabled) Modifier.tapBounce(bounce) else Modifier).foundationToggleable(value, interactionSource, indication, enabled, role, onValueChange)
+    sharedTapBounce(enabled).foundationToggleable(value, interactionSource, indication, enabled, role, onValueChange)
 }
 fun Modifier.selectable(selected: Boolean, enabled: Boolean = true, role: Role? = null, onClick: () -> Unit): Modifier = composed {
-    val bounce = rememberTapBounce()
-    then(if (enabled) Modifier.tapBounce(bounce) else Modifier).foundationSelectable(selected = selected, enabled = enabled, role = role, onClick = onClick)
+    sharedTapBounce(enabled).foundationSelectable(selected = selected, enabled = enabled, role = role, onClick = onClick)
 }
 fun Modifier.selectable(selected: Boolean, interactionSource: MutableInteractionSource?, indication: Indication?, enabled: Boolean = true, role: Role? = null, onClick: () -> Unit): Modifier = composed {
-    val bounce = rememberTapBounce()
-    then(if (enabled) Modifier.tapBounce(bounce) else Modifier).foundationSelectable(selected, interactionSource, indication, enabled, role, onClick)
+    sharedTapBounce(enabled).foundationSelectable(selected, interactionSource, indication, enabled, role, onClick)
 }

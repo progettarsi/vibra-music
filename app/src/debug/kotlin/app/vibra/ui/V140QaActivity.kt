@@ -23,7 +23,9 @@ class V140QaActivity : ComponentActivity() {
         val count = intent.getIntExtra("count", 2)
         setContent {
             ArchiveTuneTheme(darkTheme = true) {
-                if (mode == "onboarding") {
+                if (mode == "feedback") {
+                    FeedbackBoundsQa(bounce = intent.getBooleanExtra("bounce", true))
+                } else if (mode == "onboarding") {
                     val vm = remember { VibraOnboardingViewModel(object : OnboardingAccount {
                         override suspend fun youTubeProfile() = "Preview" to null
                         override suspend fun youTubeArtists() = emptyList<OnboardingArtist>()

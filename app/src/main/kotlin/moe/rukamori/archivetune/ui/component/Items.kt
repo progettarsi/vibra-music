@@ -22,6 +22,7 @@ import androidx.compose.animation.shrinkOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import app.vibra.ui.motion.clickable
+import app.vibra.ui.motion.interactiveSurface
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
@@ -762,7 +763,7 @@ fun PlaylistListItem(
                     modifier = Modifier.size(ListThumbnailSize / 2),
                 )
             },
-            shape = RoundedCornerShape(ThumbnailCornerRadius),
+            shape = app.vibra.ui.components.rememberPlaylistCoverShape(playlist.id),
         )
     },
     trailingContent = trailingContent,
@@ -2066,9 +2067,11 @@ fun BoxScope.AlbumPlayButton(
             modifier =
                 Modifier
                     .size(36.dp)
-                    .clip(CircleShape)
-                    .background(Color.Black.copy(alpha = ActiveBoxAlpha))
-                    .clickable(onClick = onClick),
+                    .interactiveSurface(
+                        shape = CircleShape,
+                        containerColor = Color.Black.copy(alpha = ActiveBoxAlpha),
+                        onClick = onClick,
+                    ),
         ) {
             Icon(
                 painter = painterResource(R.drawable.play),

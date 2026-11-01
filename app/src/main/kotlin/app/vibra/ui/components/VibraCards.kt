@@ -22,8 +22,12 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import app.vibra.ui.motion.interactiveLongSurface
+import app.vibra.ui.motion.interactiveSurface
 import app.vibra.ui.motion.rememberTapBounce
 import app.vibra.ui.motion.tapBounce
 import app.vibra.ui.theme.VibraShapes
@@ -35,15 +39,20 @@ import app.vibra.ui.theme.VibraShapes
 @Composable
 fun VibraCard(
     modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
+    onLongClick: (() -> Unit)? = null,
+    shape: Shape = VibraShapes.Card,
+    containerColor: Color = MaterialTheme.colorScheme.surfaceContainer,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    Column(
-        modifier =
-            modifier
-                .clip(VibraShapes.Card)
-                .background(MaterialTheme.colorScheme.surfaceContainer),
-        content = content,
-    )
+    val cardModifier =
+        when {
+            onLongClick != null ->
+                modifier.interactiveLongSurface(shape, onLongClick, containerColor, onClick = onClick ?: {})
+            onClick != null -> modifier.interactiveSurface(shape, containerColor, onClick = onClick)
+            else -> modifier.clip(shape).background(containerColor)
+        }
+    Column(modifier = cardModifier, content = content)
 }
 
 /** Any item that can appear in a cover tile / shelf. */

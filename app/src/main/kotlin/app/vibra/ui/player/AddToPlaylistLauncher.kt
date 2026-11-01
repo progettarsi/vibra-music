@@ -18,41 +18,48 @@ import moe.rukamori.archivetune.LocalDatabase
 import moe.rukamori.archivetune.R
 import moe.rukamori.archivetune.models.MediaMetadata
 import moe.rukamori.archivetune.ui.menu.AddToPlaylistDialog
+import moe.rukamori.archivetune.ui.menu.PlaylistPickerContext
 
 /**
- * Hosts the engine's "Add to playlist" dialog for [metadata] and returns the lambda that
- * opens it. Used by the dock's ⊕ and the player's add button, so both behave the same
- * (local + synced YouTube Music playlists, duplicate detection, result toast).
+ * Hosts the engine's "Add to playlist" dialog for [metadata] and returns the lambda that opens it.
+ * Used by the dock's ⊕ and the player's add button, so both behave the same (local + synced YouTube
+ * Music playlists, duplicate detection, result toast).
  */
 @Composable
 fun rememberAddToPlaylistLauncher(metadata: MediaMetadata?): () -> Unit {
-    val context = LocalContext.current
-    // Resources from LocalResources follow configuration changes (locale, density).
-    val resources = LocalResources.current
-    val database = LocalDatabase.current
-    val haptics = rememberVibraHaptics()
-    var visible by remember { mutableStateOf(false) }
+  val context = LocalContext.current
+  // Resources from LocalResources follow configuration changes (locale, density).
+  val resources = LocalResources.current
+  val database = LocalDatabase.current
+  val haptics = rememberVibraHaptics()
+  var visible by remember { mutableStateOf(false) }
 
-    if (metadata != null) {
-        AddToPlaylistDialog(
-            isVisible = visible,
-            onGetSong = {
-                // The playlist map references the song row, so make sure it exists.
-                database.withTransaction { insert(metadata) }
-                listOf(metadata.id)
-            },
-            onDismiss = { visible = false },
-            onAddComplete = { _, playlistNames ->
-                haptics.confirm()
-                val message =
-                    if (playlistNames.size == 1) {
-                        resources.getString(R.string.added_to_playlist, playlistNames.first())
-                    } else {
-                        resources.getString(R.string.added_to_n_playlists, playlistNames.size)
-                    }
-                Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-            },
-        )
-    }
-    return remember(metadata) { { if (metadata != null) visible = true } }
+  if (metadata != null) {
+    AddToPlaylistDialog(
+      context =
+        PlaylistPickerContext(
+          metadata.title,
+          metadata.artists.joinToString { it.name },
+          metadata.thumbnailUrl,
+        ),
+      isVisible = visible,
+      onGetSong = {
+        // The playlist map references the song row, so make sure it exists.
+        database.withTransaction { insert(metadata) }
+        listOf(metadata.id)
+      },
+      onDismiss = { visible = false },
+      onAddComplete = { _, playlistNames ->
+        haptics.confirm()
+        val message =
+          if (playlistNames.size == 1) {
+            resources.getString(R.string.added_to_playlist, playlistNames.first())
+          } else {
+            resources.getString(R.string.added_to_n_playlists, playlistNames.size)
+          }
+        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+      },
+    )
+  }
+  return remember(metadata) { { if (metadata != null) visible = true } }
 }

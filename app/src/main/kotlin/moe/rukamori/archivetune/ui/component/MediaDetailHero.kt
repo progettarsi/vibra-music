@@ -97,11 +97,12 @@ public fun MediaDetailHero(
     // The screen's extra actions also live in its top bar menu ("⋯" at the top right), so the
     // row would only repeat that menu. Screens without one (Spotify) keep them in the row.
     extraActionsInRow: Boolean = false,
+    playlistId: String? = null,
 ) {
     val menuState = LocalMenuState.current
     // Albums keep a rounded square (Figma 33:203); collections get the expressive pentagon
     // used by the playlist screen's "Shape Set".
-    val coverShape: Shape = if (fallbackIcon == R.drawable.album) VibraShapes.AlbumCover else VibraShapes.Pentagon
+    val coverShape: Shape = if (playlistId != null) app.vibra.ui.components.rememberPlaylistCoverShape(playlistId) else if (fallbackIcon == R.drawable.album) VibraShapes.AlbumCover else VibraShapes.Pentagon
 
     Column(
         modifier =

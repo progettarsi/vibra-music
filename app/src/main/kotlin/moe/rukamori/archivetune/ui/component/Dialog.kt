@@ -35,6 +35,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ProvideTextStyle
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
@@ -54,6 +55,8 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -61,7 +64,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import app.vibra.ui.components.VibraDialog
+import app.vibra.ui.components.*
 import app.vibra.ui.components.VibraDialogButton
 import app.vibra.ui.components.VibraDialogButtonSpacing
 import app.vibra.ui.components.VibraFieldShape
@@ -73,370 +76,416 @@ import moe.rukamori.archivetune.R
 // surface); the optional icon sits in a tonal circle and the actions are pills.
 @Composable
 fun DefaultDialog(
-    onDismiss: () -> Unit,
-    modifier: Modifier = Modifier,
-    icon: (@Composable () -> Unit)? = null,
-    title: (@Composable () -> Unit)? = null,
-    buttons: (@Composable RowScope.() -> Unit)? = null,
-    horizontalAlignment: Alignment.Horizontal = Alignment.CenterHorizontally,
-    contentScrollable: Boolean = false,
-    constrainContentHeight: Boolean = false,
-    content: @Composable ColumnScope.() -> Unit,
+  onDismiss: () -> Unit,
+  modifier: Modifier = Modifier,
+  icon: (@Composable () -> Unit)? = null,
+  title: (@Composable () -> Unit)? = null,
+  buttons: (@Composable RowScope.() -> Unit)? = null,
+  horizontalAlignment: Alignment.Horizontal = Alignment.Start,
+  contentScrollable: Boolean = false,
+  constrainContentHeight: Boolean = false,
+  content: @Composable ColumnScope.() -> Unit,
 ) {
-    VibraDialog(onDismissRequest = onDismiss, modifier = modifier) {
-        val bodyModifier =
-            when {
-                contentScrollable ->
-                    Modifier
-                        .weight(1f, fill = false)
-                        .verticalScroll(rememberScrollState())
-                constrainContentHeight -> Modifier.weight(1f, fill = false)
-                else -> Modifier
-            }
-
-        Column(
-            horizontalAlignment = horizontalAlignment,
-            modifier = bodyModifier,
+  VibraDialog(
+    onDismissRequest = onDismiss,
+    modifier = modifier,
+    contentPadding = PaddingValues(0.dp),
+    groupContent = false,
+  ) {
+    if (icon != null || title != null) {
+      Surface(
+        shape = app.vibra.ui.theme.VibraShapes.Card,
+        color = MaterialTheme.colorScheme.surfaceContainer,
+      ) {
+        Row(
+          Modifier.fillMaxWidth().padding(20.dp),
+          verticalAlignment = Alignment.CenterVertically,
+          horizontalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            if (icon != null) {
-                Box(
-                    modifier =
-                        Modifier
-                            .align(Alignment.CenterHorizontally)
-                            .size(56.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.secondaryContainer),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSecondaryContainer) {
-                        icon()
-                    }
-                }
-
-                Spacer(Modifier.height(16.dp))
+          if (icon != null)
+            Box(
+              Modifier.size(48.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.secondaryContainer),
+              contentAlignment = Alignment.Center,
+            ) {
+              CompositionLocalProvider(
+                LocalContentColor provides MaterialTheme.colorScheme.onSecondaryContainer
+              ) {
+                icon()
+              }
             }
-            if (title != null) {
-                ProvideTextStyle(MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.SemiBold)) {
-                    Box(
-                        Modifier.align(if (icon == null) Alignment.Start else Alignment.CenterHorizontally),
-                    ) {
-                        title()
-                    }
-                }
-
-                Spacer(Modifier.height(16.dp))
-            }
-
-            content()
-        }
-
-        if (buttons != null) {
-            Spacer(Modifier.height(24.dp))
-
-            FlowRow(
-                horizontalArrangement = VibraDialogButtonSpacing,
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.fillMaxWidth(),
-            ) flowRowScope@{
-                CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.primary) {
-                    ProvideTextStyle(
-                        value = MaterialTheme.typography.labelLarge,
-                    ) {
-                        this@flowRowScope.buttons()
-                    }
-                }
+          if (title != null)
+            ProvideTextStyle(
+              MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.SemiBold)
+            ) {
+              Box(Modifier.weight(1f)) { title() }
             }
         }
+      }
+      Spacer(Modifier.height(14.dp))
     }
+    Surface(
+      modifier =
+        (if (contentScrollable || constrainContentHeight) Modifier.weight(1f, fill = false)
+          else Modifier)
+          .fillMaxWidth(),
+      shape = app.vibra.ui.theme.VibraShapes.Card,
+      color = MaterialTheme.colorScheme.surfaceContainer,
+    ) {
+      Column(
+        horizontalAlignment = horizontalAlignment,
+        modifier =
+          Modifier.then(
+              if (contentScrollable) Modifier.verticalScroll(rememberScrollState()) else Modifier
+            )
+            .padding(20.dp),
+      ) {
+        content()
+      }
+    }
+
+    if (buttons != null) {
+      Spacer(Modifier.height(14.dp))
+
+      Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) buttonRow@{
+        CompositionLocalProvider(LocalDialogActionModifier provides Modifier.weight(1f)) {
+          this@buttonRow.buttons()
+        }
+      }
+    }
+  }
 }
 
 @Composable
 fun ActionPromptDialog(
-    title: String? = null,
-    titleBar: @Composable (RowScope.() -> Unit)? = null,
-    onDismiss: () -> Unit,
-    onConfirm: () -> Unit,
-    onReset: (() -> Unit)? = null,
-    onCancel: (() -> Unit)? = null,
-    content: @Composable ColumnScope.() -> Unit = {},
+  title: String? = null,
+  titleBar: @Composable (RowScope.() -> Unit)? = null,
+  onDismiss: () -> Unit,
+  onConfirm: () -> Unit,
+  onReset: (() -> Unit)? = null,
+  onCancel: (() -> Unit)? = null,
+  content: @Composable ColumnScope.() -> Unit = {},
 ) {
-    VibraDialog(onDismissRequest = onDismiss) {
-        if (titleBar != null) {
-            Row {
-                titleBar()
-            }
-            Spacer(Modifier.height(16.dp))
-        } else if (title != null) {
-            Text(
-                text = title,
-                overflow = TextOverflow.Ellipsis,
-                maxLines = 1,
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Spacer(Modifier.height(16.dp))
-        }
-
-        content()
-
-        Spacer(Modifier.height(24.dp))
-
-        FlowRow(
-            horizontalArrangement = VibraDialogButtonSpacing,
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            if (onReset != null) {
-                VibraDialogButton(onClick = onReset) {
-                    Text(stringResource(R.string.reset))
-                }
-            }
-            if (onCancel != null) {
-                VibraDialogButton(onClick = onCancel) {
-                    Text(stringResource(android.R.string.cancel))
-                }
-            }
-            VibraDialogButton(onClick = onConfirm, primary = true) {
-                Text(stringResource(android.R.string.ok))
-            }
-        }
+  VibraDialog(onDismissRequest = onDismiss) {
+    if (titleBar != null) {
+      Row { titleBar() }
+      Spacer(Modifier.height(16.dp))
+    } else if (title != null) {
+      Text(
+        text = title,
+        overflow = TextOverflow.Ellipsis,
+        maxLines = 1,
+        style = MaterialTheme.typography.headlineSmall,
+        fontWeight = FontWeight.SemiBold,
+      )
+      Spacer(Modifier.height(16.dp))
     }
+
+    content()
+
+    Spacer(Modifier.height(24.dp))
+
+    FlowRow(
+      horizontalArrangement = VibraDialogButtonSpacing,
+      verticalArrangement = Arrangement.spacedBy(8.dp),
+      modifier = Modifier.fillMaxWidth(),
+    ) {
+      if (onReset != null) {
+        VibraDialogButton(onClick = onReset) { Text(stringResource(R.string.reset)) }
+      }
+      if (onCancel != null) {
+        VibraDialogButton(onClick = onCancel) { Text(stringResource(android.R.string.cancel)) }
+      }
+      VibraDialogButton(onClick = onConfirm, primary = true) {
+        Text(stringResource(android.R.string.ok))
+      }
+    }
+  }
 }
 
 @Composable
 fun ListDialog(
-    onDismiss: () -> Unit,
-    modifier: Modifier = Modifier,
-    content: LazyListScope.() -> Unit,
+  onDismiss: () -> Unit,
+  modifier: Modifier = Modifier,
+  content: LazyListScope.() -> Unit,
 ) {
-    VibraDialog(
-        onDismissRequest = onDismiss,
-        modifier = modifier,
-        contentPadding = PaddingValues(vertical = 24.dp),
-    ) {
-        LazyColumn(content = content)
-    }
+  VibraDialog(
+    onDismissRequest = onDismiss,
+    modifier = modifier,
+    contentPadding = PaddingValues(vertical = 24.dp),
+  ) {
+    LazyColumn(content = content)
+  }
 }
 
 @Composable
 fun InfoLabel(text: String) =
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.padding(horizontal = 8.dp),
-    ) {
-        Icon(
-            painter = painterResource(id = R.drawable.info),
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.secondary,
-            modifier = Modifier.padding(4.dp),
-        )
-        Text(
-            text = text,
-            style = MaterialTheme.typography.bodySmall,
-            modifier = Modifier.padding(horizontal = 4.dp),
-        )
-    }
+  Row(
+    verticalAlignment = Alignment.CenterVertically,
+    modifier = Modifier.padding(horizontal = 8.dp),
+  ) {
+    Icon(
+      painter = painterResource(id = R.drawable.info),
+      contentDescription = null,
+      tint = MaterialTheme.colorScheme.secondary,
+      modifier = Modifier.padding(4.dp),
+    )
+    Text(
+      text = text,
+      style = MaterialTheme.typography.bodySmall,
+      modifier = Modifier.padding(horizontal = 4.dp),
+    )
+  }
 
 @Composable
 fun TextFieldDialog(
-    modifier: Modifier = Modifier,
-    icon: (@Composable () -> Unit)? = null,
-    title: (@Composable () -> Unit)? = null,
-    initialTextFieldValue: TextFieldValue = TextFieldValue(), // legacy
-    textFieldValue: String? = null,
-    onTextFieldValueChange: ((String) -> Unit)? = null,
-    placeholder: @Composable (() -> Unit)? = null,
-    singleLine: Boolean = true,
-    autoFocus: Boolean = true,
-    enabled: Boolean = true,
-    dismissOnDone: Boolean = true,
-    maxLines: Int = if (singleLine) 1 else 10,
-    keyboardOptions: KeyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-    visualTransformation: VisualTransformation = VisualTransformation.None,
-    isInputValid: (String) -> Boolean = { it.isNotEmpty() },
-    onDone: (String) -> Unit = {},
-    // new multi-field support
-    textFields: List<Pair<String, TextFieldValue>>? = null,
-    onTextFieldsChange: ((Int, TextFieldValue) -> Unit)? = null,
-    onDoneMultiple: ((List<String>) -> Unit)? = null,
-    onDismiss: () -> Unit,
-    extraContent: (@Composable () -> Unit)? = null,
+  modifier: Modifier = Modifier,
+  icon: (@Composable () -> Unit)? = null,
+  title: (@Composable () -> Unit)? = null,
+  initialTextFieldValue: TextFieldValue = TextFieldValue(), // legacy
+  textFieldValue: String? = null,
+  onTextFieldValueChange: ((String) -> Unit)? = null,
+  placeholder: @Composable (() -> Unit)? = null,
+  singleLine: Boolean = true,
+  autoFocus: Boolean = false,
+  enabled: Boolean = true,
+  dismissOnDone: Boolean = true,
+  maxLines: Int = if (singleLine) 1 else 10,
+  keyboardOptions: KeyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+  visualTransformation: VisualTransformation = VisualTransformation.None,
+  isInputValid: (String) -> Boolean = { it.isNotEmpty() },
+  onDone: (String) -> Unit = {},
+  // new multi-field support
+  textFields: List<Pair<String, TextFieldValue>>? = null,
+  onTextFieldsChange: ((Int, TextFieldValue) -> Unit)? = null,
+  onDoneMultiple: ((List<String>) -> Unit)? = null,
+  onDismiss: () -> Unit,
+  extraContent: (@Composable () -> Unit)? = null,
 ) {
-    val legacyFieldState = remember { mutableStateOf(initialTextFieldValue) }
-    val currentLegacyValue = textFieldValue ?: legacyFieldState.value.text
+  val legacyFieldState = remember { mutableStateOf(initialTextFieldValue) }
+  val currentLegacyValue = textFieldValue ?: legacyFieldState.value.text
 
-    val focusRequester = remember { FocusRequester() }
+  val focusRequester = remember { FocusRequester() }
 
-    LaunchedEffect(Unit) {
-        if (autoFocus) {
-            delay(300)
-            focusRequester.requestFocus()
-        }
+  LaunchedEffect(Unit) {
+    if (autoFocus) {
+      delay(300)
+      focusRequester.requestFocus()
     }
+  }
 
-    DefaultDialog(
-        onDismiss = onDismiss,
-        modifier = modifier,
-        icon = icon,
-        title = title,
-        contentScrollable = true,
-        buttons = {
-            VibraDialogButton(onClick = onDismiss) {
-                Text(text = stringResource(android.R.string.cancel))
-            }
+  DefaultDialog(
+    onDismiss = onDismiss,
+    modifier = modifier,
+    icon = icon,
+    title = title,
+    contentScrollable = true,
+    buttons = {
+      VibraDialogButton(onClick = onDismiss) {
+        Text(text = stringResource(android.R.string.cancel))
+      }
 
-            val isValid =
-                textFields?.all { isInputValid(it.second.text) }
-                    ?: isInputValid(currentLegacyValue)
+      val isValid =
+        textFields?.all { isInputValid(it.second.text) } ?: isInputValid(currentLegacyValue)
 
-            VibraDialogButton(
-                primary = true,
-                enabled = enabled && isValid,
-                onClick = {
-                    if (textFields != null && onDoneMultiple != null) {
-                        onDoneMultiple(textFields.map { it.second.text })
-                    } else {
-                        onDone(currentLegacyValue)
-                    }
-                    if (dismissOnDone) {
-                        onDismiss()
-                    }
-                },
-            ) {
-                Text(text = stringResource(android.R.string.ok))
-            }
+      VibraDialogButton(
+        primary = true,
+        enabled = enabled && isValid,
+        onClick = {
+          if (textFields != null && onDoneMultiple != null) {
+            onDoneMultiple(textFields.map { it.second.text })
+          } else {
+            onDone(currentLegacyValue)
+          }
+          if (dismissOnDone) {
+            onDismiss()
+          }
         },
-    ) {
-        Column {
-            if (textFields != null) {
-                textFields.forEachIndexed { index, (label, value) ->
-                    TextField(
-                        value = value,
-                        onValueChange = { onTextFieldsChange?.invoke(index, it) },
-                        placeholder = { Text(label) },
-                        enabled = enabled,
-                        singleLine = singleLine,
-                        maxLines = maxLines,
-                        shape = VibraFieldShape,
-                        colors = vibraTextFieldColors(),
-                        keyboardOptions = keyboardOptions,
-                        visualTransformation = visualTransformation,
-                        keyboardActions =
-                            KeyboardActions(
-                                onDone = {
-                                    val areFieldsValid = textFields.all { isInputValid(it.second.text) }
-                                    if (enabled && areFieldsValid && onDoneMultiple != null) {
-                                        onDoneMultiple(textFields.map { it.second.text })
-                                        if (dismissOnDone) {
-                                            onDismiss()
-                                        }
-                                    }
-                                },
-                            ),
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(bottom = 12.dp)
-                                .then(if (index == 0) Modifier.focusRequester(focusRequester) else Modifier),
-                    )
+      ) {
+        Text(text = stringResource(android.R.string.ok))
+      }
+    },
+  ) {
+    Column {
+      if (textFields != null) {
+        textFields.forEachIndexed { index, (label, value) ->
+          TextField(
+            value = value,
+            onValueChange = { onTextFieldsChange?.invoke(index, it) },
+            placeholder = { Text(label) },
+            enabled = enabled,
+            singleLine = singleLine,
+            maxLines = maxLines,
+            shape = VibraFieldShape,
+            colors = vibraTextFieldColors(),
+            keyboardOptions = keyboardOptions,
+            visualTransformation = visualTransformation,
+            keyboardActions =
+              KeyboardActions(
+                onDone = {
+                  val areFieldsValid = textFields.all { isInputValid(it.second.text) }
+                  if (enabled && areFieldsValid && onDoneMultiple != null) {
+                    onDoneMultiple(textFields.map { it.second.text })
+                    if (dismissOnDone) {
+                      onDismiss()
+                    }
+                  }
                 }
-            } else {
-                TextField(
-                    value = currentLegacyValue,
-                    onValueChange = { value ->
-                        if (onTextFieldValueChange != null) {
-                            onTextFieldValueChange(value)
-                        } else {
-                            legacyFieldState.value = TextFieldValue(value)
-                        }
-                    },
-                    placeholder = placeholder,
-                    enabled = enabled,
-                    singleLine = singleLine,
-                    maxLines = maxLines,
-                    shape = VibraFieldShape,
-                        colors = vibraTextFieldColors(),
-                    keyboardOptions = keyboardOptions,
-                    visualTransformation = visualTransformation,
-                    keyboardActions =
-                        KeyboardActions(
-                            onDone = {
-                                if (enabled && isInputValid(currentLegacyValue)) {
-                                    onDone(currentLegacyValue)
-                                    if (dismissOnDone) {
-                                        onDismiss()
-                                    }
-                                }
-                            },
-                        ),
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .focusRequester(focusRequester),
-                )
-            }
-
-            extraContent?.invoke()
+              ),
+            modifier =
+              Modifier.fillMaxWidth()
+                .padding(bottom = 12.dp)
+                .then(if (index == 0) Modifier.focusRequester(focusRequester) else Modifier),
+          )
         }
+      } else {
+        TextField(
+          value = currentLegacyValue,
+          onValueChange = { value ->
+            if (onTextFieldValueChange != null) {
+              onTextFieldValueChange(value)
+            } else {
+              legacyFieldState.value = TextFieldValue(value)
+            }
+          },
+          placeholder = placeholder,
+          enabled = enabled,
+          singleLine = singleLine,
+          maxLines = maxLines,
+          shape = VibraFieldShape,
+          colors = vibraTextFieldColors(),
+          keyboardOptions = keyboardOptions,
+          visualTransformation = visualTransformation,
+          keyboardActions =
+            KeyboardActions(
+              onDone = {
+                if (enabled && isInputValid(currentLegacyValue)) {
+                  onDone(currentLegacyValue)
+                  if (dismissOnDone) {
+                    onDismiss()
+                  }
+                }
+              }
+            ),
+          modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
+        )
+      }
+
+      extraContent?.invoke()
     }
+  }
 }
 
 @Composable
 fun EditPlaylistDialog(
-    initialName: String,
-    onDismiss: () -> Unit,
-    onSave: (name: String) -> Unit,
+  initialName: String,
+  onDismiss: () -> Unit,
+  onSave: (name: String) -> Unit,
+  playlistId: String? = null,
+  onChangeCover: (() -> Unit)? = null,
+  onRemoveCover: (() -> Unit)? = null,
 ) {
-    val keyboardController = LocalSoftwareKeyboardController.current
+  val (savedStyle, setSavedStyle) =
+    moe.rukamori.archivetune.utils.rememberPreference(
+      app.vibra.ui.components.playlistCoverStyleKey(playlistId.orEmpty()),
+      app.vibra.ui.components.PlaylistCoverStyle.Pentagon.name,
+    )
+  var selectedStyle by rememberSaveable(playlistId) { mutableStateOf(savedStyle) }
+  val saveStyle = { if (playlistId != null) setSavedStyle(selectedStyle) }
+  val keyboardController = LocalSoftwareKeyboardController.current
 
-    var nameField by rememberSaveable(stateSaver = TextFieldValue.Saver) {
-        mutableStateOf(TextFieldValue(initialName, TextRange(initialName.length)))
+  var nameField by
+    rememberSaveable(stateSaver = TextFieldValue.Saver) {
+      mutableStateOf(TextFieldValue(initialName, TextRange(initialName.length)))
     }
 
-    val canSave by remember {
-        derivedStateOf { nameField.text.isNotBlank() }
-    }
+  val canSave by remember { derivedStateOf { nameField.text.isNotBlank() } }
 
-    DefaultDialog(
-        onDismiss = onDismiss,
-        icon = { Icon(painter = painterResource(R.drawable.edit), contentDescription = null) },
-        title = { Text(text = stringResource(R.string.edit_playlist)) },
-        contentScrollable = true,
-        buttons = {
-            VibraDialogButton(onClick = onDismiss) {
-                Text(text = stringResource(android.R.string.cancel))
-            }
-            VibraDialogButton(
-                primary = true,
-                enabled = canSave,
-                onClick = {
-                    keyboardController?.hide()
-                    onSave(nameField.text.trim())
-                    onDismiss()
-                },
-            ) {
-                Text(text = stringResource(R.string.save))
-            }
-        },
+  VibraDialog(
+    onDismissRequest = onDismiss,
+    groupContent = false,
+    contentPadding = PaddingValues(0.dp),
+  ) {
+    Column(
+      Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
+      verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        TextField(
+      ControlSheetHeader(
+        stringResource(R.string.edit_playlist),
+        initialName,
+        R.drawable.playlist_add,
+      )
+      MenuCard {
+        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+          val nameLabel = stringResource(R.string.playlist_name)
+          Text(
+            nameLabel,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+          )
+          androidx.compose.material3.OutlinedTextField(
             value = nameField,
             onValueChange = { nameField = it },
-            placeholder = { Text(text = stringResource(R.string.playlist_name)) },
             singleLine = true,
             shape = VibraFieldShape,
-                        colors = vibraTextFieldColors(),
+            colors = vibraOutlinedTextFieldColors(),
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
             keyboardActions =
-                KeyboardActions(
-                    onDone = {
-                        if (!canSave) return@KeyboardActions
-                        keyboardController?.hide()
-                        onSave(nameField.text.trim())
-                        onDismiss()
-                    },
-                ),
-            modifier = Modifier.fillMaxWidth(),
-        )
+              KeyboardActions(
+                onDone = {
+                  if (!canSave) return@KeyboardActions
+                  keyboardController?.hide()
+                  saveStyle()
+                  onSave(nameField.text.trim())
+                  onDismiss()
+                }
+              ),
+            modifier = Modifier.fillMaxWidth().semantics { contentDescription = nameLabel },
+          )
+        }
+      }
+      if (playlistId != null || onChangeCover != null || onRemoveCover != null)
+        MenuCard {
+          Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            if (onChangeCover != null || onRemoveCover != null)
+              Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                onChangeCover?.let { change ->
+                  VibraDialogButton(onClick = change) {
+                    Text(stringResource(R.string.vibra_change_cover))
+                  }
+                }
+                onRemoveCover?.let { remove ->
+                  VibraDialogButton(onClick = remove, destructive = true) {
+                    Text(stringResource(R.string.vibra_remove_cover))
+                  }
+                }
+              }
+            if (playlistId != null)
+              PlaylistCoverStylePicker(
+                parsePlaylistCoverStyle(selectedStyle),
+                onChange = { selectedStyle = it.name },
+              )
+          }
+        }
+      Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        VibraDialogButton(onClick = onDismiss, modifier = Modifier.weight(1f)) {
+          Text(stringResource(android.R.string.cancel))
+        }
+        VibraDialogButton(
+          onClick = {
+            keyboardController?.hide()
+            saveStyle()
+            onSave(nameField.text.trim())
+            onDismiss()
+          },
+          primary = true,
+          enabled = canSave,
+          modifier = Modifier.weight(1f),
+        ) {
+          Text(stringResource(R.string.save))
+        }
+      }
     }
+  }
 }

@@ -146,6 +146,7 @@ fun VibraAppShell(
     pureBlack: Boolean,
     modifier: Modifier = Modifier,
 ) {
+    val liveSearch: moe.rukamori.archivetune.viewmodels.OnlineSearchSuggestionViewModel = androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel()
     val dock = controller.dock
     val playerSheet = rememberLiquidSheetState()
     var miniPlayerBounds by remember { mutableStateOf<Rect?>(null) }
@@ -189,6 +190,7 @@ fun VibraAppShell(
     LaunchedEffect(route) { if (dock.mode == DockMode.Search && route?.startsWith("search/") == true) dock.closeSearch() }
 
     val submitSearch: (String) -> Unit = { raw ->
+        liveSearch.cancel()
         val query = raw.trim()
         if (query.isNotEmpty()) {
             if (!pauseSearchHistory) database.query { insert(SearchHistory(query = query)) }
@@ -250,6 +252,7 @@ fun VibraAppShell(
             Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).statusBarsPadding()) {
                 OnlineSearchScreen(
                     query = dock.query.text,
+                    viewModel = liveSearch,
                     onQueryChange = { dock.query = it },
                     navController = navController,
                     onSearch = submitSearch,

@@ -18,6 +18,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import app.vibra.ui.motion.clickable
 import app.vibra.ui.motion.combinedClickable
+import app.vibra.ui.motion.interactiveSurface
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -171,7 +172,7 @@ fun VibraStatsScreen(navController: NavController) {
 
             artists.firstOrNull()?.let { top ->
                 item(key = "number_one") {
-                    VibraCard(modifier = Modifier.fillMaxWidth().clickable(role = Role.Button) { navController.navigateToArtist(top.id) }) {
+                    VibraCard(modifier = Modifier.fillMaxWidth(), onClick = { navController.navigateToArtist(top.id) }) {
                         Column(modifier = Modifier.fillMaxWidth().padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                             Box(modifier = Modifier.size(180.dp).clip(VibraShapes.Star).background(MaterialTheme.colorScheme.primaryContainer)) {
                                 VibraArtwork(url = top.thumbnailUrl, shape = RectangleShape, sizePx = 480, modifier = Modifier.fillMaxSize())
@@ -364,12 +365,15 @@ private fun PeriodSelector(
                     Modifier
                         .weight(1f)
                         .height(40.dp)
-                        .clip(CircleShape)
-                        .background(container)
-                        .clickable(role = Role.Tab) {
-                            haptics.tick()
-                            onSelect(option)
-                        },
+                        .interactiveSurface(
+                            shape = CircleShape,
+                            containerColor = container,
+                            role = Role.Tab,
+                            onClick = {
+                                haptics.tick()
+                                onSelect(option)
+                            },
+                        ),
                 contentAlignment = Alignment.Center,
             ) {
                 AnimatedContent(targetState = option, transitionSpec = { fadeIn() togetherWith fadeOut() }, label = "periodLabel") {
