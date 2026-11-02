@@ -50,6 +50,7 @@ import moe.rukamori.archivetune.ui.screens.search.SearchScreen
 import moe.rukamori.archivetune.ui.screens.settings.AboutScreen
 import moe.rukamori.archivetune.ui.screens.settings.ThirdPartyLicensesScreen
 import moe.rukamori.archivetune.ui.screens.settings.FontLicensesScreen
+import moe.rukamori.archivetune.ui.screens.settings.OpenSourceLicensesScreen
 import moe.rukamori.archivetune.ui.screens.settings.LicenseTextScreen
 import moe.rukamori.archivetune.ui.screens.settings.AccountSettings
 import moe.rukamori.archivetune.ui.screens.settings.AiIntegrationSettings
@@ -511,6 +512,9 @@ fun NavGraphBuilder.navigationBuilder(
     }
     composable("settings/about/licenses") {
         moe.rukamori.archivetune.ui.component.EnginePageSurface { ThirdPartyLicensesScreen(navController)         }
+    }
+    composable("settings/about/open-source") {
+        moe.rukamori.archivetune.ui.component.EnginePageSurface { OpenSourceLicensesScreen(navController) }
     }
     composable("settings/about/fonts") {
         moe.rukamori.archivetune.ui.component.EnginePageSurface { FontLicensesScreen(navController)         }

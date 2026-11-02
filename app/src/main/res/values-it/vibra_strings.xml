@@ -87,7 +87,7 @@
         <item quantity="other">%1$d ascolti</item>
     </plurals>
     <string name="vibra_cast_connected">Connesso</string>
-    <string name="vibra_about_tagline">Musica che scorre come un liquido.</string>
+    <string name="vibra_about_tagline">Ascolta come ti senti.</string>
     <string name="vibra_update_title">vibra %1$s è pronta</string>
     <string name="vibra_update_text">L\'aggiornamento è già scaricato. Android ti chiederà di confermare l\'installazione.</string>
     <string name="vibra_update_text_once">L\'aggiornamento è già scaricato. Consenti a vibra di installarlo una volta: da lì in poi gli aggiornamenti si installeranno da soli mentre non usi l\'app.</string>
@@ -151,4 +151,16 @@
     <string name="vibra_menu_show_translation">Mostra traduzione</string>
     <string name="vibra_menu_headroom_title">Headroom automatico</string>
     <string name="vibra_menu_system_equalizer">Apri equalizzatore di sistema</string>
+    <string name="vibra_about_version">Versione %1$s</string>
+    <string name="vibra_about_whats_new">Novità</string>
+    <string name="vibra_about_open_source">Licenze open source</string>
+    <string name="vibra_about_source_code">Codice sorgente</string>
+    <string name="vibra_update_check_action">Controlla</string>
+    <string name="vibra_update_check_hint">Cerca una versione più recente</string>
+    <string name="vibra_update_checking">Ricerca in corso…</string>
+    <string name="vibra_update_downloading">Download dell\'aggiornamento…</string>
+    <string name="vibra_update_current">Sei aggiornato</string>
+    <string name="vibra_update_ready">Un aggiornamento è pronto da installare</string>
+    <string name="vibra_update_check_failed">Ricerca non riuscita. Riprova.</string>
+    <string name="vibra_update_check_unavailable">Non disponibile in questa build</string>
 </resources>

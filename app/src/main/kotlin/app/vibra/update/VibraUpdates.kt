@@ -55,10 +55,17 @@ import java.security.MessageDigest
  *  4. After   – an update that happened while the user was away is announced by a
  *               notification from the new version.
  *
- *  Errors are silent: the next start simply tries again.
+ *  Automatic errors are silent; an explicit About check reports its result to the card.
  * ─────────────────────────────────────────────────────────────────────────────────────
  */
 object VibraUpdates {
+    /** Result of an explicit check, independent of the background install state. */
+    enum class CheckStatus { Idle, Checking, UpToDate, Ready, Failed, Unavailable }
+
+    private val _manualCheck = MutableStateFlow(CheckStatus.Idle)
+    val manualCheck: StateFlow<CheckStatus> = _manualCheck.asStateFlow()
+    private var manualPrompt = false
+
     sealed interface State {
         data object Idle : State
 
@@ -137,8 +144,39 @@ object VibraUpdates {
 
     /** "Later" in the dialog. */
     fun postpone() {
+        manualPrompt = false
         declinedAt = SystemClock.elapsedRealtime()
         refreshPrompt()
+    }
+
+    /** Explicitly retries the latest release, bypassing the automatic interval and skipped version. */
+    fun checkNow() {
+        if (_manualCheck.value == CheckStatus.Checking) return
+        if (!::app.isInitialized || BuildConfig.VIBRA_UPDATE_URL.isBlank()) {
+            _manualCheck.value = CheckStatus.Unavailable
+            return
+        }
+        _manualCheck.value = CheckStatus.Checking
+        val previous = checkJob
+        checkJob = scope.launch {
+            try {
+                // Let an existing download finish; never fetch or mutate its APK concurrently.
+                previous?.join()
+                lastCheckAt = SystemClock.elapsedRealtime()
+                val result = check(force = true)
+                if (result == CheckStatus.Ready) {
+                    manualPrompt = true
+                    declinedAt = null
+                    refreshPrompt()
+                }
+                _manualCheck.value = result
+            } catch (error: CancellationException) {
+                _manualCheck.value = CheckStatus.Idle
+                throw error
+            } catch (error: Exception) {
+                _manualCheck.value = CheckStatus.Failed
+            }
+        }
     }
 
     private fun onForeground() {
@@ -174,25 +212,25 @@ object VibraUpdates {
         scheduleInstall()
     }
 
-    private suspend fun check() {
+    private suspend fun check(force: Boolean = false): CheckStatus {
         val release =
             try {
-                withContext(Dispatchers.IO) { VibraReleases.parseLatest(readLatest()) }
+                withContext(Dispatchers.IO) { VibraReleases.parseLatest(readLatest(force)) }
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {
                 Timber.d("Update check failed: %s", error.javaClass.simpleName)
                 null
-            } ?: return
+            } ?: return CheckStatus.Failed
         Timber.d("Update check: latest %s", release.versionName)
         val dir = updatesDir(app)
         val prefs = prefs(app)
-        if (!VibraReleases.isNewer(release.versionName, BuildConfig.VERSION_NAME) ||
-            release.versionName == prefs.getString(KeySkipped, null)
-        ) {
+        if (!VibraReleases.isNewer(release.versionName, BuildConfig.VERSION_NAME)) {
+            clearUpdate()
             withContext(Dispatchers.IO) { dir.deleteRecursively() }
-            return
+            return CheckStatus.UpToDate
         }
+        if (!force && release.versionName == prefs.getString(KeySkipped, null)) return CheckStatus.Failed
         val apk = File(dir, "VIBRA-${release.versionName}.apk")
         if (state.value !is State.Ready) _state.value = State.Downloading(release)
         val installable =
@@ -207,20 +245,28 @@ object VibraUpdates {
                 throw error
             } catch (error: Exception) {
                 Timber.d("Update download failed: %s", error.javaClass.simpleName)
-                _state.value = State.Idle
-                return
+                clearUpdate()
+                return CheckStatus.Failed
             }
         if (!installable) {
             // Not a newer build signed with our key: don't download it again at every start.
             Timber.d("Update %s is not installable over this build", release.versionName)
             apk.delete()
             prefs.edit { putString(KeySkipped, release.versionName) }
-            _state.value = State.Idle
-            return
+            clearUpdate()
+            return CheckStatus.Failed
         }
+        prefs.edit { remove(KeySkipped) }
         _state.value = State.Ready(release, apk)
         refreshPrompt()
         scheduleInstall()
+        return CheckStatus.Ready
+    }
+
+    private fun clearUpdate() {
+        installJob?.cancel()
+        _state.value = State.Idle
+        refreshPrompt()
     }
 
     private fun refreshPrompt() {
@@ -229,7 +275,7 @@ object VibraUpdates {
             ready?.release?.takeIf {
                 foreground && !confirming &&
                     declinedAt?.let { at -> SystemClock.elapsedRealtime() - at < AskAgainAfter } != true &&
-                    (confirmationRequired || !VibraInstaller.canInstallSilently(app))
+                    (manualPrompt || confirmationRequired || !VibraInstaller.canInstallSilently(app))
             }
     }
 
@@ -304,8 +350,8 @@ object VibraUpdates {
         if (silently != null) VibraInstaller.notifyUpdated(context)
     }
 
-    private fun readLatest(): String {
-        val cached = latest
+    private fun readLatest(force: Boolean): String {
+        val cached = latest.takeUnless { force }
         return open(BuildConfig.VIBRA_UPDATE_URL, accept = "application/vnd.github+json", etag = cached?.etag).run {
             try {
                 if (cached != null && responseCode == HttpURLConnection.HTTP_NOT_MODIFIED) return cached.body
