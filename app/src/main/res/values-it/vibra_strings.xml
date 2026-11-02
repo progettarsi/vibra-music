@@ -152,7 +152,9 @@
     <string name="vibra_menu_headroom_title">Headroom automatico</string>
     <string name="vibra_menu_system_equalizer">Apri equalizzatore di sistema</string>
     <string name="vibra_about_version">Versione %1$s</string>
-    <string name="vibra_about_whats_new">Novità</string>
+    <string name="vibra_about_notes_title">Novità della %1$s</string>
+    <string name="vibra_about_notes_failed">Impossibile caricare le note.</string>
+    <string name="vibra_about_notes_open">Apri su GitHub</string>
     <string name="vibra_about_open_source">Licenze open source</string>
     <string name="vibra_about_source_code">Codice sorgente</string>
     <string name="vibra_update_check_action">Controlla</string>

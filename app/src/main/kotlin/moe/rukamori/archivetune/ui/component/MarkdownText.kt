@@ -37,14 +37,15 @@ fun MarkdownText(
     modifier: Modifier = Modifier,
     style: TextStyle = MaterialTheme.typography.bodyMedium,
     color: Color = MaterialTheme.colorScheme.onSurface,
+    @androidx.annotation.FontRes font: Int = R.font.vibra_roboto,
 ) {
     val context = LocalContext.current
     val colorArgb = color.toArgb()
     val fontSize = style.fontSize
 
     val typeface =
-        remember(context) {
-            ResourcesCompat.getFont(context, R.font.vibra_roboto)
+        remember(context, font) {
+            ResourcesCompat.getFont(context, font)
         }
 
     val markwon =

@@ -149,6 +149,20 @@ object VibraUpdates {
         refreshPrompt()
     }
 
+    /** The patch notes published with [version], read from its GitHub release; null when it has none. */
+    suspend fun releaseNotes(version: String): String? =
+        withContext(Dispatchers.IO) {
+            val json =
+                open("$ReleasesApiUrl/tags/v$version", accept = "application/vnd.github+json").run {
+                    try {
+                        inputStream.bufferedReader().use { it.readText() }
+                    } finally {
+                        disconnect()
+                    }
+                }
+            VibraReleases.notesOf(json)
+        }
+
     /** Explicitly retries the latest release, bypassing the automatic interval and skipped version. */
     fun checkNow() {
         if (_manualCheck.value == CheckStatus.Checking) return
@@ -425,6 +439,8 @@ object VibraUpdates {
     )
 
     private const val CheckInterval = 15 * 60 * 1000L
+    /** The public repository's releases; patch notes are read from here in every build. */
+    private const val ReleasesApiUrl = "https://api.github.com/repos/progettarsi/vibra-music/releases"
     private const val AskAgainAfter = 4 * 60 * 60 * 1000L
     private const val QuietPeriod = 30 * 1000L
     private const val KeySkipped = "skipped_version"

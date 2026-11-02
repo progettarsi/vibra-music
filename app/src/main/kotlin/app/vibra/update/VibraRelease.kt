@@ -59,6 +59,12 @@ internal object VibraReleases {
     }
 
     /** "v1.0.8" → "1.0.8"; null when the text holds no version. */
+    /** The patch notes of a release (`GET .../releases/tags/{tag}`): its body, or null when empty. */
+    fun notesOf(json: String): String? {
+        val root = runCatching { Json.parseToJsonElement(json).jsonObject }.getOrNull() ?: return null
+        return root.text("body")?.trim()?.takeIf { it.isNotEmpty() }
+    }
+
     fun versionOf(tag: String): String? = VersionPattern.find(tag)?.value
 
     /** True when [latest] is a higher version than [current] ("1.1" > "1.0.8", "1.1" == "1.1.0"). */

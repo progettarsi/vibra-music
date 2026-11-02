@@ -151,7 +151,9 @@
     <string name="vibra_menu_headroom_title">Automatic headroom</string>
     <string name="vibra_menu_system_equalizer">Open system equalizer</string>
     <string name="vibra_about_version">Version %1$s</string>
-    <string name="vibra_about_whats_new">What\'s new</string>
+    <string name="vibra_about_notes_title">What\'s new in %1$s</string>
+    <string name="vibra_about_notes_failed">Couldn\'t load the notes.</string>
+    <string name="vibra_about_notes_open">Open on GitHub</string>
     <string name="vibra_about_open_source">Open source licenses</string>
     <string name="vibra_about_source_code">Source code</string>
     <string name="vibra_update_check_action">Check</string>

@@ -64,4 +64,12 @@ class VibraReleasesTest {
         assertFalse(VibraReleases.isNewer("1.0.8", "1.1"))
         assertFalse(VibraReleases.isNewer("nightly", "1.1"))
     }
+
+    @Test
+    fun readsPatchNotesFromTheBody() {
+        assertEquals("Patch Notes v1.2", VibraReleases.notesOf(release(extra = "\"body\":\"  Patch Notes v1.2\\n\",")))
+        assertNull(VibraReleases.notesOf(release(extra = "\"body\":\"   \",")))
+        assertNull(VibraReleases.notesOf(release()))
+        assertNull(VibraReleases.notesOf("not json"))
+    }
 }

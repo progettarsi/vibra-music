@@ -26,6 +26,12 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.Alignment
+import androidx.compose.runtime.saveable.rememberSaveable
+import app.vibra.ui.components.VibraBottomSheet
+import kotlinx.coroutines.CancellationException
+import moe.rukamori.archivetune.ui.component.MarkdownText
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -50,11 +56,6 @@ fun AboutScreen(navController: NavController) {
         PreferenceGroup(modifier = Modifier.padding(top = 12.dp)) {
             item { VibraUpdateEntry() }
             item {
-                PreferenceEntry(title = { Text(stringResource(R.string.vibra_about_whats_new)) },
-                    icon = { Icon(painterResource(R.drawable.newspaper), null) },
-                    onClick = { uriHandler.openUri("$VibraRepositoryUrl/releases/tag/v${BuildConfig.VERSION_NAME}") })
-            }
-            item {
                 PreferenceEntry(title = { Text(stringResource(R.string.vibra_about_open_source)) },
                     icon = { Icon(painterResource(R.drawable.lock_open), null) },
                     onClick = { navController.navigate("settings/about/open-source") })
@@ -75,10 +76,14 @@ fun AboutScreen(navController: NavController) {
     }
 }
 
-/** The installed version, with a manual check for a newer one (Vibra's own updater). */
+/**
+ * The installed version: a tap opens its patch notes, the Check button looks for a newer one
+ * (Vibra's own updater).
+ */
 @Composable
 private fun VibraUpdateEntry() {
     val haptics = app.vibra.ui.haptics.rememberVibraHaptics()
+    var showNotes by rememberSaveable { mutableStateOf(false) }
     val manual by VibraUpdates.manualCheck.collectAsStateWithLifecycle()
     val background by VibraUpdates.state.collectAsStateWithLifecycle()
     val status = stringResource(
@@ -100,6 +105,10 @@ private fun VibraUpdateEntry() {
         title = { Text(stringResource(R.string.vibra_about_version, BuildConfig.VERSION_NAME)) },
         description = status,
         icon = { Icon(painterResource(R.drawable.update), null) },
+        onClick = {
+            haptics.press()
+            showNotes = true
+        },
         trailingContent = {
             VibraFilledTonalButton(
                 onClick = {
@@ -110,6 +119,61 @@ private fun VibraUpdateEntry() {
             ) { Text(stringResource(R.string.vibra_update_check_action)) }
         },
     )
+    if (showNotes) PatchNotesSheet(version = BuildConfig.VERSION_NAME, onDismiss = { showNotes = false })
+}
+
+/** The notes published with [version], in a sheet; on failure, a way to read them on GitHub. */
+@Composable
+private fun PatchNotesSheet(version: String, onDismiss: () -> Unit) {
+    val uriHandler = LocalUriHandler.current
+    var notes by remember { mutableStateOf<String?>(null) }
+    var failed by remember { mutableStateOf(false) }
+    LaunchedEffect(version) {
+        try {
+            notes = VibraUpdates.releaseNotes(version)
+            failed = notes == null
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            failed = true
+        }
+    }
+    VibraBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).navigationBarsPadding()
+                .padding(horizontal = app.vibra.ui.theme.VibraDimens.Gutter, vertical = 8.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.vibra_about_notes_title, version),
+                style = MaterialTheme.typography.headlineSmall,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.semantics { heading() },
+            )
+            val text = notes
+            when {
+                text != null -> MarkdownText(
+                    markdown = text,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    font = R.font.vibra_google_sans_flex,
+                    modifier = Modifier.padding(top = 16.dp, bottom = 16.dp),
+                )
+                failed -> {
+                    Text(
+                        text = stringResource(R.string.vibra_about_notes_failed),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 12.dp),
+                    )
+                    VibraFilledTonalButton(
+                        onClick = { uriHandler.openUri("$VibraRepositoryUrl/releases/tag/v$version") },
+                        modifier = Modifier.padding(vertical = 16.dp),
+                    ) { Text(stringResource(R.string.vibra_about_notes_open)) }
+                }
+                else -> CircularProgressIndicator(modifier = Modifier.padding(vertical = 24.dp).align(Alignment.CenterHorizontally))
+            }
+        }
+    }
 }
 
 /** GPL-3.0, the libraries and the fonts, behind the single "Open source licenses" entry. */
