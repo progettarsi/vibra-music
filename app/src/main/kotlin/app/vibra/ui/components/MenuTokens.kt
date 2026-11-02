@@ -10,7 +10,7 @@ object MenuTokens {
   val SheetHandleHeight = 38.dp
   val Gutter = 20.dp
   val CardRadius = 32.dp
-  val ExpandedGap = 16.dp
+  val ExpandedGap = 10.dp
   val CompactGap = 10.dp
   val ExpandedArtwork = 104.dp
   val CompactArtwork = 56.dp

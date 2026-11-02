@@ -304,7 +304,7 @@ private fun EqualizerContent(
 ) {
   Column(
     Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
-    verticalArrangement = Arrangement.spacedBy(14.dp),
+    verticalArrangement = Arrangement.spacedBy(10.dp),
   ) {
     val selectedName =
       (0 until model.profiles.size).map { model.profiles[it] }.firstOrNull { it.isSelected }?.name

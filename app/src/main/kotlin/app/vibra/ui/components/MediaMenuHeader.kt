@@ -20,6 +20,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -54,10 +55,14 @@ fun MediaMenuSheet(
 }
 
 @Composable
-fun MenuCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
+fun MenuCard(
+  modifier: Modifier = Modifier,
+  shape: Shape = VibraShapes.Card,
+  content: @Composable ColumnScope.() -> Unit,
+) {
   Surface(
     modifier.fillMaxWidth(),
-    shape = VibraShapes.Card,
+    shape = shape,
     color = MaterialTheme.colorScheme.surfaceContainer,
   ) {
     Column(content = content)
@@ -84,7 +89,8 @@ fun MediaMenuHeader(
         horizontal = if (compact) 16.dp else 20.dp,
         vertical = if (compact) 10.dp else 20.dp,
       ),
-      verticalAlignment = Alignment.CenterVertically,
+      // Expanded: the text column spans the cover, title on its top edge and actions on its bottom.
+      verticalAlignment = if (compact) Alignment.CenterVertically else Alignment.Top,
       horizontalArrangement = Arrangement.spacedBy(if (compact) 14.dp else 18.dp),
     ) {
       val playLabel = stringResource(R.string.play) + " " + title
@@ -108,14 +114,25 @@ fun MediaMenuHeader(
             ),
       )
       Column(
-        Modifier.weight(1f),
-        verticalArrangement = Arrangement.spacedBy(if (compact) 0.dp else 14.dp),
+        Modifier.weight(1f)
+          .then(if (compact) Modifier else Modifier.heightIn(min = MenuTokens.ExpandedArtwork)),
+        verticalArrangement =
+          if (compact) Arrangement.Top else Arrangement.SpaceBetween,
       ) {
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
           Text(
             title,
             fontSize = if (compact) MenuTokens.CompactTitle else MenuTokens.ExpandedTitle,
             lineHeight = if (compact) 24.sp else 26.sp,
+            // No leading above the first line, so the title starts on the cover's top edge.
+            style =
+              LocalTextStyle.current.copy(
+                lineHeightStyle =
+                  LineHeightStyle(
+                    LineHeightStyle.Alignment.Center,
+                    LineHeightStyle.Trim.FirstLineTop,
+                  )
+              ),
             fontWeight = FontWeight.SemiBold,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
@@ -133,6 +150,7 @@ fun MediaMenuHeader(
         if (!compact)
           CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides 40.dp) {
             Row(
+              Modifier.padding(top = 10.dp),
               verticalAlignment = Alignment.CenterVertically,
               horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {

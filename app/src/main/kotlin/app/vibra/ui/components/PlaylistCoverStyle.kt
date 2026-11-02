@@ -2,8 +2,11 @@
  * Vibra (2026) — persistent playlist cover presentation.
  * GPL-3.0 License. Derived from ArchiveTune © Rukamori (github.com/rukamori).
  */
+@file:OptIn(ExperimentalMaterial3ExpressiveApi::class)
+
 package app.vibra.ui.components
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -17,6 +20,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.unit.dp
 import androidx.datastore.preferences.core.stringPreferencesKey
+import app.vibra.ui.theme.VibraEmotionalShapes
 import app.vibra.ui.theme.VibraShapes
 import moe.rukamori.archivetune.R
 import android.content.Context
@@ -32,10 +36,20 @@ import moe.rukamori.archivetune.utils.PreferenceStore
 import moe.rukamori.archivetune.utils.dataStore
 
 /** Shape metadata stays in app settings; media files and remote playlists are unchanged. */
-enum class PlaylistCoverStyle {
-  Pentagon,
-  Rounded,
-  Circle,
+enum class PlaylistCoverStyle(@StringRes val label: Int) {
+  Pentagon(R.string.vibra_shape_pentagon),
+  Rounded(R.string.vibra_shape_round),
+  Circle(R.string.vibra_shape_circle),
+  // Saved by name: new shapes go after the originals, an unknown name falls back to Pentagon.
+  Flower(R.string.vibra_shape_flower),
+  Cookie(R.string.vibra_shape_cookie),
+  Sunny(R.string.vibra_shape_sunny),
+  Clover(R.string.vibra_shape_clover),
+  Puffy(R.string.vibra_shape_puffy),
+  Gem(R.string.vibra_shape_gem),
+  Heart(R.string.vibra_shape_heart),
+  Star(R.string.vibra_shape_star),
+  Burst(R.string.vibra_shape_burst),
 }
 
 fun playlistCoverStyleKey(id: String) = stringPreferencesKey("playlistCoverStyle:$id")
@@ -49,6 +63,15 @@ fun PlaylistCoverStyle.shape(): Shape =
     PlaylistCoverStyle.Pentagon -> VibraShapes.Pentagon
     PlaylistCoverStyle.Rounded -> VibraShapes.AlbumCover
     PlaylistCoverStyle.Circle -> CircleShape
+    PlaylistCoverStyle.Flower -> VibraShapes.Flower
+    PlaylistCoverStyle.Cookie -> VibraShapes.Cookie9
+    PlaylistCoverStyle.Sunny -> VibraShapes.Sunny
+    PlaylistCoverStyle.Clover -> MaterialShapes.Clover4Leaf.toShape()
+    PlaylistCoverStyle.Puffy -> MaterialShapes.Puffy.toShape()
+    PlaylistCoverStyle.Gem -> MaterialShapes.Gem.toShape()
+    PlaylistCoverStyle.Heart -> MaterialShapes.Heart.toShape()
+    PlaylistCoverStyle.Star -> VibraEmotionalShapes.Star.toShape()
+    PlaylistCoverStyle.Burst -> MaterialShapes.SoftBoom.toShape()
   }
 
 private const val PlaylistCoverStylePrefix = "playlistCoverStyle:"
@@ -108,16 +131,16 @@ fun PlaylistCoverStylePicker(
 ) {
   Column(modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
     Text(stringResource(R.string.vibra_cover_shape), style = MaterialTheme.typography.titleSmall)
-    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+    // Two even rows of six. Each 44 dp button keeps a 48 dp touch area, so the row spreads them
+    // across the card instead of adding fixed gaps (that would wrap at five on a phone).
+    FlowRow(
+      Modifier.fillMaxWidth(),
+      horizontalArrangement = Arrangement.SpaceBetween,
+      verticalArrangement = Arrangement.spacedBy(6.dp),
+      maxItemsInEachRow = 6,
+    ) {
       PlaylistCoverStyle.entries.forEach { style ->
-        val label =
-          stringResource(
-            when (style) {
-              PlaylistCoverStyle.Pentagon -> R.string.vibra_shape_pentagon
-              PlaylistCoverStyle.Rounded -> R.string.vibra_shape_round
-              PlaylistCoverStyle.Circle -> R.string.vibra_shape_circle
-            }
-          )
+        val label = stringResource(style.label)
         Surface(
           onClick = { onChange(style) },
           shape = androidx.compose.foundation.shape.CircleShape,

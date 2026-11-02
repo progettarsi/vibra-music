@@ -269,7 +269,7 @@ fun PlayerMenu(
 
   Column(
     Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(bottom = 24.dp),
-    verticalArrangement = Arrangement.spacedBy(16.dp),
+    verticalArrangement = Arrangement.spacedBy(10.dp),
   ) {
     MediaMenuHeader(
       nowPlayingTitle,
@@ -650,7 +650,7 @@ fun TempoPitchDialog(onDismiss: () -> Unit) {
   ) {
     Column(
       Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
-      verticalArrangement = Arrangement.spacedBy(14.dp),
+      verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
       ControlSheetHeader(
         stringResource(R.string.vibra_menu_tempo_pitch),

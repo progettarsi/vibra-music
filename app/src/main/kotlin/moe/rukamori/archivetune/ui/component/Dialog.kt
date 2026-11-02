@@ -123,7 +123,7 @@ fun DefaultDialog(
             }
         }
       }
-      Spacer(Modifier.height(14.dp))
+      Spacer(Modifier.height(10.dp))
     }
     Surface(
       modifier =
@@ -146,7 +146,7 @@ fun DefaultDialog(
     }
 
     if (buttons != null) {
-      Spacer(Modifier.height(14.dp))
+      Spacer(Modifier.height(10.dp))
 
       Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) buttonRow@{
         CompositionLocalProvider(LocalDialogActionModifier provides Modifier.weight(1f)) {
@@ -409,7 +409,7 @@ fun EditPlaylistDialog(
   ) {
     Column(
       Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
-      verticalArrangement = Arrangement.spacedBy(14.dp),
+      verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
       ControlSheetHeader(
         stringResource(R.string.edit_playlist),

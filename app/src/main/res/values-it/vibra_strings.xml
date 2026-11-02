@@ -120,6 +120,7 @@
     <string name="vibra_shape_circle">Cerchio</string>
     <string name="vibra_toggle_saved">Cambia stato salvato</string>
     <string name="vibra_more_actions">Altre azioni</string>
+    <string name="vibra_choose_cover">Scegli immagine</string>
     <string name="vibra_change_cover">Cambia immagine</string>
     <string name="vibra_remove_cover">Rimuovi immagine</string>
     <string name="vibra_menu_go_to">Vai a</string>

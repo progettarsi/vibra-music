@@ -52,6 +52,7 @@ data class CreatePlaylistUiData(
     val syncRequested: Boolean,
     val isSubmitting: Boolean,
     val coverStyle: String = "Pentagon",
+    val coverUri: String? = null,
 ) {
     val canSubmit: Boolean
         get() = name.isNotBlank() && !isSubmitting
@@ -158,6 +159,8 @@ class CreatePlaylistViewModel
 
         fun updateCoverStyle(value: String) { updateData { it.copy(coverStyle = value) } }
 
+        fun updateCoverUri(value: String?) { updateData { it.copy(coverUri = value) } }
+
         fun submit() {
             if (createJob?.isActive == true) return
             val data = currentData() ?: return
@@ -174,6 +177,7 @@ class CreatePlaylistViewModel
                             name = data.name,
                             syncRequested = data.syncRequested,
                             coverStyle = data.coverStyle,
+                            coverUri = data.coverUri?.let(android.net.Uri::parse),
                         )
                         mutableScreenState.value =
                             CreatePlaylistScreenState.Success(

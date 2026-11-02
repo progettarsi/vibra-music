@@ -34,6 +34,9 @@ fun ReferenceSlider(
 ) {
   var draft by remember { mutableFloatStateOf(value) }
   var dragging by remember { mutableStateOf(false) }
+  // Unsnapped finger position: stepping each small drag delta from the snapped value would round
+  // back to the same step, so a slow drag never moved the thumb.
+  var dragPosition by remember { mutableFloatStateOf(value) }
   var width by remember { mutableIntStateOf(1) }
   val change by rememberUpdatedState(onValueChange)
   val finish by rememberUpdatedState(onValueChangeFinished)
@@ -78,11 +81,17 @@ fun ReferenceSlider(
         enabled = enabled,
         state =
           rememberDraggableState { delta ->
-            update(draft + delta / width.coerceAtLeast(1) * (maximum - minimum))
+            dragPosition =
+              (dragPosition + delta / width.coerceAtLeast(1) * (maximum - minimum)).coerceIn(
+                minimum,
+                maximum,
+              )
+            update(dragPosition)
           },
-        onDragStarted = {
+        onDragStarted = { start ->
           dragging = true
-          draft = value
+          dragPosition = minimum + start.x / width.coerceAtLeast(1) * (maximum - minimum)
+          update(dragPosition)
         },
         onDragStopped = {
           dragging = false

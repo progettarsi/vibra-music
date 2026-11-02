@@ -266,6 +266,8 @@ fun VibraPlayerSheet(
     }
 
     val queueSheet = rememberLiquidSheetState()
+    // Driven by the sleep timer popup: the player behind it blurs a little (read in draw only).
+    val timerBackdrop = remember { Animatable(0f) }
     var lyricsVisible by rememberSaveable { mutableStateOf(false) }
     // 0 = player, 1 = lyrics. The player turns into the lyrics view: the last two rows
     // sink out at the bottom (slider and transport stay and serve the lyrics), cover,
@@ -293,7 +295,7 @@ fun VibraPlayerSheet(
     val spin = LocalPlaybackSpin.current
     val accent = artworkAccent(rememberArtworkColors(metadata.thumbnailUrl))
 
-    CompositionLocalProvider(LocalPlayerAccent provides accent) {
+    CompositionLocalProvider(LocalPlayerAccent provides accent, LocalTimerBackdrop provides timerBackdrop) {
         BoxWithConstraints(
             modifier =
                 modifier
@@ -474,6 +476,7 @@ fun VibraPlayerSheet(
                     scale = VibraTextStyles.PlayerTitle.fontSize.value / MaterialTheme.typography.titleMedium.fontSize.value,
                 )
             val recedeBlur = with(density) { 14.dp.toPx() }
+            val timerBlur = with(density) { 6.dp.toPx() }
             Box(
                 modifier =
                     Modifier
@@ -494,10 +497,11 @@ fun VibraPlayerSheet(
                             scaleX = scale
                             scaleY = scale
                             alpha = lerp(1f, 0.35f, q)
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && q > 0.01f) {
+                            val blur = maxOf(recedeBlur * q, timerBlur * timerBackdrop.value.coerceIn(0f, 1f))
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && blur > 0.5f) {
                                 renderEffect =
                                     FrameworkRenderEffect
-                                        .createBlurEffect(recedeBlur * q, recedeBlur * q, FrameworkShader.TileMode.DECAL)
+                                        .createBlurEffect(blur, blur, FrameworkShader.TileMode.DECAL)
                                         .asComposeRenderEffect()
                             }
                         }.onPlaced {
@@ -694,6 +698,13 @@ fun VibraPlayerSheet(
                             .graphicsLayer {
                                 alpha = ((sheet.progress - 0.5f) / 0.5f).coerceIn(0f, 1f) * (1f - lyrics() * 1.6f).coerceIn(0f, 1f)
                                 translationY = lyrics() * BottomRowSink.toPx()
+                                val blur = timerBlur * timerBackdrop.value.coerceIn(0f, 1f)
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && blur > 0.5f) {
+                                    renderEffect =
+                                        FrameworkRenderEffect
+                                            .createBlurEffect(blur, blur, FrameworkShader.TileMode.DECAL)
+                                            .asComposeRenderEffect()
+                                }
                             }.navigationBarsPadding()
                             .padding(horizontal = VibraDimens.Gutter, vertical = 20.dp),
                 )
@@ -1606,6 +1617,8 @@ internal fun SleepTimerButton(
     }
 
         SleepTimerPopup(expanded = popup, anchor = anchor, anchorColor = container, anchorContentColor = content,
+            progress = LocalTimerBackdrop.current ?: remember { Animatable(0f) },
+            liveAnchor = { anchorCoordinates[0]?.takeIf { it.isAttached }?.boundsInWindow() ?: anchor },
             onDismiss = { popup = false }, onAnchorClick = onTimerPress, onConfirm = { timer.start(it); popup = false },
             onEndOfSong = { timer.start(-1); popup = false })
     }
@@ -1830,6 +1843,9 @@ private val CoverScrim = Color.Black.copy(alpha = 0.28f)
 
 /** Accent taken from the current cover; see [artworkAccent]. */
 private val LocalPlayerAccent = compositionLocalOf { ArtworkAccent(Color.White, Color.Black) }
+
+/** The timer popup's progress, shared so the player can blur behind it. */
+private val LocalTimerBackdrop = compositionLocalOf<Animatable<Float, AnimationVector1D>?> { null }
 
 /** The five transport controls share one size; the cookie is a little larger because its
  *  scalloped edge reads smaller than a circle of the same diameter. */

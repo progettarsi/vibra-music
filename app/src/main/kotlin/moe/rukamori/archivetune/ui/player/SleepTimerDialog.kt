@@ -25,14 +25,25 @@ import moe.rukamori.archivetune.R
 @Composable
 fun SleepTimerPanel(onConfirm: (Int) -> Unit, onEndOfSong: () -> Unit) {
   var minutes by remember { mutableIntStateOf(30) }
-  val setMinutes: (Float) -> Unit = { minutes = ((it / 5).roundToInt() * 5).coerceIn(5, 120) }
-  Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+  val haptics = app.vibra.ui.haptics.rememberVibraHaptics()
+  // One tick for every 5-minute step the value crosses.
+  val setMinutes: (Float) -> Unit = {
+    val next = ((it / 5).roundToInt() * 5).coerceIn(5, 120)
+    if (next != minutes) {
+      minutes = next
+      haptics.tick()
+    }
+  }
+  // Cards nest in the popup's corner: card radius + this padding = SleepTimerPanelRadius.
+  val cardShape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp)
+  Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
     ControlSheetHeader(
       stringResource(R.string.sleep_timer),
       stringResource(R.string.vibra_menu_minutes_short, minutes),
       R.drawable.bedtime,
+      shape = cardShape,
     )
-    MenuCard {
+    MenuCard(shape = cardShape) {
       Column(Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
           Text(stringResource(R.string.vibra_menu_duration), modifier = Modifier.weight(1f))
@@ -88,7 +99,7 @@ fun SleepTimerPanel(onConfirm: (Int) -> Unit, onEndOfSong: () -> Unit) {
         }
       }
     }
-    MenuCard {
+    MenuCard(shape = cardShape) {
       MediaMenuRow(
         headlineContent = { Text(stringResource(R.string.end_of_song)) },
         leadingContent = { Icon(painterResource(R.drawable.music_note), null) },

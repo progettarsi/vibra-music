@@ -86,6 +86,7 @@ import androidx.compose.ui.semantics.invisibleToUser
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
@@ -410,6 +411,23 @@ fun VibraDialog(
         }
       else Column(Modifier.fillMaxWidth().padding(contentPadding), content = content)
     }
+  }
+}
+
+/**
+ * Tallest [VibraDialog] content that still opens whole, below the sheets' opening limit. Content
+ * capped to it never needs the sheet to expand, so a list inside can be the only thing scrolling.
+ */
+@Composable
+fun vibraDialogNaturalMaxHeight(): Dp {
+  val density = LocalDensity.current
+  val window = LocalWindowInfo.current.containerSize.height
+  val navigationBar = WindowInsets.navigationBars.getBottom(density)
+  return with(density) {
+    (window * MenuTokens.NaturalSheetOpeningLimit - navigationBar).toDp() -
+      MenuTokens.SheetHandleHeight -
+      20.dp - // VibraDialog's bottom padding
+      2.dp
   }
 }
 

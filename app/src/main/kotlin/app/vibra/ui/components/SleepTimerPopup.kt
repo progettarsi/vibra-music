@@ -2,6 +2,7 @@
 package app.vibra.ui.components
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -19,6 +20,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.geometry.lerp
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
@@ -65,7 +67,18 @@ fun timerPopupBounds(
   return Rect(left, top, left + width, top + height)
 }
 
-/** One interruptible surface grows from / returns to the measured player button. */
+/** Outer corner of the panel: its cards' radius plus the padding around them, so they nest. */
+val SleepTimerPanelRadius = 34.dp
+
+/** Darkness of the veil behind the open panel. */
+private const val SleepTimerScrim = 0.32f
+
+/**
+ * One interruptible surface grows from / returns to the measured player button, carrying the
+ * panel's content with it (moved and scaled, as the profile page grows out of the dock avatar).
+ * [anchor] places the panel when it opens; [liveAnchor] is read while drawing, so a close always
+ * lands on the button's current shape (a pill once a timer runs) without state writes per frame.
+ */
 @Composable
 fun SleepTimerPopup(
   expanded: Boolean,
@@ -76,8 +89,9 @@ fun SleepTimerPopup(
   onEndOfSong: () -> Unit,
   anchorColor: Color = MaterialTheme.colorScheme.secondaryContainer,
   anchorContentColor: Color = MaterialTheme.colorScheme.onSecondaryContainer,
+  liveAnchor: () -> Rect = { anchor },
+  progress: Animatable<Float, AnimationVector1D> = remember { Animatable(0f) },
 ) {
-  val progress = remember { Animatable(0f) }
   var mounted by remember { mutableStateOf(false) }
   val motion = Liquid.container<Float>()
   LaunchedEffect(expanded) {
@@ -110,7 +124,8 @@ fun SleepTimerPopup(
   val timerTitle = stringResource(R.string.sleep_timer)
   val currentDismiss by rememberUpdatedState(onDismiss)
   val currentAnchorClick by rememberUpdatedState(onAnchorClick)
-  val currentAnchor by rememberUpdatedState(anchor)
+  val currentLiveAnchor by rememberUpdatedState(liveAnchor)
+  fun currentAnchor(): Rect = currentLiveAnchor().takeUnless { it.isEmpty } ?: anchor
   val currentTarget by rememberUpdatedState(target)
   Popup(
     popupPositionProvider =
@@ -134,18 +149,24 @@ fun SleepTimerPopup(
         )
         .pointerInput(Unit) {
           detectTapGestures { point ->
-            if (currentAnchor.contains(point)) currentAnchorClick() else currentDismiss()
+            if (currentAnchor().contains(point)) currentAnchorClick() else currentDismiss()
           }
         }
         .drawBehind {
           val p = progress.value.coerceIn(0f, 1f)
-          val rect = lerp(anchor, target, p)
-          val radius = androidx.compose.ui.util.lerp(anchor.height / 2, 32.dp.toPx(), p)
+          // A light veil darkens the screen behind the panel so it stands out.
+          drawRect(Color.Black, alpha = SleepTimerScrim * p)
+          val from = currentAnchor()
+          val rect = lerp(from, target, p)
+          val radius =
+            androidx.compose.ui.util.lerp(from.height / 2, SleepTimerPanelRadius.toPx(), p)
+          // Fades over the real button at both ends, so a close ends on the button itself.
           drawRoundRect(
             androidx.compose.ui.graphics.lerp(anchorColor, panelColor, p),
             rect.topLeft,
             rect.size,
             CornerRadius(radius),
+            alpha = (p / 0.12f).coerceIn(0f, 1f),
           )
         }
     ) {
@@ -154,14 +175,14 @@ fun SleepTimerPopup(
         null,
         tint = anchorContentColor,
         modifier =
-          Modifier.offset {
-              IntOffset(
-                (anchor.center.x - with(density) { 10.dp.toPx() }).roundToInt(),
-                (anchor.center.y - with(density) { 10.dp.toPx() }).roundToInt(),
-              )
-            }
-            .size(20.dp)
-            .graphicsLayer { alpha = (1f - progress.value * 3).coerceIn(0f, 1f) },
+          Modifier.size(20.dp).graphicsLayer {
+            val p = progress.value.coerceIn(0f, 1f)
+            val rect = lerp(currentAnchor(), target, p)
+            // The button's icon sits 11 dp in from its leading edge, round or pill.
+            translationX = rect.left + 11.dp.toPx()
+            translationY = rect.center.y - 10.dp.toPx()
+            alpha = (p / 0.12f).coerceIn(0f, 1f) * (1f - (p - 0.12f) / 0.2f).coerceIn(0f, 1f)
+          },
       )
       Column(
         Modifier.width(minOf(350.dp, with(density) { (window.width - margin * 2).toDp() }))
@@ -172,7 +193,7 @@ fun SleepTimerPopup(
           .offset { IntOffset(target.left.roundToInt(), target.top.roundToInt()) }
           .pointerInput(Unit) {
             detectTapGestures { point ->
-              if (currentAnchor.contains(point + currentTarget.topLeft)) currentAnchorClick()
+              if (currentAnchor().contains(point + currentTarget.topLeft)) currentAnchorClick()
             }
           }
           .pointerInput(expanded) {
@@ -195,7 +216,7 @@ fun SleepTimerPopup(
                   event.changes.forEach { it.consume() }
                 }
                 if (!moved) {
-                  if (currentAnchor.contains(last + currentTarget.topLeft)) currentAnchorClick()
+                  if (currentAnchor().contains(last + currentTarget.topLeft)) currentAnchorClick()
                   else currentDismiss()
                 }
               }
@@ -210,7 +231,7 @@ fun SleepTimerPopup(
           }
           .drawWithContent {
             val p = progress.value.coerceIn(0f, 1f)
-            val rect = lerp(anchor, target, p)
+            val rect = lerp(currentAnchor(), target, p)
             val contentScope = this
             clipRect(
               rect.left - target.left,
@@ -221,7 +242,18 @@ fun SleepTimerPopup(
               contentScope.drawContent()
             }
           }
-          .graphicsLayer { alpha = ((progress.value - 0.45f) / 0.55f).coerceIn(0f, 1f) }
+          .graphicsLayer {
+            // The content travels with the surface: moved to its corner and scaled to its width.
+            val p = progress.value.coerceIn(0f, 1f)
+            val rect = lerp(currentAnchor(), target, p)
+            val scale = if (target.width > 0f) (rect.width / target.width).coerceIn(0f, 1f) else 1f
+            transformOrigin = TransformOrigin(0f, 0f)
+            scaleX = scale
+            scaleY = scale
+            translationX = rect.left - target.left
+            translationY = rect.top - target.top
+            alpha = ((p - 0.15f) / 0.45f).coerceIn(0f, 1f)
+          }
           .verticalScroll(rememberScrollState())
       ) {
         SleepTimerPanel(onConfirm, onEndOfSong)

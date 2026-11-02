@@ -284,9 +284,14 @@ fun AddToPlaylistDialogOnline(
       groupContent = false,
       contentPadding = PaddingValues(0.dp),
     ) {
-      Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+      // Capped below the opening limit: the sheet opens whole and only the playlists scroll.
+      Column(
+        Modifier.fillMaxWidth()
+          .heightIn(max = app.vibra.ui.components.vibraDialogNaturalMaxHeight()),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+      ) {
         ControlSheetHeader(stringResource(R.string.add_to_playlist), "", R.drawable.playlist_add)
-        MenuCard {
+        MenuCard(Modifier.weight(1f, fill = false)) {
           if (available.size > 8)
             androidx.compose.material3.TextField(
               value = playlistQuery,
@@ -298,7 +303,7 @@ fun AddToPlaylistDialogOnline(
               colors = vibraTextFieldColors(),
             )
           LazyColumn(
-            Modifier.fillMaxWidth().heightIn(max = 480.dp),
+            Modifier.fillMaxWidth(),
             contentPadding = PaddingValues(vertical = 12.dp),
           ) {
             item {
@@ -324,9 +329,6 @@ fun AddToPlaylistDialogOnline(
               )
             }
           }
-        }
-        VibraDialogButton(onClick = onDismiss, primary = true, modifier = Modifier.fillMaxWidth()) {
-          Text(stringResource(R.string.vibra_menu_done))
         }
       }
     }

@@ -7,6 +7,8 @@
 
 package moe.rukamori.archivetune.ui.component
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.Arrangement
@@ -26,7 +28,10 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -36,6 +41,7 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.vibra.ui.components.*
+import coil3.compose.AsyncImage
 import app.vibra.ui.motion.vibraControlFeedback
 import moe.rukamori.archivetune.R
 import moe.rukamori.archivetune.viewmodels.CreatePlaylistEvent
@@ -92,6 +98,7 @@ fun CreatePlaylistDialog(
         errorMessageResId = null,
         onNameChange = updateName,
         onCoverStyleChange = viewModel::updateCoverStyle,
+        onCoverUriChange = viewModel::updateCoverUri,
         onSyncRequestedChange = updateSyncRequested,
         onSubmit = submit,
         onDismiss = dismiss,
@@ -105,6 +112,7 @@ fun CreatePlaylistDialog(
         errorMessageResId = null,
         onNameChange = updateName,
         onCoverStyleChange = viewModel::updateCoverStyle,
+        onCoverUriChange = viewModel::updateCoverUri,
         onSyncRequestedChange = updateSyncRequested,
         onSubmit = submit,
         onDismiss = dismiss,
@@ -126,6 +134,7 @@ fun CreatePlaylistDialog(
         errorMessageResId = null,
         onNameChange = updateName,
         onCoverStyleChange = viewModel::updateCoverStyle,
+        onCoverUriChange = viewModel::updateCoverUri,
         onSyncRequestedChange = updateSyncRequested,
         onSubmit = submit,
         onDismiss = dismiss,
@@ -139,6 +148,7 @@ fun CreatePlaylistDialog(
         errorMessageResId = state.messageResId,
         onNameChange = updateName,
         onCoverStyleChange = viewModel::updateCoverStyle,
+        onCoverUriChange = viewModel::updateCoverUri,
         onSyncRequestedChange = updateSyncRequested,
         onSubmit = submit,
         onDismiss = dismiss,
@@ -154,6 +164,7 @@ private fun CreatePlaylistDialogContent(
   @StringRes errorMessageResId: Int?,
   onNameChange: (String) -> Unit,
   onCoverStyleChange: (String) -> Unit,
+  onCoverUriChange: (String?) -> Unit,
   onSyncRequestedChange: (Boolean) -> Unit,
   onSubmit: () -> Unit,
   onDismiss: () -> Unit,
@@ -171,7 +182,7 @@ private fun CreatePlaylistDialogContent(
   ) {
     Column(
       Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
-      verticalArrangement = Arrangement.spacedBy(14.dp),
+      verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
       ControlSheetHeader(stringResource(R.string.create_playlist), "", R.drawable.playlist_add)
       MenuCard {
@@ -200,11 +211,13 @@ private fun CreatePlaylistDialogContent(
         }
       }
       MenuCard {
-        PlaylistCoverStylePicker(
-          parsePlaylistCoverStyle(data.coverStyle),
-          onChange = { onCoverStyleChange(it.name) },
-          modifier = Modifier.padding(20.dp),
-        )
+        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+          PlaylistCoverStylePicker(
+            parsePlaylistCoverStyle(data.coverStyle),
+            onChange = { onCoverStyleChange(it.name) },
+          )
+          CreatePlaylistCoverImage(data, enabled, onCoverUriChange)
+        }
       }
       Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         VibraDialogButton(
@@ -226,6 +239,43 @@ private fun CreatePlaylistDialogContent(
         }
       }
     }
+  }
+}
+
+/** The image is only remembered here and applied once the playlist exists (same path as Edit). */
+@Composable
+private fun CreatePlaylistCoverImage(
+  data: CreatePlaylistUiData,
+  enabled: Boolean,
+  onCoverUriChange: (String?) -> Unit,
+) {
+  val pickCover =
+    rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+      uri?.let { onCoverUriChange(it.toString()) }
+    }
+  Row(
+    horizontalArrangement = Arrangement.spacedBy(8.dp),
+    verticalAlignment = Alignment.CenterVertically,
+  ) {
+    data.coverUri?.let { uri ->
+      AsyncImage(
+        model = uri,
+        contentDescription = null,
+        contentScale = ContentScale.Crop,
+        modifier = Modifier.size(48.dp).clip(parsePlaylistCoverStyle(data.coverStyle).shape()),
+      )
+    }
+    VibraDialogButton(onClick = { pickCover.launch(arrayOf("image/*")) }, enabled = enabled) {
+      Text(
+        stringResource(
+          if (data.coverUri == null) R.string.vibra_choose_cover else R.string.vibra_change_cover
+        )
+      )
+    }
+    if (data.coverUri != null)
+      VibraDialogButton(onClick = { onCoverUriChange(null) }, enabled = enabled, destructive = true) {
+        Text(stringResource(R.string.vibra_remove_cover))
+      }
   }
 }
 

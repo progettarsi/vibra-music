@@ -119,6 +119,7 @@
     <string name="vibra_shape_circle">Circle</string>
     <string name="vibra_toggle_saved">Toggle saved state</string>
     <string name="vibra_more_actions">More actions</string>
+    <string name="vibra_choose_cover">Choose image</string>
     <string name="vibra_change_cover">Change image</string>
     <string name="vibra_remove_cover">Remove image</string>
     <string name="vibra_menu_go_to">Go to</string>

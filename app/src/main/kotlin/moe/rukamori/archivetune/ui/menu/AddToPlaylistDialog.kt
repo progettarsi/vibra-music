@@ -276,7 +276,11 @@ fun AddToPlaylistDialog(
     contentPadding = PaddingValues(0.dp),
     properties = DialogProperties(dismissOnBackPress = !busy, dismissOnClickOutside = !busy),
   ) {
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+    // Capped below the opening limit: the sheet opens whole and only the playlists scroll.
+    Column(
+      Modifier.fillMaxWidth().heightIn(max = app.vibra.ui.components.vibraDialogNaturalMaxHeight()),
+      verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
       MediaMenuHeader(
         context?.title ?: stringResource(R.string.add_to_playlist),
         context?.subtitle.orEmpty(),
@@ -308,7 +312,7 @@ fun AddToPlaylistDialog(
             }
           }
         LazyColumn(
-          modifier = Modifier.fillMaxWidth().heightIn(max = 480.dp),
+          modifier = Modifier.fillMaxWidth(),
           contentPadding = PaddingValues(vertical = 12.dp),
         ) {
           item(key = "create") {
@@ -361,14 +365,6 @@ fun AddToPlaylistDialog(
             )
           }
         }
-      }
-      VibraDialogButton(
-        onClick = onDismiss,
-        primary = true,
-        enabled = !busy,
-        modifier = Modifier.fillMaxWidth(),
-      ) {
-        Text(stringResource(R.string.vibra_menu_done))
       }
     }
   }

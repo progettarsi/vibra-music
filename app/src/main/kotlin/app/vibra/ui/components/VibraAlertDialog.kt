@@ -65,7 +65,7 @@ fun VibraAlertDialog(
       }
     }
     Row(
-      Modifier.fillMaxWidth().padding(top = 14.dp),
+      Modifier.fillMaxWidth().padding(top = 10.dp),
       horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
       if (dismissButton != null)

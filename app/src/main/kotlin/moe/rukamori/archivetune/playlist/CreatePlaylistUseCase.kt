@@ -7,6 +7,7 @@
 
 package moe.rukamori.archivetune.playlist
 
+import android.net.Uri
 import kotlinx.coroutines.CancellationException
 import moe.rukamori.archivetune.repository.PlaylistCreationRepository
 import timber.log.Timber
@@ -35,11 +36,13 @@ class CreatePlaylistUseCase
     @Inject
     constructor(
         private val repository: PlaylistCreationRepository,
+        private val updateCover: UpdatePlaylistCoverUseCase,
     ) {
         suspend operator fun invoke(
             name: String,
             syncRequested: Boolean,
             coverStyle: String = "Pentagon",
+            coverUri: Uri? = null,
         ) {
             val normalizedName = name.trim()
             require(normalizedName.isNotEmpty())
@@ -56,10 +59,21 @@ class CreatePlaylistUseCase
                     null
                 }
 
-            repository.createLocalPlaylist(
-                name = normalizedName,
-                browseId = browseId,
-                coverStyle = coverStyle,
-            )
+            val playlistId =
+                repository.createLocalPlaylist(
+                    name = normalizedName,
+                    browseId = browseId,
+                    coverStyle = coverStyle,
+                )
+            // The playlist exists either way; an image that cannot be read only leaves the default cover.
+            if (coverUri != null) {
+                try {
+                    updateCover(playlistId, coverUri)
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (error: Exception) {
+                    Timber.w(error, "Playlist cover could not be applied after creation")
+                }
+            }
         }
     }

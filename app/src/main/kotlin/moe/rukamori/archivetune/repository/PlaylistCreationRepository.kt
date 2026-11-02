@@ -65,5 +65,6 @@ class PlaylistCreationRepository
             val style = app.vibra.ui.components.parsePlaylistCoverStyle(coverStyle).name
             database.withTransaction { insert(entity) }
             context.dataStore.edit { it[playlistCoverStyleKey(entity.id)] = style }
+            entity.id
         }
     }
