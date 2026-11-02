@@ -7,6 +7,13 @@
 
 package app.vibra.ui.components
 
+import androidx.compose.animation.core.AnimationVector
+import androidx.compose.animation.core.FiniteAnimationSpec
+import androidx.compose.animation.core.SpringSpec
+import androidx.compose.animation.core.TwoWayConverter
+import androidx.compose.animation.core.VectorConverter
+import androidx.compose.animation.core.VectorizedFiniteAnimationSpec
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -33,9 +40,11 @@ import androidx.compose.material3.ButtonShapes
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.ModalBottomSheetProperties
+import androidx.compose.material3.MotionScheme
 import androidx.compose.material3.ProvideTextStyle
 import androidx.compose.material3.SheetState
 import androidx.compose.material3.SheetValue
@@ -75,6 +84,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.semantics.invisibleToUser
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
@@ -210,76 +220,123 @@ fun VibraBottomSheet(
           }
         }
       }
-    ModalBottomSheet(
-      onDismissRequest = { if (active) onDismissRequest() },
-      modifier =
-        modifier.drawWithContent {
-          drawContent()
-          // This modifier precedes Material's offset, so this band uses window coordinates.
-          if (active && !imeVisible && navigationBarPx > 0)
-            drawRect(
-              containerColor,
-              topLeft = Offset(0f, (windowHeight - navigationBarPx).toFloat()),
-              size = Size(size.width, navigationBarPx.toFloat()),
-            )
-        },
-      sheetState = sheetState,
-      sheetMaxWidth = 560.dp,
-      sheetGesturesEnabled = sheetGesturesEnabled && active,
-      shape = VibraShapes.SheetTop,
-      containerColor = if (active) containerColor else Color.Transparent,
-      contentColor = MaterialTheme.colorScheme.onSurface,
-      tonalElevation = 0.dp,
-      scrimColor = if (active) PopupScrim else Color.Transparent,
-      dragHandle = {
-        Box(
-          Modifier.fillMaxWidth()
-            .graphicsLayer { alpha = if (active) 1f else 0f }
-            .semantics { if (!active) invisibleToUser() }
-            .pointerInput(active, openingLimitReached) {
-              if (active && openingLimitReached)
-                awaitEachGesture {
-                  val down =
-                    awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
-                  var travel = 0f
-                  var pressed = true
-                  while (pressed) {
-                    val event = awaitPointerEvent(PointerEventPass.Initial)
-                    val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                    travel += change.position.y - change.previousPosition.y
-                    if (travel < -viewConfiguration.touchSlop) expansionUnlocked = true
-                    pressed = change.pressed
-                  }
-                }
-            },
-          contentAlignment = Alignment.Center,
-        ) {
-          VibraSheetHandle()
-        }
-      },
-      contentWindowInsets = { requestedInsets },
-      properties = properties,
-      content = {
-        PopupWindowInput(active)
-        // Measure at the final available height from the start. Native partial/expanded anchors
-        // control the opening; changing constraints during a drag can desynchronise hit testing.
-        val bodyLimit = (windowHeightDp - 32.dp) - MenuTokens.SheetHandleHeight - bottomInset
-        Column(
-          Modifier.fillMaxWidth()
-            .heightIn(max = bodyLimit.coerceAtLeast(0.dp))
-            .onSizeChanged {
-              measuredHeight =
-                it.height +
-                  with(density) { (MenuTokens.SheetHandleHeight + bottomInset).roundToPx() }
+    val themeMotion = MaterialTheme.motionScheme
+    val sheetMotion = remember(themeMotion) { SheetMotionScheme(themeMotion) }
+    val textStyle = LocalTextStyle.current
+    WithMotionScheme(sheetMotion, textStyle) {
+      ModalBottomSheet(
+        onDismissRequest = { if (active) onDismissRequest() },
+        modifier =
+          modifier.drawWithContent {
+            drawContent()
+            // This modifier precedes Material's offset, so this band uses window coordinates.
+            if (active && !imeVisible && navigationBarPx > 0)
+              drawRect(
+                containerColor,
+                topLeft = Offset(0f, (windowHeight - navigationBarPx).toFloat()),
+                size = Size(size.width, navigationBarPx.toFloat()),
+              )
+          },
+        sheetState = sheetState,
+        sheetMaxWidth = 560.dp,
+        sheetGesturesEnabled = sheetGesturesEnabled && active,
+        shape = VibraShapes.SheetTop,
+        containerColor = if (active) containerColor else Color.Transparent,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        tonalElevation = 0.dp,
+        scrimColor = if (active) PopupScrim else Color.Transparent,
+        dragHandle = {
+          WithMotionScheme(themeMotion, textStyle) {
+            Box(
+              Modifier.fillMaxWidth()
+                .graphicsLayer { alpha = if (active) 1f else 0f }
+                .semantics { if (!active) invisibleToUser() }
+                .pointerInput(active, openingLimitReached) {
+                  if (active && openingLimitReached)
+                    awaitEachGesture {
+                      val down =
+                        awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                      var travel = 0f
+                      var pressed = true
+                      while (pressed) {
+                        val event = awaitPointerEvent(PointerEventPass.Initial)
+                        val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                        travel += change.position.y - change.previousPosition.y
+                        if (travel < -viewConfiguration.touchSlop) expansionUnlocked = true
+                        pressed = change.pressed
+                      }
+                    }
+                },
+              contentAlignment = Alignment.Center,
+            ) {
+              VibraSheetHandle()
             }
-            .nestedScroll(expansionScroll)
-            .graphicsLayer { alpha = if (active) 1f else 0f }
-            .semantics { if (!active) invisibleToUser() }
-        ) {
-          content()
-        }
-      },
-    )
+          }
+        },
+        contentWindowInsets = { requestedInsets },
+        properties = properties,
+        content = {
+          WithMotionScheme(themeMotion, textStyle) {
+            PopupWindowInput(active)
+            // Measure at the final available height from the start. Native partial/expanded
+            // anchors control the opening; changing constraints during a drag can desynchronise
+            // hit testing.
+            val bodyLimit = (windowHeightDp - 32.dp) - MenuTokens.SheetHandleHeight - bottomInset
+            Column(
+              Modifier.fillMaxWidth()
+                .heightIn(max = bodyLimit.coerceAtLeast(0.dp))
+                .onSizeChanged {
+                  measuredHeight =
+                    it.height +
+                      with(density) { (MenuTokens.SheetHandleHeight + bottomInset).roundToPx() }
+                }
+                .nestedScroll(expansionScroll)
+                .graphicsLayer { alpha = if (active) 1f else 0f }
+                .semantics { if (!active) invisibleToUser() }
+            ) {
+              content()
+            }
+          }
+        },
+      )
+    }
+  }
+}
+
+/**
+ * The theme's spatial spring, stopping within half a pixel. The sheet animates its offset in pixels
+ * with this spring; the default 0.01 threshold made the expressive spring creep through its last
+ * pixel for about half a second after opening, drawing frames that changed nothing on screen.
+ */
+private class SheetMotionScheme(private val theme: MotionScheme) : MotionScheme by theme {
+  override fun <T> defaultSpatialSpec(): FiniteAnimationSpec<T> =
+    theme.defaultSpatialSpec<T>().let { if (it is SpringSpec<T>) HalfPixelSpring(it) else it }
+}
+
+private class HalfPixelSpring<T>(private val spring: SpringSpec<T>) : FiniteAnimationSpec<T> {
+  override fun <V : AnimationVector> vectorize(
+    converter: TwoWayConverter<T, V>
+  ): VectorizedFiniteAnimationSpec<V> =
+    if (converter === Float.VectorConverter) {
+      @Suppress("UNCHECKED_CAST")
+      spring(spring.dampingRatio, spring.stiffness, 0.5f as T).vectorize(converter)
+    } else spring.vectorize(converter)
+}
+
+/** Material reads the motion scheme from the theme; sheet content keeps the app's own. */
+@Composable
+private fun WithMotionScheme(
+  motionScheme: MotionScheme,
+  textStyle: TextStyle,
+  content: @Composable () -> Unit,
+) {
+  MaterialTheme(
+    colorScheme = MaterialTheme.colorScheme,
+    motionScheme = motionScheme,
+    shapes = MaterialTheme.shapes,
+    typography = MaterialTheme.typography,
+  ) {
+    CompositionLocalProvider(LocalTextStyle provides textStyle, content = content)
   }
 }
 
