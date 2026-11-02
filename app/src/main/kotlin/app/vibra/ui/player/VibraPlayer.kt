@@ -1616,11 +1616,18 @@ internal fun SleepTimerButton(
         }
     }
 
-        SleepTimerPopup(expanded = popup, anchor = anchor, anchorColor = container, anchorContentColor = content,
-            progress = LocalTimerBackdrop.current ?: remember { Animatable(0f) },
-            liveAnchor = { anchorCoordinates[0]?.takeIf { it.isAttached }?.boundsInWindow() ?: anchor },
-            onDismiss = { popup = false }, onAnchorClick = onTimerPress, onConfirm = { timer.start(it); popup = false },
-            onEndOfSong = { timer.start(-1); popup = false })
+        // The panel takes its colours from the cover, like the player's other controls.
+        val coverScheme =
+            remember(accent.color) {
+                com.materialkolor.dynamicColorScheme(seedColor = accent.color, isDark = true)
+            }
+        MaterialTheme(colorScheme = coverScheme) {
+            SleepTimerPopup(expanded = popup, anchor = anchor, anchorColor = container, anchorContentColor = content,
+                progress = LocalTimerBackdrop.current ?: remember { Animatable(0f) },
+                liveAnchor = { anchorCoordinates[0]?.takeIf { it.isAttached }?.boundsInWindow() ?: anchor },
+                onDismiss = { popup = false }, onAnchorClick = onTimerPress, onConfirm = { timer.start(it); popup = false },
+                onEndOfSong = { timer.start(-1); popup = false })
+        }
     }
 }
 

@@ -3,6 +3,9 @@ package app.vibra.ui.components
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector1D
+import androidx.compose.animation.core.SnapSpec
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -18,10 +21,12 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.geometry.lerp
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
@@ -37,6 +42,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.*
 import androidx.compose.ui.window.*
 import app.vibra.ui.motion.Liquid
+import kotlin.math.pow
 import kotlin.math.roundToInt
 import moe.rukamori.archivetune.R
 import moe.rukamori.archivetune.ui.player.SleepTimerPanel
@@ -70,6 +76,24 @@ fun timerPopupBounds(
 /** Outer corner of the panel: its cards' radius plus the padding around them, so they nest. */
 val SleepTimerPanelRadius = 34.dp
 
+/**
+ * The surface between the button ([from]) and the panel ([to]) at progress [p]. It widens a
+ * little ahead of growing taller, so it unfolds along an arc rather than scaling as a box; past
+ * 1 (the opening overshoot) both axes extend together.
+ */
+internal fun timerSurfaceRect(from: Rect, to: Rect, p: Float): Rect {
+  val x = p.coerceIn(0f, 1.1f)
+  val y = if (x < 1f) x.pow(1.35f) else x
+  return Rect(
+    androidx.compose.ui.util.lerp(from.left, to.left, x),
+    androidx.compose.ui.util.lerp(from.top, to.top, y),
+    androidx.compose.ui.util.lerp(from.right, to.right, x),
+    androidx.compose.ui.util.lerp(from.bottom, to.bottom, y),
+  )
+}
+
+private val shadowPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+
 /** Darkness of the veil behind the open panel. */
 private const val SleepTimerScrim = 0.32f
 
@@ -93,13 +117,15 @@ fun SleepTimerPopup(
   progress: Animatable<Float, AnimationVector1D> = remember { Animatable(0f) },
 ) {
   var mounted by remember { mutableStateOf(false) }
-  val motion = Liquid.container<Float>()
+  // Opening settles with a small overshoot, so the panel lands with some weight; closing is
+  // critically damped, so it never passes through the button.
+  val animationsOff = Liquid.container<Float>() is SnapSpec<*>
   LaunchedEffect(expanded) {
     if (expanded) {
       mounted = true
-      progress.animateTo(1f, motion)
+      progress.animateTo(1f, if (animationsOff) snap() else spring(0.74f, 420f))
     } else {
-      progress.animateTo(0f, motion)
+      progress.animateTo(0f, if (animationsOff) snap() else spring(1f, 520f))
       mounted = false
     }
   }
@@ -157,9 +183,23 @@ fun SleepTimerPopup(
           // A light veil darkens the screen behind the panel so it stands out.
           drawRect(Color.Black, alpha = SleepTimerScrim * p)
           val from = currentAnchor()
-          val rect = lerp(from, target, p)
+          val rect = timerSurfaceRect(from, target, progress.value)
           val radius =
             androidx.compose.ui.util.lerp(from.height / 2, SleepTimerPanelRadius.toPx(), p)
+          // A soft shadow builds up as the panel lifts off the button.
+          if (p > 0.01f)
+            drawIntoCanvas { canvas ->
+              shadowPaint.color = android.graphics.Color.TRANSPARENT
+              shadowPaint.setShadowLayer(
+                28.dp.toPx() * p,
+                0f,
+                10.dp.toPx() * p,
+                Color.Black.copy(alpha = 0.45f * p).toArgb(),
+              )
+              canvas.nativeCanvas.drawRoundRect(
+                rect.left, rect.top, rect.right, rect.bottom, radius, radius, shadowPaint,
+              )
+            }
           // Fades over the real button at both ends, so a close ends on the button itself.
           drawRoundRect(
             androidx.compose.ui.graphics.lerp(anchorColor, panelColor, p),
@@ -177,7 +217,7 @@ fun SleepTimerPopup(
         modifier =
           Modifier.size(20.dp).graphicsLayer {
             val p = progress.value.coerceIn(0f, 1f)
-            val rect = lerp(currentAnchor(), target, p)
+            val rect = timerSurfaceRect(currentAnchor(), target, progress.value)
             // The button's icon sits 11 dp in from its leading edge, round or pill.
             translationX = rect.left + 11.dp.toPx()
             translationY = rect.center.y - 10.dp.toPx()
@@ -230,8 +270,7 @@ fun SleepTimerPopup(
             }
           }
           .drawWithContent {
-            val p = progress.value.coerceIn(0f, 1f)
-            val rect = lerp(currentAnchor(), target, p)
+            val rect = timerSurfaceRect(currentAnchor(), target, progress.value)
             val contentScope = this
             clipRect(
               rect.left - target.left,
@@ -243,16 +282,18 @@ fun SleepTimerPopup(
             }
           }
           .graphicsLayer {
-            // The content travels with the surface: moved to its corner and scaled to its width.
-            val p = progress.value.coerceIn(0f, 1f)
-            val rect = lerp(currentAnchor(), target, p)
-            val scale = if (target.width > 0f) (rect.width / target.width).coerceIn(0f, 1f) else 1f
-            transformOrigin = TransformOrigin(0f, 0f)
+            // The content rides the surface's corner by the button and grows in from 85 %, so it
+            // arrives with the panel instead of zooming up from a few pixels.
+            val p = progress.value
+            val rect = timerSurfaceRect(currentAnchor(), target, p)
+            val reveal = ((p - 0.18f) / 0.5f).coerceIn(0f, 1f)
+            val scale = androidx.compose.ui.util.lerp(0.85f, 1f, reveal)
+            transformOrigin = TransformOrigin(1f, 1f)
             scaleX = scale
             scaleY = scale
-            translationX = rect.left - target.left
-            translationY = rect.top - target.top
-            alpha = ((p - 0.15f) / 0.45f).coerceIn(0f, 1f)
+            translationX = rect.right - target.right
+            translationY = rect.bottom - target.bottom
+            alpha = reveal
           }
           .verticalScroll(rememberScrollState())
       ) {

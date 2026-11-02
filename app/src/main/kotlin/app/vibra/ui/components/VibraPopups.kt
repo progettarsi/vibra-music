@@ -62,6 +62,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -97,7 +98,10 @@ import app.vibra.ui.motion.VibraButton as Button
 import app.vibra.ui.motion.VibraFilledTonalButton as FilledTonalButton
 import app.vibra.ui.theme.VibraShapes
 import java.util.WeakHashMap
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
 
 /*
  * ─────────────────────────────────────────────────────────────────────────────────────
@@ -164,7 +168,38 @@ fun VibraBottomSheet(
   var previousIme by remember { mutableStateOf(imeVisible) }
   // Only a keyboard opened after the sheet is shown can expand it. A keyboard
   // inherited from the underlying screen never bypasses the opening-height limit.
+  val currentDismiss by rememberUpdatedState(onDismissRequest)
+  val dismissed = remember { booleanArrayOf(false) }
   PopupLayer { active ->
+    // Safety net: Material removes a sheet only through onDismissRequest, after its hide
+    // animation completes. If that animation is interrupted (content changing height while a
+    // full-height sheet closes), the sheet can end up off screen still composed, and its window
+    // keeps the scrim and swallows every touch. A sheet that was shown and has come to rest
+    // off screen is dismissed here instead.
+    LaunchedEffect(sheetState, active) {
+      if (!active) return@LaunchedEffect
+      var shown = false
+      snapshotFlow {
+          val offset = runCatching { sheetState.requireOffset() }.getOrNull()
+          val offScreen =
+            sheetState.currentValue == SheetValue.Hidden ||
+              (offset != null && offset >= windowHeight * 0.98f)
+          offScreen to (sheetState.targetValue == SheetValue.Hidden || offScreen)
+        }
+        .distinctUntilChanged()
+        .collectLatest { (offScreen, leaving) ->
+          if (!offScreen) {
+            shown = true
+            dismissed[0] = false
+          } else if (shown && leaving) {
+            delay(300) // Material's own dismissal normally lands first.
+            if (!dismissed[0]) {
+              dismissed[0] = true
+              currentDismiss()
+            }
+          }
+        }
+    }
     LaunchedEffect(imeVisible, active) {
       if (active && imeVisible && !previousIme && sheetState.currentValue != SheetValue.Hidden) {
         expansionUnlocked = true
@@ -226,7 +261,12 @@ fun VibraBottomSheet(
     val textStyle = LocalTextStyle.current
     WithMotionScheme(sheetMotion, textStyle) {
       ModalBottomSheet(
-        onDismissRequest = { if (active) onDismissRequest() },
+        onDismissRequest = {
+          if (active) {
+            dismissed[0] = true
+            onDismissRequest()
+          }
+        },
         modifier =
           modifier.drawWithContent {
             drawContent()
