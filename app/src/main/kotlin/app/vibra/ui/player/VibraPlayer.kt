@@ -56,6 +56,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -145,8 +147,7 @@ import app.vibra.ui.components.VibraGlyphButton
 import app.vibra.ui.components.VibraMarquee
 import app.vibra.ui.components.VibraPlayButton
 import app.vibra.ui.components.VibraSeekBar
-import app.vibra.ui.components.artworkAccent
-import app.vibra.ui.components.rememberArtworkColors
+import app.vibra.ui.components.rememberArtworkAccent
 import app.vibra.ui.dock.MiniPlayerGeometry
 import app.vibra.ui.dock.MiniPlayerTrackText
 import app.vibra.ui.haptics.rememberVibraHaptics
@@ -183,9 +184,8 @@ import moe.rukamori.archivetune.ui.component.LocalMenuState
 import moe.rukamori.archivetune.ui.menu.PlayerMenu
 import moe.rukamori.archivetune.ui.player.LyricsScreen
 import moe.rukamori.archivetune.ui.player.PlaybackErrorDialog
-import app.vibra.ui.components.SleepTimerPopup
-import androidx.compose.ui.layout.boundsInWindow
-import androidx.compose.ui.layout.onGloballyPositioned
+import app.vibra.ui.components.SleepTimerOverlay
+import app.vibra.ui.components.SleepTimerPanelState
 import moe.rukamori.archivetune.ui.player.toPlaybackErrorInfo
 import moe.rukamori.archivetune.ui.screens.buildLoginRoute
 import moe.rukamori.archivetune.ui.utils.ShowMediaInfo
@@ -266,8 +266,8 @@ fun VibraPlayerSheet(
     }
 
     val queueSheet = rememberLiquidSheetState()
-    // Driven by the sleep timer popup: the player behind it blurs a little (read in draw only).
-    val timerBackdrop = remember { Animatable(0f) }
+    // The sleep timer opens inside the player, out of its button (see SleepTimerOverlay).
+    val timerPanel = remember { SleepTimerPanelState() }
     var lyricsVisible by rememberSaveable { mutableStateOf(false) }
     // 0 = player, 1 = lyrics. The player turns into the lyrics view: the last two rows
     // sink out at the bottom (slider and transport stay and serve the lyrics), cover,
@@ -289,13 +289,15 @@ fun VibraPlayerSheet(
         }
     }
 
-    PlayerBackHandlers(sheet = sheet, queueSheet = queueSheet, lyricsVisible = { lyricsVisible })
+    PlayerBackHandlers(sheet = sheet, queueSheet = queueSheet, lyricsVisible = { lyricsVisible }, timerOpen = { timerPanel.isOpen })
+    // A closing player takes the timer panel with it.
+    LaunchedEffect(sheet.isExpanded) { if (!sheet.isExpanded) timerPanel.close() }
 
     val screenCorner = rememberScreenCornerRadius()
     val spin = LocalPlaybackSpin.current
-    val accent = artworkAccent(rememberArtworkColors(metadata.thumbnailUrl))
+    val accent = rememberArtworkAccent(metadata.thumbnailUrl)
 
-    CompositionLocalProvider(LocalPlayerAccent provides accent, LocalTimerBackdrop provides timerBackdrop) {
+    CompositionLocalProvider(LocalPlayerAccent provides accent, LocalSleepTimerPanel provides timerPanel) {
         BoxWithConstraints(
             modifier =
                 modifier
@@ -476,7 +478,6 @@ fun VibraPlayerSheet(
                     scale = VibraTextStyles.PlayerTitle.fontSize.value / MaterialTheme.typography.titleMedium.fontSize.value,
                 )
             val recedeBlur = with(density) { 14.dp.toPx() }
-            val timerBlur = with(density) { 6.dp.toPx() }
             Box(
                 modifier =
                     Modifier
@@ -492,18 +493,7 @@ fun VibraPlayerSheet(
                                         cornerPx = lerp(pillCorner, screenCorner, p).toPx(),
                                     )
                             }
-                            val q = queueSheet.progress.coerceIn(0f, 1f)
-                            val scale = lerp(1f, 0.9f, q)
-                            scaleX = scale
-                            scaleY = scale
-                            alpha = lerp(1f, 0.35f, q)
-                            val blur = maxOf(recedeBlur * q, timerBlur * timerBackdrop.value.coerceIn(0f, 1f))
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && blur > 0.5f) {
-                                renderEffect =
-                                    FrameworkRenderEffect
-                                        .createBlurEffect(blur, blur, FrameworkShader.TileMode.DECAL)
-                                        .asComposeRenderEffect()
-                            }
+                            // The scene (cover and backdrop) never moves for the queue: only the interface recedes.
                         }.onPlaced {
                             geometry.foreground = it
                             measureSlot()
@@ -650,29 +640,50 @@ fun VibraPlayerSheet(
                     )
                 }
 
-                PlayerContent(
-                    connection = connection,
-                    nowPlaying = nowPlaying,
-                    metadata = metadata,
-                    navController = navController,
-                    sheet = sheet,
-                    queueSheet = queueSheet,
-                    landscape = landscape,
-                    onShowLyrics = { lyricsVisible = !lyricsVisible },
-                    onCoverSlot = { slot ->
-                        geometry.cover = slot
-                        measureSlot()
-                    },
-                    onTitleSlot = { slot ->
-                        geometry.title = slot
-                        measureSlot()
-                    },
-                    titleFlight = titleFlight,
-                    coverGesture = coverSwipeGesture,
-                    lyrics = lyrics,
-                )
+                // Opening the queue, only the interface on top recedes (smaller, dimmer, blurred). The
+                // sleep timer only dims and blurs it: the cover keeps its size.
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            val q = maxOf(queueSheet.progress, timerPanel.progress.value).coerceIn(0f, 1f)
+                            val scale = lerp(1f, 0.9f, queueSheet.progress.coerceIn(0f, 1f))
+                            scaleX = scale
+                            scaleY = scale
+                            alpha = lerp(1f, 0.35f, q)
+                            val blur = recedeBlur * q
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && blur > 0.5f) {
+                                renderEffect =
+                                    FrameworkRenderEffect
+                                        .createBlurEffect(blur, blur, FrameworkShader.TileMode.DECAL)
+                                        .asComposeRenderEffect()
+                            }
+                        }.onPlaced { timerPanel.buttonLayer = it },
+                ) {
+                    PlayerContent(
+                        connection = connection,
+                        nowPlaying = nowPlaying,
+                        metadata = metadata,
+                        navController = navController,
+                        sheet = sheet,
+                        queueSheet = queueSheet,
+                        landscape = landscape,
+                        onShowLyrics = { lyricsVisible = !lyricsVisible },
+                        onCoverSlot = { slot ->
+                            geometry.cover = slot
+                            measureSlot()
+                        },
+                        onTitleSlot = { slot ->
+                            geometry.title = slot
+                            measureSlot()
+                        },
+                        titleFlight = titleFlight,
+                        coverGesture = coverSwipeGesture,
+                        lyrics = lyrics,
+                    )
 
-                FlyingMiniText(metadata = metadata, flight = titleFlight, sheet = sheet, scroll = miniTitleScroll)
+                    FlyingMiniText(metadata = metadata, flight = titleFlight, sheet = sheet, scroll = miniTitleScroll)
+                }
             }
 
             // ── Queue: a sheet over the receding player ─────────────────────────────────────
@@ -698,13 +709,8 @@ fun VibraPlayerSheet(
                             .graphicsLayer {
                                 alpha = ((sheet.progress - 0.5f) / 0.5f).coerceIn(0f, 1f) * (1f - lyrics() * 1.6f).coerceIn(0f, 1f)
                                 translationY = lyrics() * BottomRowSink.toPx()
-                                val blur = timerBlur * timerBackdrop.value.coerceIn(0f, 1f)
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && blur > 0.5f) {
-                                    renderEffect =
-                                        FrameworkRenderEffect
-                                            .createBlurEffect(blur, blur, FrameworkShader.TileMode.DECAL)
-                                            .asComposeRenderEffect()
-                                }
+                                // Under the sleep timer it only dims (the panel sits above it).
+                                alpha *= lerp(1f, 0.35f, timerPanel.progress.value.coerceIn(0f, 1f))
                             }.navigationBarsPadding()
                             .padding(horizontal = VibraDimens.Gutter, vertical = 20.dp),
                 )
@@ -736,20 +742,37 @@ fun VibraPlayerSheet(
                             },
                 )
             }
+
+            // ── Sleep timer: its button grows into the panel, over the receding interface ────
+            SleepTimerOverlay(
+                state = timerPanel,
+                seed = accent.color,
+                onConfirm = { minutes ->
+                    connection.service.sleepTimer.start(minutes)
+                    timerPanel.close()
+                },
+                onEndOfSong = {
+                    connection.service.sleepTimer.start(-1)
+                    timerPanel.close()
+                },
+                modifier = Modifier.fillMaxSize(),
+            )
         }
     }
 
     PlaybackErrorHost(connection = connection, navController = navController, sheet = sheet)
 }
 
-/** Back: close lyrics → close queue → collapse player, each with predictive preview. */
+/** Back: close lyrics → close queue → collapse player, each with predictive preview (the sleep
+ *  timer panel handles its own, see SleepTimerOverlay). */
 @Composable
 private fun PlayerBackHandlers(
     sheet: LiquidSheetState,
     queueSheet: LiquidSheetState,
     lyricsVisible: () -> Boolean,
+    timerOpen: () -> Boolean,
 ) {
-    PredictiveBackHandler(enabled = sheet.isExpanded && !queueSheet.isOpenOrOpening && !lyricsVisible()) { events ->
+    PredictiveBackHandler(enabled = sheet.isExpanded && !queueSheet.isOpenOrOpening && !lyricsVisible() && !timerOpen()) { events ->
         try {
             events.collect { sheet.previewBack(it.progress) }
             sheet.collapse()
@@ -1550,17 +1573,15 @@ private fun SkipButton(
 
 /**
  * Sleep timer: a round button that, while a timer runs, grows leftwards into a pill
- * showing the time left (or "End of song"). Tapping a running timer cancels it.
+ * showing the time left (or "End of song"). Tapping a running timer cancels it; otherwise
+ * the button grows into the timer panel (see SleepTimerOverlay), which stands in for it
+ * while it is open.
  */
 @Composable
 internal fun SleepTimerButton(
     timer: SleepTimer,
 ) {
-    var popup by remember { mutableStateOf(false) }
-    var anchor by remember { mutableStateOf(androidx.compose.ui.geometry.Rect.Zero) }
-    // The player moves on every frame while it opens, closes or swipes. Keep the button's
-    // coordinates outside snapshot state and publish bounds only for the popup that uses them.
-    val anchorCoordinates = remember { arrayOfNulls<LayoutCoordinates>(1) }
+    val panel = LocalSleepTimerPanel.current ?: remember { SleepTimerPanelState() }
     val haptics = rememberVibraHaptics()
     val accent = LocalPlayerAccent.current
     val active = timer.isActive
@@ -1579,26 +1600,29 @@ internal fun SleepTimerButton(
     }
     val container by animateColorAsState(if (active) accent.color else BackdropContainer, Liquid.effects(), label = "sleepContainer")
     val content by animateColorAsState(if (active) accent.on else OnBackdrop, Liquid.effects(), label = "sleepContent")
+    // The panel's surface leaves from and lands on these colours.
+    SideEffect {
+        panel.buttonColor = container
+        panel.buttonContentColor = content
+    }
     val interactionSource = remember { MutableInteractionSource() }
     val description = stringResource(if (active) R.string.vibra_sleep_timer_active else R.string.sleep_timer)
     val onTimerPress: () -> Unit = {
         if (timer.isActive) {
             timer.clear()
-            popup = false
+            panel.close()
             haptics.toggle(on = false)
         } else {
-            if (!popup) anchorCoordinates[0]?.takeIf { it.isAttached }?.let { anchor = it.boundsInWindow() }
-            popup = !popup
+            haptics.press()
+            panel.toggle()
         }
     }
-    Box {
     Row(
         modifier =
             Modifier
-                .onGloballyPositioned {
-                    anchorCoordinates[0] = it
-                    if (popup) anchor = it.boundsInWindow()
-                }
+                .onPlaced { panel.button = it }
+                // While the panel is out, its surface is the button.
+                .graphicsLayer { alpha = if (panel.progress.value > 0f) 0f else 1f }
                 .height(44.dp)
                 .defaultMinSize(minWidth = 44.dp)
                 .liquidPress(interactionSource, pressedScale = 0.92f)
@@ -1613,20 +1637,6 @@ internal fun SleepTimerButton(
         if (active && label.isNotEmpty()) {
             Spacer(Modifier.width(6.dp))
             Text(text = label, style = MaterialTheme.typography.labelLarge, color = content, maxLines = 1)
-        }
-    }
-
-        // The panel takes its colours from the cover, like the player's other controls.
-        val coverScheme =
-            remember(accent.color) {
-                com.materialkolor.dynamicColorScheme(seedColor = accent.color, isDark = true)
-            }
-        MaterialTheme(colorScheme = coverScheme) {
-            SleepTimerPopup(expanded = popup, anchor = anchor, anchorColor = container, anchorContentColor = content,
-                progress = LocalTimerBackdrop.current ?: remember { Animatable(0f) },
-                liveAnchor = { anchorCoordinates[0]?.takeIf { it.isAttached }?.boundsInWindow() ?: anchor },
-                onDismiss = { popup = false }, onAnchorClick = onTimerPress, onConfirm = { timer.start(it); popup = false },
-                onEndOfSong = { timer.start(-1); popup = false })
         }
     }
 }
@@ -1851,8 +1861,8 @@ private val CoverScrim = Color.Black.copy(alpha = 0.28f)
 /** Accent taken from the current cover; see [artworkAccent]. */
 private val LocalPlayerAccent = compositionLocalOf { ArtworkAccent(Color.White, Color.Black) }
 
-/** The timer popup's progress, shared so the player can blur behind it. */
-private val LocalTimerBackdrop = compositionLocalOf<Animatable<Float, AnimationVector1D>?> { null }
+/** The sleep timer panel of this player, shared with its button. */
+private val LocalSleepTimerPanel = staticCompositionLocalOf<SleepTimerPanelState?> { null }
 
 /** The five transport controls share one size; the cookie is a little larger because its
  *  scalloped edge reads smaller than a circle of the same diameter. */

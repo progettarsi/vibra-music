@@ -132,43 +132,70 @@ class MenuPresentationTest {
   }
 
   @Test
-  fun timerFitsAboveItsRealButton() {
+  fun timerPanelGrowsUpFromItsButtonAcrossThePlayer() {
+    // Portrait: the button ends its row 54 px before the gutter (the add button sits there).
     val result =
-      timerPopupBounds(
-        Rect(290f, 700f, 340f, 744f),
-        Size(320f, 400f),
-        Size(390f, 844f),
-        20f,
-        24f,
-        24f,
-      )
-    assertEquals(20f, result.left)
-    assertEquals(290f, result.top)
-    assertTrue(result.bottom < 700f)
+      timerPanelBounds(Rect(272f, 700f, 316f, 744f), Size(350f, 400f), Size(390f, 844f), 20f, 24f, 24f)
+    assertEquals(Rect(20f, 344f, 370f, 744f), result)
   }
 
   @Test
-  fun timerNearTopFallsBelowAnchorAndStaysInsideSafeArea() {
+  fun timerPanelNearTopStaysInsideSafeArea() {
     val result =
-      timerPopupBounds(Rect(10f, 40f, 54f, 84f), Size(350f, 300f), Size(390f, 844f), 20f, 24f, 24f)
+      timerPanelBounds(Rect(10f, 40f, 54f, 84f), Size(350f, 300f), Size(390f, 844f), 20f, 24f, 24f)
+    assertEquals(44f, result.top)
     assertEquals(20f, result.left)
-    assertEquals(94f, result.top)
     assertTrue(result.right <= 370f)
   }
 
   @Test
-  fun tallTimerIsConstrainedOnLandscapeViewport() {
+  fun tallTimerPanelIsCappedOnLandscapeViewport() {
     val result =
-      timerPopupBounds(
-        Rect(700f, 250f, 744f, 294f),
-        Size(350f, 600f),
-        Size(844f, 390f),
-        20f,
-        24f,
-        24f,
-      )
+      timerPanelBounds(Rect(700f, 250f, 744f, 294f), Size(420f, 600f), Size(844f, 390f), 20f, 24f, 24f, 48f)
     assertEquals(302f, result.height)
-    assertTrue(result.top >= 44f)
-    assertTrue(result.bottom <= 346f)
+    assertEquals(44f, result.top)
+    assertEquals(844f - 48f - 20f, result.right)
+  }
+
+  @Test
+  fun timerSurfaceStartsOnTheButtonAndEndsOnThePanelWithoutOvershoot() {
+    val button = Rect(272f, 700f, 316f, 744f)
+    val panel = Rect(20f, 344f, 370f, 744f)
+    assertEquals(button, timerContainerRect(button, panel, 0f))
+    assertEquals(panel, timerContainerRect(button, panel, 1f))
+    // Past either end (a spring, a back gesture) it stays put: no bounce.
+    assertEquals(panel, timerContainerRect(button, panel, 1.2f))
+    assertEquals(button, timerContainerRect(button, panel, -0.1f))
+    var previous = button
+    for (step in 1..20) {
+      val rect = timerContainerRect(button, panel, step / 20f)
+      assertTrue(rect.left <= previous.left && rect.top <= previous.top && rect.right >= previous.right)
+      assertTrue(rect.left >= panel.left && rect.top >= panel.top && rect.right <= panel.right)
+      previous = rect
+    }
+  }
+
+  @Test
+  fun timerContentGrowsWithTheSurfaceAndIsNeverCut() {
+    val button = Rect(272f, 700f, 316f, 744f)
+    val panel = Rect(20f, 344f, 370f, 744f)
+    assertEquals(panel, timerContentBounds(panel, panel.size))
+    for (step in 0..20) {
+      val container = timerContainerRect(button, panel, step / 20f)
+      val content = timerContentBounds(container, panel.size)
+      // Same proportions as the panel, inside the surface, centred on it.
+      assertEquals(panel.width / panel.height, content.width / content.height, 0.001f)
+      assertTrue(content.left >= container.left - 0.01f && content.right <= container.right + 0.01f)
+      assertTrue(content.top >= container.top - 0.01f && content.bottom <= container.bottom + 0.01f)
+      assertEquals(container.center.x, content.center.x, 0.01f)
+      assertEquals(container.center.y, content.center.y, 0.01f)
+    }
+  }
+
+  @Test
+  fun timerBlocksAppearNearestFirstAndAreAllShownWhenOpen() {
+    assertEquals(0f, timerBlockReveal(0, 0f))
+    for (order in 0..4) assertEquals(1f, timerBlockReveal(order, 1f))
+    for (order in 1..4) assertTrue(timerBlockReveal(order - 1, 0.4f) > timerBlockReveal(order, 0.4f))
   }
 }

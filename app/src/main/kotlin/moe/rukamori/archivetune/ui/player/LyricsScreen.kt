@@ -81,8 +81,7 @@ import app.vibra.ui.components.VibraGlyphButton
 import app.vibra.ui.components.VibraMarquee
 import app.vibra.ui.components.VibraPlayButton
 import app.vibra.ui.components.VibraSeekBar
-import app.vibra.ui.components.artworkAccent
-import app.vibra.ui.components.rememberArtworkColors
+import app.vibra.ui.components.rememberArtworkAccent
 import app.vibra.ui.motion.liquidPress
 import app.vibra.ui.theme.VibraDimens
 import app.vibra.ui.theme.VibraShapes
@@ -142,7 +141,7 @@ fun LyricsScreen(
     val (enableHapticFeedback) = rememberPreference(EnableHapticFeedbackKey, true)
     val lyricsMode = LyricsMode.ENHANCED
     // Vibra: one fixed design on the cover's colour field, like the player.
-    val accent = artworkAccent(rememberArtworkColors(mediaMetadata.thumbnailUrl))
+    val accent = rememberArtworkAccent(mediaMetadata.thumbnailUrl)
 
     val hapticClick =
         remember(enableHapticFeedback, view) {

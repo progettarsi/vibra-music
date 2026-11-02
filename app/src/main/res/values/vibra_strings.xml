@@ -130,6 +130,7 @@
     <string name="vibra_menu_minutes_short">%1$d min</string>
     <string name="vibra_menu_duration">Duration</string>
     <string name="vibra_menu_start_timer">Start</string>
+    <string name="vibra_timer_stops_at">Stops at %1$s</string>
     <string name="vibra_menu_create">Create</string>
     <string name="vibra_menu_next">Next</string>
     <string name="vibra_menu_queue">Queue</string>

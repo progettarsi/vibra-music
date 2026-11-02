@@ -19,10 +19,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.blur
@@ -37,7 +40,13 @@ import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
 import androidx.core.graphics.ColorUtils
+import androidx.palette.graphics.Palette
+import coil3.imageLoader
+import coil3.request.ImageRequest
+import coil3.request.allowHardware
+import coil3.toBitmap
 import app.vibra.ui.motion.Liquid
 import app.vibra.ui.motion.LiquidSpeed
 import kotlin.math.PI
@@ -45,8 +54,12 @@ import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.max
 import kotlin.math.sin
+import kotlin.math.sqrt
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import moe.rukamori.archivetune.LocalAnimationsDisabled
 import moe.rukamori.archivetune.ui.screens.library.rememberArtworkGradient
+import moe.rukamori.archivetune.ui.theme.PlayerColorExtractor
 
 /*
  * ─────────────────────────────────────────────────────────────────────────────────────
@@ -100,6 +113,12 @@ fun artworkAccent(colors: List<Color>): ArtworkAccent {
             ColorUtils.colorToHSL(color.toArgb(), hsl)
             hsl[1] * (1f - abs(hsl[2] - 0.5f))
         }
+    return artworkAccent(vivid)
+}
+
+/** The accent made from one cover colour: its hue, lifted to a light tone; see [artworkAccent]. */
+fun artworkAccent(vivid: Color): ArtworkAccent {
+    val hsl = FloatArray(3)
     ColorUtils.colorToHSL(vivid.toArgb(), hsl)
     val saturation = hsl[1].coerceAtMost(0.78f)
     val accent = Color(ColorUtils.HSLToColor(floatArrayOf(hsl[0], saturation, hsl[2].coerceIn(0.74f, 0.86f))))
@@ -113,6 +132,83 @@ data class ArtworkAccent(
     val color: Color,
     val on: Color,
 )
+
+/**
+ * The accent of the cover at [url], read from the cover's own colours: the most colourful one
+ * that covers a visible part of it ([vividSwatch]). The backdrop's palette turns a cover with a
+ * neutral background (black, white, a grey wall) into greys, which would grey the controls too;
+ * a red jacket on a white cover still colours them here. Only a cover with no colour at all
+ * falls back to that palette. The previous cover's accent is held while the next one is read.
+ */
+@Composable
+fun rememberArtworkAccent(url: String?): ArtworkAccent {
+    val colors = rememberArtworkColors(url)
+    val context = LocalContext.current
+    // The colour read from the current cover; null when it has none (or before the first).
+    var vivid by remember { mutableStateOf<Color?>(null) }
+    LaunchedEffect(url) {
+        if (url == null) return@LaunchedEffect
+        val request =
+            ImageRequest.Builder(context)
+                .data(url)
+                .size(PlayerColorExtractor.Config.IMAGE_SIZE, PlayerColorExtractor.Config.IMAGE_SIZE)
+                .allowHardware(false)
+                .build()
+        val bitmap = runCatching { context.imageLoader.execute(request).image?.toBitmap() }.getOrNull() ?: return@LaunchedEffect
+        vivid =
+            withContext(Dispatchers.Default) {
+                val palette =
+                    Palette.from(bitmap)
+                        .maximumColorCount(PlayerColorExtractor.Config.MAX_COLOR_COUNT)
+                        .resizeBitmapArea(PlayerColorExtractor.Config.BITMAP_AREA)
+                        .generate()
+                vividSwatch(palette.swatches.map { CoverSwatch(Color(it.rgb), it.population) })
+            }
+    }
+    val target = vivid?.let { artworkAccent(it) } ?: artworkAccent(colors)
+    val spec = Liquid.effects<Color>(LiquidSpeed.Fast)
+    val color by animateColorAsState(target.color, spec, label = "accent")
+    val on by animateColorAsState(target.on, spec, label = "accentOn")
+    return ArtworkAccent(color, on)
+}
+
+/** One colour of a cover and how many of its pixels have it. */
+@Immutable
+data class CoverSwatch(
+    val color: Color,
+    val population: Int,
+)
+
+/**
+ * The cover colour the controls take: the most colourful of [swatches] (saturated and neither
+ * near black nor near white) among those that cover at least a small part of the cover, so a
+ * speck of colour does not win. Null when no swatch has colour.
+ */
+fun vividSwatch(swatches: List<CoverSwatch>): Color? {
+    val total = swatches.sumOf { it.population }.coerceAtLeast(1)
+    return swatches
+        .filter { it.population >= total * MinAccentShare && hslSaturation(it.color) >= MinAccentSaturation }
+        .maxByOrNull {
+            val lightness = hslLightness(it.color)
+            hslSaturation(it.color) * (1f - abs(lightness - 0.5f) * 2f) * sqrt(it.population.toFloat() / total)
+        }
+        ?.color
+}
+
+private fun hslLightness(color: Color) = (maxOf(color.red, color.green, color.blue) + minOf(color.red, color.green, color.blue)) / 2f
+
+private fun hslSaturation(color: Color): Float {
+    val max = maxOf(color.red, color.green, color.blue)
+    val min = minOf(color.red, color.green, color.blue)
+    val lightness = (max + min) / 2f
+    return if (max == min) 0f else (max - min) / (1f - abs(2f * lightness - 1f)).coerceAtLeast(0.0001f)
+}
+
+/** A swatch must cover this share of the cover to colour the controls. */
+private const val MinAccentShare = 0.02f
+
+/** Below this saturation a swatch counts as grey. */
+private const val MinAccentSaturation = 0.25f
 
 /**
  * Full-bleed moving colour field for a cover (player backdrop, For You card).

@@ -131,6 +131,7 @@
     <string name="vibra_menu_minutes_short">%1$d min</string>
     <string name="vibra_menu_duration">Durata</string>
     <string name="vibra_menu_start_timer">Avvia</string>
+    <string name="vibra_timer_stops_at">Si ferma alle %1$s</string>
     <string name="vibra_menu_create">Crea</string>
     <string name="vibra_menu_next">Dopo</string>
     <string name="vibra_menu_queue">In coda</string>
