@@ -44,6 +44,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -162,10 +163,11 @@ fun VibraQueuePanel(
         }
     }
 
-    // Opening the queue brings the current track into view.
-    LaunchedEffect(queueSheet.isExpanded) {
-        if (queueSheet.isExpanded && currentIndex >= 0) {
-            listState.scrollToItem((currentIndex - 1).coerceAtLeast(0))
+    // The current track is brought into view while the queue is closed (on every track change and
+    // once it has slid away), so opening it never lays the list out again on its first frame.
+    LaunchedEffect(queueSheet, listState) {
+        snapshotFlow { currentIndex to queueSheet.isOpenOrOpening }.collect { (index, open) ->
+            if (!open && index >= 0) listState.scrollToItem((index - 1).coerceAtLeast(0))
         }
     }
 

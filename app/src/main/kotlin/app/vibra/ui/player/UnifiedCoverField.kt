@@ -63,6 +63,7 @@ internal fun UnifiedCoverField(
     crop: CoverCrop?,
     visibility: () -> Float,
     offsetX: () -> Float = { 0f },
+    blurRadius: () -> Float = { 0f },
 ) {
     val focused = rememberGraphicsLayer()
     Canvas(Modifier.fillMaxSize().graphicsLayer {
@@ -85,6 +86,9 @@ internal fun UnifiedCoverField(
             }
             drawRect(Brush.verticalGradient(colorStops = stops, endY = canvas.height), blendMode = BlendMode.DstIn)
         }
+        // The blur goes on this layer itself: on a parent of the layers the cover is recorded
+        // into, the cover and its field would not be drawn at all.
+        focused.renderEffect = timerBlurEffect(blurRadius())
         drawLayer(focused)
     }
 }

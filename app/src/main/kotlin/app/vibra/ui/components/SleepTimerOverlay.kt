@@ -373,8 +373,11 @@ private class RoundedRectShape(private val bounds: Rect, private val radius: Flo
     Outline.Rounded(RoundRect(bounds, CornerRadius(radius)))
 }
 
-/** Outer corner of the open panel (VibraShapes.Card). */
-private val PanelCorner = 32.dp
+/**
+ * Outer corner of the open panel: concentric with the pill buttons in its bottom corners and the
+ * moon's disc in its top one (radius 26 dp, 20 dp in from the edges).
+ */
+private val PanelCorner = 46.dp
 
 /** Widest panel, for landscape and tablets. */
 private val PanelMaxWidth = 420.dp

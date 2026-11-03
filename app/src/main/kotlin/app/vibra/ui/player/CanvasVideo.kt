@@ -59,6 +59,8 @@ import app.vibra.canvas.CanvasRepository
 import app.vibra.canvas.toCanvasQuery
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
+import androidx.compose.runtime.Immutable
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.collectLatest
 import moe.rukamori.archivetune.LocalAnimationsDisabled
 import moe.rukamori.archivetune.models.MediaMetadata
@@ -81,18 +83,25 @@ import moe.rukamori.archivetune.utils.rememberPreference
  * ─────────────────────────────────────────────────────────────────────────────────────
  */
 
+/** A track's Canvas lookup: the clip (if any) and whether the lookup is over (or waited on long enough). */
+@Immutable
+data class CanvasLookup(val artwork: CanvasArtwork?, val settled: Boolean)
+
 /**
  * The Canvas for [metadata]'s track while [enabled], or null. The lookup starts at once and
  * independently of the cover (Coil) and of the audio; whatever the repository already knows is
  * returned at the first composition. A new track cancels the previous lookup, and a result is
  * only handed out for the media id it was found for.
+ *
+ * A music video waits for [CanvasLookup.settled] before its video starts: a Canvas comes first,
+ * and the video must not start only to be swapped for it a moment later.
  */
 @Composable
-fun rememberCanvasArtwork(
+fun rememberCanvasLookup(
     metadata: MediaMetadata,
     enabled: Boolean,
     repository: CanvasRepository = CanvasRepository.shared,
-): CanvasArtwork? {
+): CanvasLookup {
     val query =
         remember(metadata.id, metadata.title, metadata.artists, metadata.album?.title, metadata.isPodcast, metadata.isMusicVideo) {
             metadata.toCanvasQuery()
@@ -101,6 +110,7 @@ fun rememberCanvasArtwork(
     val allowed by rememberPreference(CanvasEnabledKey, defaultValue = true)
     val identified = allowed && query != null
     var found by remember(metadata.id) { mutableStateOf(query?.let { repository.cached(it)?.artwork }) }
+    var settled by remember(metadata.id) { mutableStateOf(query?.let { repository.cached(it) } != null) }
     LaunchedEffect(query, identified, enabled) {
         if (!identified || query == null) {
             found = null
@@ -108,23 +118,43 @@ fun rememberCanvasArtwork(
         }
         // Closed player: keep what is known (it is ready when the player reopens), search nothing.
         if (!enabled) return@LaunchedEffect
+        // A slow lookup does not hold a music video back for ever.
+        val patience = launch {
+            delay(MusicVideoPatienceMillis)
+            settled = true
+        }
         // Skipping through tracks must not fire a lookup per track.
         if (repository.cached(query) == null) delay(LookupDebounceMillis)
         found = repository.canvasFor(query)
+        settled = true
+        patience.cancel()
     }
-    return found?.takeIf { identified && it.mediaId == metadata.id }
+    return CanvasLookup(
+        artwork = found?.takeIf { identified && it.mediaId == metadata.id },
+        settled = settled || !identified,
+    )
 }
 
 /**
- * What the cover may show for [mediaId]: the Canvas, only if it was found for this very track,
- * ambient motion is allowed, and the track has no music video (which keeps its own surface).
+ * What the cover may show for [mediaId]: the Canvas, only if it was found for this very track and
+ * ambient motion is allowed. A Canvas comes before the track's own music video (see
+ * [musicVideoAllowed]).
  */
 internal fun canvasForSurface(
     canvas: CanvasArtwork?,
     mediaId: String,
-    hasMusicVideo: Boolean,
     ambientAllowed: Boolean,
-): CanvasArtwork? = canvas?.takeIf { ambientAllowed && !hasMusicVideo && it.mediaId == mediaId }
+): CanvasArtwork? = canvas?.takeIf { ambientAllowed && it.mediaId == mediaId }
+
+/**
+ * Whether a track's music video may play over its cover: motion allowed, videos not turned off
+ * ("Songs only"), the Canvas lookup over and no Canvas found.
+ */
+internal fun musicVideoAllowed(
+    ambientAllowed: Boolean,
+    songsOnly: Boolean,
+    canvas: CanvasLookup,
+): Boolean = ambientAllowed && !songsOnly && canvas.settled && canvas.artwork == null
 
 internal enum class CanvasStage { Idle, Preparing, Ready, Visible, Failed }
 
@@ -416,6 +446,9 @@ private const val ParkDelayMillis = 15_000L
 
 /** An uncached lookup waits this long, so skipping through the queue does not search every track. */
 private const val LookupDebounceMillis = 250L
+
+/** How long a music video waits for its Canvas lookup before it starts anyway. */
+private const val MusicVideoPatienceMillis = 4_000L
 
 private const val MinBufferMillis = 2_000
 private const val MaxBufferMillis = 8_000

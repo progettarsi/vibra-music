@@ -49,7 +49,7 @@ fun MediaMenuSheet(
     ) {
       header()
       if (actions.isNotEmpty()) MenuCard { MediaMenuActions(actions, layout) }
-      MenuCard { Column(Modifier.padding(vertical = 12.dp), content = rows) }
+      MenuCard { Column(Modifier.padding(vertical = MenuTokens.CardInset), content = rows) }
     }
   }
 }
@@ -78,17 +78,15 @@ fun MediaMenuHeader(
   layout: MediaMenuLayout,
   onPlay: (() -> Unit)?,
   modifier: Modifier = Modifier,
-  artworkShape: Shape = RoundedCornerShape(24.dp),
+  artworkShape: Shape = RoundedCornerShape(concentric(MenuTokens.CardRadius, MenuTokens.ExpandedHeaderInset)),
   compactArtwork: Dp = MenuTokens.CompactArtwork,
   toggle: @Composable () -> Unit = {},
 ) {
   val compact = layout == MediaMenuLayout.Compact
   MenuCard(modifier) {
+    // The same margin on all four sides, so the cover sits concentric in the card's corner.
     Row(
-      Modifier.padding(
-        horizontal = if (compact) 16.dp else 20.dp,
-        vertical = if (compact) 10.dp else 20.dp,
-      ),
+      Modifier.padding(if (compact) MenuTokens.CompactHeaderInset else MenuTokens.ExpandedHeaderInset),
       // Expanded: the text column spans the cover, title on its top edge and actions on its bottom.
       verticalAlignment = if (compact) Alignment.CenterVertically else Alignment.Top,
       horizontalArrangement = Arrangement.spacedBy(if (compact) 14.dp else 18.dp),
@@ -103,7 +101,7 @@ fun MediaMenuHeader(
               artworkShape != CircleShape &&
               artworkShape is androidx.compose.foundation.shape.CornerBasedShape
           )
-            RoundedCornerShape(14.dp)
+            RoundedCornerShape(concentric(MenuTokens.CardRadius, MenuTokens.CompactHeaderInset))
           else artworkShape,
         modifier =
           Modifier.size(if (compact) compactArtwork else MenuTokens.ExpandedArtwork)
@@ -180,7 +178,8 @@ fun MediaMenuToggle(selected: Boolean, onClick: () -> Unit, icon: @Composable ()
     FilledTonalIconButton(
       onClick = onClick,
       modifier = Modifier.size(40.dp),
-      shape = RoundedCornerShape(14.dp),
+      // Expanded, it sits in the card's bottom corner.
+      shape = RoundedCornerShape(concentric(MenuTokens.CardRadius, MenuTokens.ExpandedHeaderInset)),
       colors =
         IconButtonDefaults.filledTonalIconButtonColors(
           containerColor =
@@ -206,22 +205,20 @@ fun MediaMenuActions(
   Row(
     modifier
       .fillMaxWidth()
-      .padding(
-        horizontal = 8.dp,
-        vertical = if (layout == MediaMenuLayout.Compact) 12.dp else 16.dp,
-      ),
+      .padding(MenuTokens.ActionsInset),
     horizontalArrangement = Arrangement.SpaceEvenly,
   ) {
     actions.forEach { action ->
       Column(
         Modifier.weight(1f)
-          .clip(RoundedCornerShape(20.dp))
+          .clip(RoundedCornerShape(concentric(MenuTokens.CardRadius, MenuTokens.ActionsInset)))
           .clickable(
             enabled = action.enabled,
             role = Role.Button,
             onClickLabel = action.text,
             onClick = action.onClick,
-          ),
+          )
+          .padding(vertical = if (layout == MediaMenuLayout.Compact) 0.dp else 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp),
       ) {
@@ -313,11 +310,14 @@ fun MediaMenuRow(
   shadowElevation: androidx.compose.ui.unit.Dp = 0.dp,
 ) {
   val compact = LocalMenuLayout.current == MediaMenuLayout.Compact
+  // The press shape is inset in the card and concentric with it; the content stays where it was.
   Row(
-    modifier
-      .fillMaxWidth()
+    Modifier.fillMaxWidth()
+      .padding(horizontal = MenuTokens.CardInset)
+      .clip(MenuTokens.RowShape)
+      .then(modifier)
       .heightIn(min = if (compact) MenuTokens.CompactRow else MenuTokens.ExpandedRow)
-      .padding(horizontal = if (compact) 18.dp else 20.dp, vertical = 10.dp),
+      .padding(horizontal = (if (compact) 18.dp else 20.dp) - MenuTokens.CardInset, vertical = 10.dp),
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement =
       Arrangement.spacedBy(if (leadingSize > MenuTokens.Icon) 14.dp else 16.dp),

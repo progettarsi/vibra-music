@@ -13,4 +13,11 @@ class SpotifyMergeTest {
     @Test fun emptyRemoteDoesNotDeleteLocalContent() {
         assertEquals(listOf("a"), mergeImportedPlaylist(emptyList(), listOf("a")))
     }
+    @Test fun onlyUntouchedImportsAreRemoved() {
+        val imported = setOf("a", "b")
+        assertTrue(isUntouchedImport(null, listOf("b", "a"), imported))
+        assertTrue(isUntouchedImport(null, emptyList(), imported))
+        assertFalse(isUntouchedImport(null, listOf("a", "manual"), imported))
+        assertFalse(isUntouchedImport("VLPL1", listOf("a"), imported))
+    }
 }

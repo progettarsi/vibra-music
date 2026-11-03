@@ -64,6 +64,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -92,6 +93,11 @@ import moe.rukamori.archivetune.LocalPlayerConnection
 import moe.rukamori.archivetune.R
 import moe.rukamori.archivetune.constants.PlaylistEditLockKey
 import moe.rukamori.archivetune.constants.PlaylistSortDescendingKey
+import app.vibra.library.PinnedPlaylistsKey
+import app.vibra.library.decodePinnedPlaylists
+import app.vibra.library.encodePinnedPlaylists
+import app.vibra.library.pinnedFirst
+import app.vibra.library.reorderedPinned
 import moe.rukamori.archivetune.constants.PlaylistSortType
 import moe.rukamori.archivetune.constants.PlaylistSortTypeKey
 import moe.rukamori.archivetune.constants.PureBlackKey
@@ -134,7 +140,13 @@ fun LibraryPlaylistsScreen(
             PlaylistSortType.CUSTOM,
         )
     val (sortDescending, onSortDescendingChange) = rememberPreference(PlaylistSortDescendingKey, true)
-    var locked by rememberPreference(PlaylistEditLockKey, defaultValue = true)
+    // Vibra: pinned playlists always lead, in their pinned order (see app.vibra.library.PinnedPlaylists).
+    val (pinnedRaw, onPinnedRawChange) = rememberPreference(PinnedPlaylistsKey, "")
+    val pinned = remember(pinnedRaw) { decodePinnedPlaylists(pinnedRaw) }
+    // Vibra: several playlists picked at once (null = not selecting); back leaves the selection.
+    var selection by remember { mutableStateOf<Set<String>?>(null) }
+    var confirmDelete by remember { mutableStateOf(false) }
+    androidx.activity.compose.BackHandler(enabled = selection != null) { selection = null }
     val playlists by viewModel.allPlaylists.collectAsStateWithLifecycle()
     val downloadedPlaylistIds by viewModel.downloadedPlaylistIds.collectAsStateWithLifecycle()
     val filteredPlaylistIds by database
@@ -143,13 +155,13 @@ fun LibraryPlaylistsScreen(
         ).collectAsStateWithLifecycle(initialValue = emptyList())
 
     val visiblePlaylists =
-        remember(playlists, selectedTagIds, filteredPlaylistIds) {
+        remember(playlists, selectedTagIds, filteredPlaylistIds, pinned) {
             playlists.filter { playlist ->
                 val name = playlist.playlist.name
                 val matchesName = !name.contains("episode", ignoreCase = true)
                 val matchesTags = selectedTagIds.isEmpty() || playlist.id in filteredPlaylistIds
                 matchesName && matchesTags
-            }
+            }.pinnedFirst(pinned) { it.id }
         }
     val mutablePlaylists = remember { mutableStateListOf<Playlist>() }
 
@@ -159,13 +171,23 @@ fun LibraryPlaylistsScreen(
     val refreshLibrary = remember(viewModel) { { viewModel.sync() } }
     val onRefreshErrorShown = remember(viewModel) { { viewModel.onRefreshErrorShown() } }
     val lazyListState = rememberLazyListState()
+    // Vibra: a playlist just pinned goes to the top, and the list follows it there.
+    val leadingPinned = pinned.firstOrNull()
+    var shownLeadingPinned by remember { mutableStateOf(leadingPinned) }
+    LaunchedEffect(leadingPinned) {
+        if (leadingPinned != null && leadingPinned != shownLeadingPinned) lazyListState.animateScrollToItem(0)
+        shownLeadingPinned = leadingPinned
+    }
+    // Vibra: only pinned playlists are reordered, by a long press and a move on the card itself.
     var pendingPlaylistOrderUpdate by remember { mutableStateOf(false) }
     val reorderableState =
         rememberReorderableLazyListState(
             lazyListState = lazyListState,
             scrollThresholdPadding = LocalPlayerAwareWindowInsets.current.asPaddingValues(),
         ) { from, to ->
-            if (from.index in mutablePlaylists.indices && to.index in mutablePlaylists.indices) {
+            if (from.index in mutablePlaylists.indices && to.index in mutablePlaylists.indices &&
+                mutablePlaylists[from.index].id in pinned && mutablePlaylists[to.index].id in pinned
+            ) {
                 mutablePlaylists.move(from.index, to.index)
                 pendingPlaylistOrderUpdate = true
             }
@@ -178,14 +200,50 @@ fun LibraryPlaylistsScreen(
 
     LaunchedEffect(reorderableState.isAnyItemDragging) {
         if (!reorderableState.isAnyItemDragging && pendingPlaylistOrderUpdate) {
-            viewModel.updateCustomPlaylistOrder(
-                mergeVisiblePlaylistOrder(
-                    currentOrder = playlists,
-                    visibleOrder = mutablePlaylists,
-                ),
-            )
+            val reordered = reorderedPinned(pinned, mutablePlaylists.map { it.id })
+            if (reordered != pinned) onPinnedRawChange(encodePinnedPlaylists(reordered))
             pendingPlaylistOrderUpdate = false
         }
+    }
+
+    val toDelete = selection.orEmpty()
+    if (confirmDelete && toDelete.isNotEmpty()) {
+        app.vibra.ui.components.VibraAlertDialog(
+            onDismissRequest = { confirmDelete = false },
+            title = { Text(pluralStringResource(R.plurals.vibra_delete_playlists_title, toDelete.size, toDelete.size)) },
+            text = { Text(stringResource(R.string.vibra_delete_playlists_text)) },
+            dismissButton = {
+                app.vibra.ui.components.VibraDialogButton(onClick = { confirmDelete = false }, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(android.R.string.cancel))
+                }
+            },
+            confirmButton = {
+                app.vibra.ui.components.VibraDialogButton(
+                    onClick = {
+                        val doomed = playlists.filter { it.id in toDelete }
+                        confirmDelete = false
+                        selection = null
+                        // The same steps as a single delete from the playlist's menu.
+                        database.transaction {
+                            doomed.forEach { playlist ->
+                                if (playlist.playlist.bookmarkedAt != null) update(playlist.playlist.toggleLike())
+                                delete(playlist.playlist)
+                            }
+                        }
+                        coroutineScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                            doomed.forEach { playlist -> playlist.playlist.browseId?.let { moe.rukamori.archivetune.innertube.YouTube.deletePlaylist(it) } }
+                        }
+                        val remaining = pinned.filter { it !in toDelete }
+                        if (remaining != pinned) onPinnedRawChange(encodePinnedPlaylists(remaining))
+                    },
+                    primary = true,
+                    destructive = true,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(stringResource(R.string.delete))
+                }
+            },
+        )
     }
 
     // Dialog launcher
@@ -215,8 +273,20 @@ fun LibraryPlaylistsScreen(
                     .fillMaxSize()
                     .padding(top = LibraryHeaderContentPadding),
         ) {
-            // Control row (Sort dropdown, grid/list layout toggle, + add button)
-            Row(
+            // Control row (Sort dropdown, grid/list layout toggle, + add button); while selecting,
+            // the selection's own bar takes its place.
+            val selected = selection
+            if (selected != null) {
+                PlaylistSelectionBar(
+                    count = selected.size,
+                    allSelected = visiblePlaylists.isNotEmpty() && selected.size == visiblePlaylists.size,
+                    onClose = { selection = null },
+                    onSelectAll = {
+                        selection = if (selected.size == visiblePlaylists.size) emptySet() else visiblePlaylists.mapTo(HashSet()) { it.id }
+                    },
+                    onDelete = { confirmDelete = true },
+                )
+            } else Row(
                 modifier =
                     Modifier
                         .fillMaxWidth()
@@ -347,19 +417,17 @@ fun LibraryPlaylistsScreen(
 
                 // Right: list/grid toggle & add button
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (sortType == PlaylistSortType.CUSTOM) {
-                        IconButton(
-                            onClick = { locked = !locked },
-                            modifier = Modifier.size(40.dp),
-                        ) {
-                            Icon(
-                                painter = painterResource(if (locked) R.drawable.lock else R.drawable.lock_open),
-                                contentDescription = null,
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.width(8.dp))
+                    IconButton(
+                        onClick = { selection = emptySet() },
+                        modifier = Modifier.size(40.dp),
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.select_all),
+                            contentDescription = stringResource(R.string.vibra_select_playlists),
+                        )
                     }
+
+                    Spacer(modifier = Modifier.width(8.dp))
 
                     // List/Grid Toggle
                     Row(
@@ -464,8 +532,15 @@ fun LibraryPlaylistsScreen(
                         PlaylistGridCard(
                             playlist = playlist,
                             isDownloaded = playlist.id in downloadedPlaylistIds,
+                            pinned = playlist.id in pinned,
+                            selected = selection?.let { playlist.id in it },
                             onClick = {
-                                openPlaylist(navController, playlist)
+                                val current = selection
+                                if (current != null) {
+                                    selection = if (playlist.id in current) current - playlist.id else current + playlist.id
+                                } else {
+                                    openPlaylist(navController, playlist)
+                                }
                             },
                             onPlay = {
                                 playerConnection?.let { conn ->
@@ -488,8 +563,8 @@ fun LibraryPlaylistsScreen(
                     }
                 }
             } else {
-                val listPlaylists = if (sortType == PlaylistSortType.CUSTOM) mutablePlaylists else visiblePlaylists
-                val showDragHandles = sortType == PlaylistSortType.CUSTOM && !locked
+                // Vibra: the list is the one being reordered (until it has caught up with the data).
+                val listPlaylists = mutablePlaylists.ifEmpty { visiblePlaylists }
                 LazyColumn(
                     state = lazyListState,
                     contentPadding = PaddingValues(start = 24.dp, end = 24.dp, bottom = playerAwareBottomPadding),
@@ -519,11 +594,53 @@ fun LibraryPlaylistsScreen(
                                     compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen
                                 },
                         ) {
+                            val isPinned = playlist.id in pinned
+                            // A card lifted by a long press: the release that ends it is not a tap.
+                            var lifted by remember { mutableStateOf(false) }
+                            val startSelection = {
+                                if (selection == null) {
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    selection = setOf(playlist.id)
+                                }
+                            }
                             PlaylistListCard(
                                 playlist = playlist,
                                 isDownloaded = playlist.id in downloadedPlaylistIds,
-                                onClick = {
-                                    openPlaylist(navController, playlist)
+                                pinned = isPinned,
+                                selected = selection?.let { playlist.id in it },
+                                // A pinned card is lifted by the long press: let go without moving it and
+                                // it starts the selection, like the others.
+                                onLongClick = startSelection.takeUnless { isPinned },
+                                modifier =
+                                    if (isPinned) {
+                                        Modifier.longPressDraggableHandle(
+                                            enabled = selection == null,
+                                            onDragStarted = {
+                                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                pendingPlaylistOrderUpdate = false
+                                                lifted = true
+                                            },
+                                            onDragStopped = {
+                                                lifted = false
+                                                if (!pendingPlaylistOrderUpdate) startSelection()
+                                            },
+                                        )
+                                    } else {
+                                        Modifier
+                                    },
+                                onClick = click@{
+                                    // Let go without moving: the long press selects, as on any other card.
+                                    if (lifted) {
+                                        lifted = false
+                                        if (!pendingPlaylistOrderUpdate) startSelection()
+                                        return@click
+                                    }
+                                    val current = selection
+                                    if (current != null) {
+                                        selection = if (playlist.id in current) current - playlist.id else current + playlist.id
+                                    } else {
+                                        openPlaylist(navController, playlist)
+                                    }
                                 },
                                 onPlay = {
                                     playerConnection?.let { conn ->
@@ -541,33 +658,11 @@ fun LibraryPlaylistsScreen(
                                         triggerPlaylistMenu(playlist, coroutineScope, menuState)
                                     }
                                 },
-                                showDragHandle = showDragHandles,
-                                dragHandleModifier =
-                                    Modifier
-                                        .draggableHandle()
-                                        .graphicsLayer { alpha = 0.99f },
                             )
                         }
                     }
                 }
             }
-        }
-    }
-}
-
-private fun mergeVisiblePlaylistOrder(
-    currentOrder: List<Playlist>,
-    visibleOrder: List<Playlist>,
-): List<Playlist> {
-    if (visibleOrder.isEmpty()) return currentOrder
-
-    val visibleIds = visibleOrder.mapTo(HashSet(visibleOrder.size)) { playlist -> playlist.id }
-    val reorderedVisible = visibleOrder.iterator()
-    return currentOrder.map { playlist ->
-        if (playlist.id in visibleIds) {
-            reorderedVisible.next()
-        } else {
-            playlist
         }
     }
 }
@@ -723,21 +818,13 @@ fun PlaylistListCard(
     onMenuClick: () -> Unit,
     showDragHandle: Boolean = false,
     dragHandleModifier: Modifier = Modifier,
+    pinned: Boolean = false,
+    selected: Boolean? = null,
+    onLongClick: (() -> Unit)? = null,
+    modifier: Modifier = Modifier,
 ) {
-    val sourceLabel =
-        stringResource(
-            if (playlist.playlist.isEditable) {
-                R.string.personal_label
-            } else {
-                R.string.youtube_synced
-            },
-        )
-    val sourceColor =
-        if (playlist.playlist.isEditable) {
-            MaterialTheme.colorScheme.primary
-        } else {
-            MaterialTheme.colorScheme.secondary
-        }
+    // Vibra: no source badge; a synced playlist only has a small cloud by its name.
+    val synced = playlist.playlist.browseId != null
     val additionalAction: (@Composable RowScope.() -> Unit)? =
         if (showDragHandle) {
             {
@@ -776,15 +863,73 @@ fun PlaylistListCard(
         title = playlist.playlist.name,
         subtitle = "${playlist.songCount} ${stringResource(R.string.tracks_label)}",
         thumbnailUrl = playlist.thumbnails.getOrNull(0),
-        sourceLabel = sourceLabel,
-        sourceColor = sourceColor,
         onClick = onClick,
         onPlay = onPlay,
         onMenuClick = onMenuClick,
         contentAlpha = 1f,
         metadataTrailingContent = metadataTrailingContent,
+        titleTrailingContent =
+            if (pinned || synced) {
+                {
+                    if (synced) SyncedMark()
+                    if (pinned) PinnedMark()
+                }
+            } else {
+                null
+            },
+        modifier = modifier,
         additionalAction = additionalAction,
+        onLongClick = onLongClick,
+        selected = selected,
     )
+}
+
+/** The pin on a pinned playlist's card. */
+@Composable
+private fun PinnedMark(modifier: Modifier = Modifier) {
+    Icon(
+        painter = painterResource(R.drawable.push_pin),
+        contentDescription = stringResource(R.string.vibra_pinned),
+        modifier = modifier.size(14.dp),
+        tint = MaterialTheme.colorScheme.primary,
+    )
+}
+
+/** Replaces the control row while playlists are being selected: close, count, select all, delete. */
+@Composable
+private fun PlaylistSelectionBar(
+    count: Int,
+    allSelected: Boolean,
+    onClose: () -> Unit,
+    onSelectAll: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        IconButton(onClick = onClose) {
+            Icon(painterResource(R.drawable.close), stringResource(R.string.close))
+        }
+        Text(
+            text = pluralStringResource(R.plurals.vibra_n_selected, count, count),
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.weight(1f).padding(start = 4.dp),
+        )
+        IconButton(onClick = onSelectAll) {
+            Icon(
+                painterResource(if (allSelected) R.drawable.deselect else R.drawable.select_all),
+                stringResource(if (allSelected) R.string.vibra_deselect_all else R.string.vibra_select_all),
+            )
+        }
+        IconButton(onClick = onDelete, enabled = count > 0) {
+            Icon(
+                painterResource(R.drawable.delete),
+                stringResource(R.string.delete),
+                tint = if (count > 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
+            )
+        }
+    }
 }
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -795,6 +940,8 @@ fun PlaylistGridCard(
     onClick: () -> Unit,
     onPlay: () -> Unit,
     onLongClick: () -> Unit,
+    pinned: Boolean = false,
+    selected: Boolean? = null,
 ) {
     val cardBgColor =
         rememberArtworkCardColor(
@@ -821,7 +968,7 @@ fun PlaylistGridCard(
                     scaleY = scale
                     alpha = hiddenAlpha
                 }.clip(RoundedCornerShape(32.dp))
-                .background(cardBgColor)
+                .background(if (selected == true) MaterialTheme.colorScheme.primaryContainer else cardBgColor)
                 .combinedClickable(
                     interactionSource = interactionSource,
                     indication = null,
@@ -834,13 +981,14 @@ fun PlaylistGridCard(
                 Modifier
                     .fillMaxWidth()
                     .aspectRatio(1f)
-                    .clip(RoundedCornerShape(26.dp)),
+                    // Vibra: concentric with the card (32 dp corner, 12 dp margin).
+                    .clip(RoundedCornerShape(20.dp)),
         ) {
             ItemThumbnail(
                 thumbnailUrl = playlist.thumbnails.getOrNull(0),
                 isActive = false,
                 isPlaying = false,
-                shape = RoundedCornerShape(26.dp),
+                shape = RoundedCornerShape(20.dp),
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
             )
@@ -863,8 +1011,35 @@ fun PlaylistGridCard(
                     )
                 }
             }
+            if (pinned) {
+                Box(
+                    modifier =
+                        Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(8.dp)
+                            .size(28.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.secondaryContainer),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.push_pin),
+                        contentDescription = stringResource(R.string.vibra_pinned),
+                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                        modifier = Modifier.size(16.dp),
+                    )
+                }
+            }
+            if (selected != null) {
+                Icon(
+                    painter = painterResource(if (selected) R.drawable.radio_button_checked else R.drawable.radio_button_unchecked),
+                    contentDescription = null,
+                    tint = if (selected) MaterialTheme.colorScheme.primary else Color.White,
+                    modifier = Modifier.align(Alignment.Center).size(36.dp),
+                )
+            }
             // Play overlay on bottom right of grid cover
-            Box(
+            if (selected == null) Box(
                 modifier =
                     Modifier
                         .align(Alignment.BottomEnd)

@@ -559,6 +559,34 @@ public fun PlaylistMenu(
     },
     actions = mediaQuickActions,
   ) {
+    // Vibra: pinned playlists lead the library (see app.vibra.library.PinnedPlaylists).
+    if (autoPlaylist != true) {
+      val (pinnedRaw, onPinnedRawChange) =
+        moe.rukamori.archivetune.utils.rememberPreference(app.vibra.library.PinnedPlaylistsKey, "")
+      val pinned = app.vibra.library.decodePinnedPlaylists(pinnedRaw)
+      MediaMenuRow(
+        headlineContent = {
+          Text(
+            text =
+              stringResource(
+                if (playlist.id in pinned) R.string.vibra_unpin_playlist else R.string.vibra_pin_playlist
+              )
+          )
+        },
+        leadingContent = {
+          Icon(painter = painterResource(R.drawable.push_pin), contentDescription = null)
+        },
+        modifier =
+          Modifier.clickable {
+            onPinnedRawChange(
+              app.vibra.library.encodePinnedPlaylists(
+                app.vibra.library.togglePinnedPlaylist(pinned, playlist.id)
+              )
+            )
+            onDismiss()
+          },
+      )
+    }
     if (editable && autoPlaylist != true) {
       MediaMenuRow(
         headlineContent = { Text(text = stringResource(R.string.edit)) },

@@ -166,4 +166,26 @@
     <string name="vibra_update_ready">An update is ready to install</string>
     <string name="vibra_update_check_failed">Couldn\'t check. Try again.</string>
     <string name="vibra_update_check_unavailable">Not available in this build</string>
+    <!-- 1.6.0 -->
+    <string name="vibra_playlist_sync_failed">Couldn\'t update “%1$s”</string>
+    <string name="vibra_select_playlists">Select playlists</string>
+    <string name="vibra_select_all">Select all</string>
+    <string name="vibra_deselect_all">Deselect all</string>
+    <string name="vibra_pinned">Pinned</string>
+    <string name="vibra_pin_playlist">Pin to top</string>
+    <string name="vibra_unpin_playlist">Unpin</string>
+    <plurals name="vibra_n_selected">
+        <item quantity="one">%1$d selected</item>
+        <item quantity="other">%1$d selected</item>
+    </plurals>
+    <plurals name="vibra_delete_playlists_title">
+        <item quantity="one">Delete %1$d playlist?</item>
+        <item quantity="other">Delete %1$d playlists?</item>
+    </plurals>
+    <string name="vibra_delete_playlists_text">Synced playlists are deleted from YouTube Music too. This can\'t be undone.</string>
+    <string name="vibra_canvas_and_videos">Canvas &amp; videos</string>
+    <string name="vibra_songs_only">Songs only</string>
+    <string name="vibra_songs_only_desc">No music videos: only tracks in queues, radios and results</string>
+    <string name="vibra_reduce_motion">Reduce motion</string>
+    <string name="vibra_reduce_motion_desc">No animations, Canvas or videos</string>
 </resources>

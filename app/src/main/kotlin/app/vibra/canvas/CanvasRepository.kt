@@ -188,10 +188,15 @@ class CanvasRepository(
     }
 }
 
-/** Null for anything a catalogue could not identify: podcasts, music videos, local files, no credits. */
+/**
+ * Null for anything a catalogue could not identify: podcasts, local files, no credits. A music
+ * video is looked up as its song (title without "Official Video" and the like, channel names
+ * without "VEVO" / "- Topic"), so it can get the Canvas that comes before its video.
+ */
 fun MediaMetadata.toCanvasQuery(): CanvasQuery? {
-    if (isPodcast || isMusicVideo || id.isLocalMediaId()) return null
-    val names = artists.map { it.name }.filter { it.isNotBlank() }
-    if (title.isBlank() || names.isEmpty()) return null
-    return CanvasQuery(id, title, names, album?.title)
+    if (isPodcast || id.isLocalMediaId()) return null
+    val names = artists.map { if (isMusicVideo) app.vibra.player.cleanChannelName(it.name) else it.name }.filter { it.isNotBlank() }
+    val songTitle = if (isMusicVideo) app.vibra.player.cleanVideoTitle(title, names) else title
+    if (songTitle.isBlank() || names.isEmpty()) return null
+    return CanvasQuery(id, songTitle, names, album?.title)
 }

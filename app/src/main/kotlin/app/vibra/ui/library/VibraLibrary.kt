@@ -37,6 +37,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import app.vibra.library.pinnedFirst
+import moe.rukamori.archivetune.utils.rememberPreference
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -106,9 +108,12 @@ fun rememberLibraryData(viewModel: VibraLibraryViewModel = hiltViewModel()): Lib
     val onRepeat by viewModel.onRepeat.collectAsStateWithLifecycle()
     val albums by viewModel.albums.collectAsStateWithLifecycle()
     val artists by viewModel.artists.collectAsStateWithLifecycle()
+    val pinnedRaw by rememberPreference(app.vibra.library.PinnedPlaylistsKey, "")
+    val pinned = remember(pinnedRaw) { app.vibra.library.decodePinnedPlaylists(pinnedRaw) }
     return LibraryData(
         // "Asc" queries list oldest/least first; habits read best most-recent/most-used first.
-        playlists = playlists.asReversed(),
+        // Pinned playlists lead, in their pinned order.
+        playlists = remember(playlists, pinned) { playlists.asReversed().pinnedFirst(pinned) { it.id } },
         likedSongs = liked.asReversed().take(8),
         likedCount = likedCount,
         onRepeat = onRepeat,

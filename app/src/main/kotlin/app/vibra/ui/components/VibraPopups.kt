@@ -397,7 +397,7 @@ fun VibraSheetHandle(modifier: Modifier = Modifier) {
   Box(
     modifier =
       modifier
-        .padding(top = 14.dp, bottom = 20.dp)
+        .padding(vertical = (MenuTokens.SheetHandleHeight - 4.dp) / 2)
         .size(width = 32.dp, height = 4.dp)
         .background(
           MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),

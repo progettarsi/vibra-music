@@ -105,6 +105,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
@@ -136,6 +137,8 @@ import androidx.media3.common.Player.REPEAT_MODE_ONE
 import androidx.navigation.NavController
 import app.vibra.canvas.CanvasArtwork
 import app.vibra.ui.motion.LocalAmbientMotion
+import moe.rukamori.archivetune.constants.HideVideoKey
+import moe.rukamori.archivetune.utils.rememberPreference
 import app.vibra.ui.motion.ambientMotionAllowed
 import app.vibra.ui.components.ArtworkAccent
 import app.vibra.ui.components.ArtworkAtmosphere
@@ -364,9 +367,9 @@ fun VibraPlayerSheet(
                 )
             }
 
-            // ── 2 + 3. Player foreground (recedes while the queue is open) ──────────────────
-            // Where the cover lands, measured inside the foreground *below* its recede layer, so
-            // the queue's scale-down applies to the cover once (through the layer), not twice.
+            // ── 2 + 3. Player foreground: the scene stays still, only the interface recedes ──
+            // Where the cover lands, measured in the foreground's own space. The interface (which
+            // holds the slots) is scaled while the queue is open, so it is measured only at rest.
             val geometry = remember { SlotGeometry() }
             val coverSwipe = remember { Animatable(0f) }
             val coverHandoff = remember { CoverHandoff() }
@@ -381,28 +384,23 @@ fun VibraPlayerSheet(
             // The backdrops are baked once per cover (blurring them every frame made the
             // lyrics, which keep the player redrawing, crawl); neighbours are baked ahead.
             val backdropBaker = rememberBackdropBaker()
-            // A music video plays in place of the cover (see ArtworkVideo): only on the settled
-            // player, uncovered and in the foreground, and it gives way to the cover as soon as
-            // the player starts closing.
+            // A Canvas (see CanvasVideo) is looked up as soon as the player opens, independently of
+            // the cover and the audio. It belongs to this track only, comes before the track's music
+            // video, and gives way to the still cover in battery saver and with reduced motion.
+            val ambient = ambientMotionAllowed
+            val canvasLookup = rememberCanvasLookup(metadata, enabled = sheet.isOpenOrOpening && ambient)
+            val canvasArtwork = canvasForSurface(canvas = canvasLookup.artwork, mediaId = metadata.id, ambientAllowed = ambient)
+            // A music video plays in place of the cover (see ArtworkVideo) when there is no Canvas:
+            // only on the settled player, uncovered and in the foreground, and it gives way to the
+            // cover as soon as the player starts closing. "Songs only" turns videos off entirely.
+            val songsOnly by rememberPreference(HideVideoKey, defaultValue = false)
             val artworkVideo =
                 rememberArtworkVideoStream(
                     metadata,
-                    // In battery saver a running video stops too and the cover takes its place.
-                    enabled = sheet.isOpenOrOpening && LocalAmbientMotion.current,
+                    enabled = sheet.isOpenOrOpening && musicVideoAllowed(ambient, songsOnly, canvasLookup),
                     request = connection.service::requestArtworkVideo,
                 )
             val currentVideo = remember { CurrentArtworkVideo() }
-            // A Canvas (see CanvasVideo) is looked up as soon as the player opens, independently of
-            // the cover and the audio. It never replaces a music video, belongs to this track only,
-            // and gives way to the still cover in battery saver.
-            val ambient = ambientMotionAllowed
-            val canvasArtwork =
-                canvasForSurface(
-                    canvas = rememberCanvasArtwork(metadata, enabled = sheet.isOpenOrOpening && ambient),
-                    mediaId = metadata.id,
-                    hasMusicVideo = artworkVideo != null,
-                    ambientAllowed = ambient,
-                )
             // A vertical Canvas runs full screen behind the controls (portrait); every other one
             // lives inside the cover.
             val screenCanvas = canvasArtwork?.takeIf { it.portraitUrl != null && !landscape }
@@ -424,7 +422,9 @@ fun VibraPlayerSheet(
                 queueSheet.progress < 0.01f && lyrics() < 0.99f &&
                     lifecycleState.isAtLeast(Lifecycle.State.RESUMED)
             }
-            val videoPrepare = { sheet.isOpenOrOpening && videoAllowed() }
+            // The decoder is kept while the player is open: the queue and the lyrics only pause it
+            // (releasing it made closing them rebuild the player on the main thread).
+            val videoPrepare = { sheet.isOpenOrOpening && lifecycleState.isAtLeast(Lifecycle.State.RESUMED) }
             val videoActive = {
                 (if (unifiedFlight) videoVisibility() > 0.001f else sheet.progress >= 0.999f) && videoAllowed()
             }
@@ -442,6 +442,11 @@ fun VibraPlayerSheet(
                 if (queueSheet.progress > 0.001f) return@measure
                 geometry.rectOf(geometry.cover)?.let { coverSlot = it }
                 geometry.rectOf(geometry.title)?.let { titleSlot = it }
+            }
+            // A slot that moved while the queue was open (another track, another title length) is
+            // measured again as soon as the interface is back at full size.
+            LaunchedEffect(queueSheet) {
+                snapshotFlow { queueSheet.progress <= 0.001f }.collect { atRest -> if (atRest) measureSlot() }
             }
             // Where the mini-player draws its track text (see MiniPlayer in VibraDock).
             val miniText =
@@ -480,7 +485,11 @@ fun VibraPlayerSheet(
                     progress = { sheet.progress.coerceIn(0f, 1f) },
                     scale = VibraTextStyles.PlayerTitle.fontSize.value / MaterialTheme.typography.titleMedium.fontSize.value,
                 )
-            val recedeBlur = with(density) { 14.dp.toPx() }
+            val playerDragAllowed = { !queueSheet.isOpenOrOpening && !lyricsVisible }
+            // Under the sleep timer the whole player softens a little (see SleepTimerOverlay). Each
+            // part blurs on its own layer: the cover field, the Canvas, the interface, the bottom row.
+            val timerBlur = with(density) { TimerBlur.toPx() }
+            val timerBlurRadius = { timerBlur * timerPanel.progress.value }
             Box(
                 modifier =
                     Modifier
@@ -503,9 +512,10 @@ fun VibraPlayerSheet(
                         }
                         .draggable(
                             orientation = Orientation.Vertical,
-                            enabled = !queueSheet.isOpenOrOpening && !lyricsVisible,
-                            state = rememberDraggableState { delta -> sheet.dragBy(delta) },
-                            onDragStopped = { velocity -> sheet.settle(velocity) },
+                            // Read when a drag happens, not in composition: opening the queue must not
+                            // recompose the whole player on the animation's first frame.
+                            state = rememberDraggableState { delta -> if (playerDragAllowed()) sheet.dragBy(delta) },
+                            onDragStopped = { velocity -> if (playerDragAllowed()) sheet.settle(velocity) },
                         ),
             ) {
                 ArtworkFlightScene(
@@ -587,6 +597,7 @@ fun VibraPlayerSheet(
                             )
                         },
                         contentDescription = metadata.title,
+                        rerecord = timerBlurRadius,
                     )
                     if (!landscape) {
                         val slot = coverSlot
@@ -601,6 +612,7 @@ fun VibraPlayerSheet(
                                             crop = rememberCoverCrop(layerUrl),
                                             visibility = { (if (layerUrl == metadata.thumbnailUrl) 1f else coverCrossfade.fadingAlpha()) * (1f - lyrics()) },
                                             offsetX = { coverSwipe.value },
+                                            blurRadius = timerBlurRadius,
                                         )
                                     }
                                 }
@@ -621,7 +633,11 @@ fun VibraPlayerSheet(
                                 // The scene already hides everything while the cookie is the mini-player.
                                 visibility = { if (unifiedFlight) 1f else videoVisibility() },
                                 // Like the cover page, it slides with a swipe.
-                                modifier = Modifier.fillMaxSize().graphicsLayer { translationX = coverSwipe.value },
+                                modifier =
+                                    Modifier.fillMaxSize().graphicsLayer {
+                                        translationX = coverSwipe.value
+                                        renderEffect = timerBlurEffect(timerBlurRadius())
+                                    },
                             )
                         }
                     }
@@ -643,24 +659,18 @@ fun VibraPlayerSheet(
                     )
                 }
 
-                // Opening the queue, only the interface on top recedes (smaller, dimmer, blurred). The
-                // sleep timer only dims and blurs it: the cover keeps its size.
+                // Opening the queue, only the interface on top recedes (smaller and dimmer; no blur:
+                // a full-screen blur redrawn on every frame of the slide made it stutter).
                 Box(
                     Modifier
                         .fillMaxSize()
                         .graphicsLayer {
-                            val q = maxOf(queueSheet.progress, timerPanel.progress.value).coerceIn(0f, 1f)
-                            val scale = lerp(1f, 0.9f, queueSheet.progress.coerceIn(0f, 1f))
+                            val q = queueSheet.progress.coerceIn(0f, 1f)
+                            val scale = lerp(1f, 0.9f, q)
                             scaleX = scale
                             scaleY = scale
                             alpha = lerp(1f, 0.35f, q)
-                            val blur = recedeBlur * q
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && blur > 0.5f) {
-                                renderEffect =
-                                    FrameworkRenderEffect
-                                        .createBlurEffect(blur, blur, FrameworkShader.TileMode.DECAL)
-                                        .asComposeRenderEffect()
-                            }
+                            renderEffect = timerBlurEffect(timerBlurRadius())
                         }.onPlaced { timerPanel.buttonLayer = it },
                 ) {
                     PlayerContent(
@@ -712,8 +722,7 @@ fun VibraPlayerSheet(
                             .graphicsLayer {
                                 alpha = ((sheet.progress - 0.5f) / 0.5f).coerceIn(0f, 1f) * (1f - lyrics() * 1.6f).coerceIn(0f, 1f)
                                 translationY = lyrics() * BottomRowSink.toPx()
-                                // Under the sleep timer it only dims (the panel sits above it).
-                                alpha *= lerp(1f, 0.35f, timerPanel.progress.value.coerceIn(0f, 1f))
+                                renderEffect = timerBlurEffect(timerBlurRadius())
                             }.navigationBarsPadding()
                             .padding(horizontal = VibraDimens.Gutter, vertical = 20.dp),
                 )
@@ -746,7 +755,13 @@ fun VibraPlayerSheet(
                 )
             }
 
-            // ── Sleep timer: its button grows into the panel, over the receding interface ────
+            // ── Sleep timer: its button grows into the panel, over a softened, lightly dimmed player ──
+            Box(
+                Modifier.fillMaxSize().drawBehind {
+                    val t = timerPanel.progress.value.coerceIn(0f, 1f)
+                    if (t > 0f) drawRect(Color.Black.copy(alpha = TimerScrim * t))
+                },
+            )
             SleepTimerOverlay(
                 state = timerPanel,
                 seed = accent.color,
@@ -900,6 +915,8 @@ private fun FlyingCover(
     artworkLayers: MutableMap<String, GraphicsLayer>,
     videoLayer: @Composable (video: ArtworkVideoStream, current: Boolean, pictureAspect: Float?) -> Unit,
     contentDescription: String,
+    // Read while recording: the cover layers are recorded again while it changes (see timerBlurRadius).
+    rerecord: () -> Float = { 0f },
 ) {
     val density = LocalDensity.current
     // The video each cover layer shows: the previous track's keeps its own and dissolves with it.
@@ -985,6 +1002,7 @@ private fun FlyingCover(
                 .drawWithContent {
                     // Coordinate canoniche durante tutto il volo: il campo non deve conservare
                     // la matrice della mini-copertina quando il layer diventa grande.
+                    rerecord()
                     val drawnSize = size
                     val canonical = IntSize(to.width.roundToInt().coerceAtLeast(1), to.height.roundToInt().coerceAtLeast(1))
                     contentLayer.record(canonical) {
@@ -1032,6 +1050,7 @@ private fun FlyingCover(
                             ),
                     ) {
                         Box(Modifier.fillMaxSize().drawWithContent {
+                            rerecord()
                             sourceLayer.record { this@drawWithContent.drawContent() }
                             drawLayer(sourceLayer)
                         }) {
@@ -1729,7 +1748,11 @@ private fun PlayerBottomRow(
     }
 }
 
-/** Icon whose on/off state is carried by an animated tint + opacity. */
+/**
+ * Repeat / shuffle. On, the glyph sits deep black in a solid white disc; off, it is a translucent
+ * white glyph with no disc. A tint alone (the cover's accent) vanished on white or pale covers;
+ * the disc reads on any cover: white against a dark one, the black glyph against a light one.
+ */
 @Composable
 private fun StateGlyph(
     @DrawableRes icon: Int,
@@ -1737,19 +1760,29 @@ private fun StateGlyph(
     active: Boolean,
     onClick: () -> Unit,
 ) {
-    val tint by animateColorAsState(
-        targetValue = if (active) LocalPlayerAccent.current.color else OnBackdrop.copy(alpha = 0.42f),
+    val on by animateFloatAsState(
+        targetValue = if (active) 1f else 0f,
         animationSpec = Liquid.effects(),
-        label = "stateGlyphTint",
+        label = "stateGlyph",
     )
     VibraGlyphButton(
         icon = icon,
         contentDescription = contentDescription,
-        tint = tint,
-        iconSize = 28.dp,
+        tint = androidx.compose.ui.graphics.lerp(OnBackdrop.copy(alpha = 0.6f), StateGlyphOnInk, on.coerceIn(0f, 1f)),
+        iconSize = 24.dp,
         onClick = onClick,
+        modifier =
+            Modifier
+                .semantics { selected = active }
+                .drawBehind { drawCircle(OnBackdrop, radius = StateGlyphDisc.toPx() / 2f * (0.8f + 0.2f * on), alpha = on.coerceIn(0f, 1f)) },
     )
 }
+
+/** Diameter of the white disc behind an active repeat / shuffle glyph. */
+private val StateGlyphDisc = 40.dp
+
+/** The active glyph's ink: deep black on the white disc. */
+private val StateGlyphOnInk = Color.Black
 
 /** Translucent round button for use on the player backdrop (Apple Music style). */
 @Composable
@@ -1915,3 +1948,17 @@ private const val TitleCrossfadeEnd = 0.55f
 
 /** Sheet progress below which a music video has given way to the cover again (closing). */
 private const val VideoFadeStart = 0.85f
+
+/** The light blur behind the open sleep timer; none below half a pixel or before Android 12. */
+internal fun timerBlurEffect(radiusPx: Float): androidx.compose.ui.graphics.RenderEffect? =
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && radiusPx > 0.5f) {
+        FrameworkRenderEffect.createBlurEffect(radiusPx, radiusPx, FrameworkShader.TileMode.CLAMP).asComposeRenderEffect()
+    } else {
+        null
+    }
+
+/** Blur of the player behind the open sleep timer: enough to set the panel apart, the cover still reads. */
+private val TimerBlur = 8.dp
+
+/** Black veil behind the open sleep timer (very light). */
+private const val TimerScrim = 0.18f

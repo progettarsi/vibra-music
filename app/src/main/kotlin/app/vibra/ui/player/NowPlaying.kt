@@ -58,8 +58,20 @@ fun PlayerConnection.collectNowPlaying(): NowPlaying {
     val canPrevious by canSkipPrevious.collectAsStateWithLifecycle()
     val canNext by canSkipNext.collectAsStateWithLifecycle()
     val title by queueTitle.collectAsStateWithLifecycle()
+    // A music video shows its song's own square cover wherever Vibra shows the track (mini-player,
+    // player, colours) once it is found; until then, or without a match, the video's picture.
+    val current = metadata
+    var songCover by remember(current?.id) { mutableStateOf(current?.id?.let(app.vibra.player.SongCovers::cached)) }
+    LaunchedEffect(current?.id, current?.isMusicVideo) {
+        if (current != null && current.isMusicVideo && songCover == null) songCover = app.vibra.player.SongCovers.coverFor(current)
+    }
+    val shown =
+        remember(current, songCover) {
+            val cover = songCover
+            if (current != null && current.isMusicVideo && cover != null) current.copy(thumbnailUrl = cover) else current
+        }
     return NowPlaying(
-        metadata = metadata,
+        metadata = shown,
         isPlaying = playing,
         // Buffering only matters to the user when they asked to play.
         isBuffering = (state == Player.STATE_BUFFERING || attempt.isLoading) && player.playWhenReady,

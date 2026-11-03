@@ -14,13 +14,13 @@ import moe.rukamori.archivetune.ui.component.*
 
 @Composable
 fun SpotifyAccountCard(viewModel: SpotifyAccountViewModel = hiltViewModel()) {
-    val (showPlaylists, setShowPlaylists) = moe.rukamori.archivetune.utils.rememberPreference(moe.rukamori.archivetune.constants.ShowSpotifyPlaylistsKey, false)
+    val (showPlaylists) = moe.rukamori.archivetune.utils.rememberPreference(moe.rukamori.archivetune.constants.ShowSpotifyPlaylistsKey, false)
     val account by viewModel.uiState.collectAsStateWithLifecycle()
     val sync by viewModel.syncState.collectAsStateWithLifecycle()
     var login by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(account.isAuthenticated) { if (account.isAuthenticated) login = false }
     PreferenceGroup(title = "Spotify") {
-        spotifyAccountPreferences(account, showPlaylists, { login = true }, setShowPlaylists, viewModel::syncAll, viewModel::logout)
+        spotifyAccountPreferences(account, showPlaylists, { login = true }, viewModel::setShowPlaylists, viewModel::syncAll, viewModel::logout)
         if (account.isAuthenticated) item {
             PreferenceEntry(
                 title = { Text(stringResource(R.string.vibra_spotify_sync_all)) },

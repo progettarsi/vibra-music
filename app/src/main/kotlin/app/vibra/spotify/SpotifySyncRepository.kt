@@ -2,6 +2,7 @@
 package app.vibra.spotify
 
 import android.content.Context
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.lifecycle.ProcessLifecycleOwner
@@ -18,6 +19,7 @@ import moe.rukamori.archivetune.db.MusicDatabase
 import moe.rukamori.archivetune.db.entities.*
 import moe.rukamori.archivetune.spotify.*
 import moe.rukamori.archivetune.network.NetworkMonitor
+import moe.rukamori.archivetune.constants.ShowSpotifyPlaylistsKey
 import moe.rukamori.archivetune.constants.SpotifySpDcKey
 import moe.rukamori.archivetune.utils.dataStore
 import java.time.LocalDateTime
@@ -144,7 +146,8 @@ class SpotifySyncRepository @Inject constructor(
                     }
                 }
                 mutable.update { it.copy(phase = "playlists") }
-                attempt {
+                // Playlists turned off in settings: they are not imported (see setPlaylistsEnabled).
+                if (context.dataStore.data.first()[PlaylistsOffKey] != true) attempt {
                     val playlists = library.refreshPlaylists()
                     check(library.errorMessage.value == null)
                     for (source in playlists) attempt {
@@ -178,8 +181,56 @@ class SpotifySyncRepository @Inject constructor(
             finally { mutable.update { it.copy(running = false) }; mutex.unlock() }
         }
     }
-    companion object { private const val SIX_HOURS = 6 * 60 * 60 * 1000L }
+    /**
+     * The "Show playlists" switch. Off: the playlists imported from Spotify leave the library and
+     * are no longer imported; on again: they are imported at once.
+     */
+    fun setPlaylistsEnabled(enabled: Boolean) {
+        scope.launch {
+            context.dataStore.edit {
+                it[ShowSpotifyPlaylistsKey] = enabled
+                it[PlaylistsOffKey] = !enabled
+            }
+            if (enabled) sync() else removeImportedPlaylists()
+        }
+    }
+
+    /**
+     * Deletes the playlists imported from Spotify (signing out, playlists turned off). A playlist the
+     * user has made their own stays: one with songs added by hand, or synced to YouTube Music.
+     */
+    suspend fun removeImportedPlaylists() {
+        // A running import must not bring them back.
+        generation++
+        job?.cancelAndJoin()
+        val importedSongs = database.spotifyImportedIds("song").toSet()
+        for (playlistId in database.spotifyImportedIds("playlist")) {
+            val playlist = database.playlist(playlistId).first()
+            if (playlist == null) {
+                database.deleteSpotifyImport("playlist", playlistId)
+                continue
+            }
+            val songs = database.playlistSongs(playlistId).first().map { it.song.id }
+            if (!isUntouchedImport(playlist.playlist.browseId, songs, importedSongs)) continue
+            database.withTransaction {
+                delete(playlist.playlist)
+                deleteSpotifyImport("playlist", playlistId)
+            }
+        }
+    }
+
+    companion object {
+        private const val SIX_HOURS = 6 * 60 * 60 * 1000L
+        private val PlaylistsOffKey = booleanPreferencesKey("vibraSpotifyPlaylistsOff")
+    }
 }
+
+/** An imported playlist still as Spotify made it: not synced to YouTube Music, no song added by hand. */
+internal fun isUntouchedImport(
+    browseId: String?,
+    songs: List<String>,
+    importedSongs: Set<String>,
+): Boolean = browseId == null && songs.all { it in importedSongs }
 
 /** Additive ordering: Spotify order first, retained local content follows once. */
 internal fun mergeImportedPlaylist(remote: List<String>, local: List<String>): List<String> = (remote + local).distinct()

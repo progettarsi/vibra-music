@@ -114,7 +114,9 @@ fun AppearanceSettings(navController: NavController) {
                         checked = pureBlack, onCheckedChange = onPureBlackChange)
                 }
                 item {
-                    SwitchPreference(title = { Text(stringResource(R.string.disable_animations)) },
+                    // Vibra: one switch for all motion — animations, Canvas and music videos.
+                    SwitchPreference(title = { Text(stringResource(R.string.vibra_reduce_motion)) },
+                        description = stringResource(R.string.vibra_reduce_motion_desc),
                         checked = disableAnimations, onCheckedChange = onDisableAnimationsChange)
                 }
                 item {

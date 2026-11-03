@@ -507,15 +507,16 @@ private fun PlayerVolumeCard(
   val safeVolume = volume.coerceIn(0f, 1f)
 
   Surface(
-    shape = RoundedCornerShape(28.dp),
+    shape = RoundedCornerShape(MenuTokens.CardRadius),
     color = MaterialTheme.colorScheme.surfaceContainerLow,
     modifier = modifier.fillMaxWidth(),
   ) {
+    // Vibra: a menu card like the others, its slider tray concentric with it.
     Column(
-      modifier = Modifier.padding(horizontal = 14.dp, vertical = 14.dp),
+      modifier = Modifier.padding(MenuTokens.ActionsInset),
       verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-      Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+      Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
         Text(
           text = stringResource(R.string.volume),
           style = MaterialTheme.typography.titleSmall,
@@ -530,7 +531,7 @@ private fun PlayerVolumeCard(
       }
 
       Surface(
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(concentric(MenuTokens.CardRadius, MenuTokens.ActionsInset)),
         color = MaterialTheme.colorScheme.surfaceContainerHighest,
         modifier = Modifier.fillMaxWidth(),
       ) {

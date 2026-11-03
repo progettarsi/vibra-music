@@ -76,7 +76,7 @@ object VibraShapes {
     val AlbumCover: Shape = RoundedCornerShape(28.dp)
 
     /** Bottom sheets / list containers ("Rectangle 18" with top corners 32). */
-    val SheetTop: Shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)
+    val SheetTop: Shape = RoundedCornerShape(topStart = 52.dp, topEnd = 52.dp)
 
     /** Dock pills are full stadiums. */
     val Pill: Shape = CircleShape

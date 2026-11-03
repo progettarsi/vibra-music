@@ -208,7 +208,6 @@ fun AddToPlaylistDialog(
   var songIds by remember { mutableStateOf<List<String>?>(null) }
   var error by remember { mutableStateOf(false) }
   var retry by remember { mutableStateOf(0) }
-  var busy by remember { mutableStateOf(false) }
   val available =
     remember(allPlaylists) {
       playlistsForAddToPlaylist(allPlaylists).filter { it.playlist.isEditable }
@@ -230,51 +229,24 @@ fun AddToPlaylistDialog(
 
   LaunchedEffect(available.size) { if (available.size <= 8) query = "" }
 
-  // Each successful remote mutation is persisted immediately. A later failure never
-  // pretends that the entire batch succeeded, and a retry only changes missing entries.
-  suspend fun toggleMembership(playlist: Playlist, remove: Boolean): Int =
-    withContext(Dispatchers.IO) {
-      val ids = songIds.orEmpty().toSet()
-      val browseId = playlist.playlist.browseId
-      check(browseId == null || hasYouTubeLoginCookie(cookie))
-      val downloadSnapshot =
-        if (!remove) downloadUtil.playlistDownloadSnapshot(playlist.id) else null
-      var added = 0
-      if (remove) {
-        val entries =
-          database
-            .getPlaylistSongs(playlist.id)
-            .filter { it.map.songId in ids }
-            .sortedByDescending { it.map.position }
-        entries.forEach { entry ->
-          if (browseId != null) removeSongFromRemotePlaylist(browseId, entry.map).getOrThrow()
-          database.withTransaction {
-            move(playlist.id, entry.map.position, Int.MAX_VALUE)
-            delete(entry.map.copy(position = Int.MAX_VALUE))
-            update(playlist.playlist.copy(lastUpdateTime = LocalDateTime.now()))
-          }
-        }
-      } else {
-        ids.forEach { songId ->
-          if (database.checkInPlaylist(playlist.id, songId) == 0) {
-            val setVideoId = browseId?.let { YouTube.addToPlaylist(it, songId).getOrThrow() }
-            database.withTransaction {
-              val current = getPlaylistById(playlist.id) ?: kotlin.error("Playlist removed")
-              addSongEntriesToPlaylist(current, listOf(songId to setVideoId))
-            }
-            downloadSnapshot?.let { downloadUtil.downloadPlaylistAdditions(it, listOf(songId)) }
-            added++
-          }
-        }
-      }
-      added
-    }
+  // Vibra: a tap answers at once. The change lands in the local database straight away and a
+  // synced playlist follows on YouTube Music in the background (app.vibra.library.PlaylistSync);
+  // until the database confirms it, the row shows the state the user asked for.
+  val appContext = androidx.compose.ui.platform.LocalContext.current
+  var requested by remember { mutableStateOf(emptyMap<String, Boolean>()) }
+  fun memberOf(playlistId: String): Boolean {
+    val ids = songIds.orEmpty()
+    val members = songMemberships?.get(playlistId).orEmpty()
+    return ids.isNotEmpty() && ids.all { it in members }
+  }
+  LaunchedEffect(songMemberships) {
+    requested = requested.filter { (playlistId, wanted) -> memberOf(playlistId) != wanted }
+  }
 
   VibraDialog(
-    onDismissRequest = { if (!busy) onDismiss() },
+    onDismissRequest = onDismiss,
     groupContent = false,
     contentPadding = PaddingValues(0.dp),
-    properties = DialogProperties(dismissOnBackPress = !busy, dismissOnClickOutside = !busy),
   ) {
     // Capped below the opening limit: the sheet opens whole and only the playlists scroll.
     Column(
@@ -287,7 +259,7 @@ fun AddToPlaylistDialog(
         context?.artworkUrl,
         MediaMenuLayout.Compact,
         onPlay = null,
-        compactArtwork = 56.dp,
+        compactArtwork = MenuTokens.CompactArtwork,
       )
       MenuCard(Modifier.weight(1f, fill = false)) {
         if (available.size > 8) {
@@ -296,7 +268,7 @@ fun AddToPlaylistDialog(
             onValueChange = { query = it },
             label = { Text(stringResource(R.string.search)) },
             singleLine = true,
-            modifier = Modifier.fillMaxWidth().padding(14.dp),
+            modifier = Modifier.fillMaxWidth().padding(app.vibra.ui.components.MenuTokens.CompactHeaderInset),
             shape = VibraFieldShape,
             colors = vibraTextFieldColors(),
           )
@@ -307,13 +279,13 @@ fun AddToPlaylistDialog(
             verticalAlignment = Alignment.CenterVertically,
           ) {
             Text(stringResource(R.string.error_unknown), modifier = Modifier.weight(1f))
-            TextButton(onClick = { retry++ }, enabled = !busy) {
+            TextButton(onClick = { retry++ }) {
               Text(stringResource(R.string.retry))
             }
           }
         LazyColumn(
           modifier = Modifier.fillMaxWidth(),
-          contentPadding = PaddingValues(vertical = 12.dp),
+          contentPadding = PaddingValues(vertical = app.vibra.ui.components.MenuTokens.CardInset),
         ) {
           item(key = "create") {
             MediaMenuRow(
@@ -326,7 +298,7 @@ fun AddToPlaylistDialog(
                   }
                 }
               },
-              modifier = Modifier.clickable(enabled = !busy) { showCreate = true },
+              modifier = Modifier.clickable { showCreate = true },
             )
           }
           if (!error && (songIds == null || songMemberships == null))
@@ -337,29 +309,30 @@ fun AddToPlaylistDialog(
             }
           items(visible, key = { it.id }) { playlist ->
             val ids = songIds.orEmpty()
-            val members = songMemberships?.get(playlist.id).orEmpty()
-            val checked = ids.isNotEmpty() && ids.all { it in members }
+            val checked = requested[playlist.id] ?: memberOf(playlist.id)
+            val ready = songIds != null && songMemberships != null && ids.isNotEmpty()
             PlaylistMembershipRow(
               playlist = playlist,
               checked = checked,
-              enabled = !busy && songIds != null && songMemberships != null && ids.isNotEmpty(),
+              enabled = ready,
               onClick = {
-                if (!busy && songIds != null && songMemberships != null && ids.isNotEmpty()) {
-                  busy = true
+                if (ready) {
                   error = false
                   haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                  scope.launch {
-                    try {
-                      val added = toggleMembership(playlist, checked)
+                  requested = requested + (playlist.id to !checked)
+                  app.vibra.library.PlaylistSync.toggle(
+                    context = appContext,
+                    database = database,
+                    downloadUtil = downloadUtil,
+                    playlist = playlist,
+                    songIds = ids,
+                    remove = checked,
+                    remoteAllowed = hasYouTubeLoginCookie(cookie),
+                    onApplied = { added ->
                       if (added > 0) onAddComplete?.invoke(added, listOf(playlist.playlist.name))
-                    } catch (cancelled: CancellationException) {
-                      throw cancelled
-                    } catch (_: Exception) {
-                      error = true
-                    } finally {
-                      busy = false
-                    }
-                  }
+                    },
+                    onFailed = { requested = requested - playlist.id },
+                  )
                 }
               },
             )
@@ -389,15 +362,16 @@ internal fun PlaylistMembershipRow(
     onClick = onClick,
     enabled = enabled,
     color = androidx.compose.ui.graphics.Color.Transparent,
-    shape = MaterialTheme.shapes.large,
+    // Concentric with the card around the list (see MediaMenuRow).
+    shape = app.vibra.ui.components.MenuTokens.RowShape,
     modifier =
-      Modifier.fillMaxWidth().semantics {
+      Modifier.fillMaxWidth().padding(horizontal = app.vibra.ui.components.MenuTokens.CardInset).semantics {
         role = Role.Checkbox
         toggleableState = if (checked) ToggleableState.On else ToggleableState.Off
       },
   ) {
     Row(
-      modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 10.dp),
+      modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
       verticalAlignment = Alignment.CenterVertically,
       horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {

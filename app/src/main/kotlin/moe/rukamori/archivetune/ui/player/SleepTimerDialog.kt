@@ -96,8 +96,9 @@ fun SleepTimerPanel(
       verticalAlignment = Alignment.CenterVertically,
       horizontalArrangement = Arrangement.spacedBy(MenuTokens.ExpandedGap),
     ) {
+      // As tall as the pill buttons below: both hug a corner of the panel (see SleepTimerOverlay).
       Surface(shape = CircleShape, color = colors.secondaryContainer) {
-        Box(Modifier.size(40.dp), contentAlignment = Alignment.Center) {
+        Box(Modifier.size(52.dp), contentAlignment = Alignment.Center) {
           Icon(
             painterResource(R.drawable.bedtime),
             null,

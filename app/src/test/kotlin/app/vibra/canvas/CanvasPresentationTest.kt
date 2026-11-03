@@ -7,7 +7,9 @@ package app.vibra.canvas
 
 import app.vibra.ui.player.CanvasPresentation
 import app.vibra.ui.player.CanvasStage
+import app.vibra.ui.player.CanvasLookup
 import app.vibra.ui.player.canvasForSurface
+import app.vibra.ui.player.musicVideoAllowed
 import app.vibra.ui.player.revealSnaps
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -100,9 +102,9 @@ class CanvasPresentationTest {
 
     @Test fun aCanvasNeverOutlivesItsTrack() {
         val first = canvas("a")
-        assertSame(first, canvasForSurface(first, "a", hasMusicVideo = false, ambientAllowed = true))
-        assertNull(canvasForSurface(first, "b", hasMusicVideo = false, ambientAllowed = true))
-        assertNull(canvasForSurface(null, "a", hasMusicVideo = false, ambientAllowed = true))
+        assertSame(first, canvasForSurface(first, "a", ambientAllowed = true))
+        assertNull(canvasForSurface(first, "b", ambientAllowed = true))
+        assertNull(canvasForSurface(null, "a", ambientAllowed = true))
     }
 
     @Test fun aVerticalCanvasPlaysOnlyItsVerticalRenditionFullScreen() {
@@ -113,12 +115,19 @@ class CanvasPresentationTest {
         assertEquals(listOf("https://cdn.example.test/a.mp4"), canvas("a").playbackUrls(portrait = true))
     }
 
-    @Test fun aMusicVideoKeepsTheSurfaceToItself() {
-        assertNull(canvasForSurface(canvas("a"), "a", hasMusicVideo = true, ambientAllowed = true))
+    @Test fun aCanvasComesBeforeTheMusicVideo() {
+        val found = CanvasLookup(canvas("a"), settled = true)
+        assertFalse(musicVideoAllowed(ambientAllowed = true, songsOnly = false, canvas = found))
+        assertTrue(musicVideoAllowed(ambientAllowed = true, songsOnly = false, canvas = CanvasLookup(null, settled = true)))
+        // Still looking: the video waits instead of starting and being swapped for the Canvas.
+        assertFalse(musicVideoAllowed(ambientAllowed = true, songsOnly = false, canvas = CanvasLookup(null, settled = false)))
+        // "Songs only" and reduced motion turn videos off.
+        assertFalse(musicVideoAllowed(ambientAllowed = true, songsOnly = true, canvas = CanvasLookup(null, settled = true)))
+        assertFalse(musicVideoAllowed(ambientAllowed = false, songsOnly = false, canvas = CanvasLookup(null, settled = true)))
     }
 
     @Test fun withoutAmbientMotionOnlyTheCoverShows() {
-        assertNull(canvasForSurface(canvas("a"), "a", hasMusicVideo = false, ambientAllowed = false))
+        assertNull(canvasForSurface(canvas("a"), "a", ambientAllowed = false))
     }
 
     @Test fun disabledAnimationsMakeTheRevealInstant() {

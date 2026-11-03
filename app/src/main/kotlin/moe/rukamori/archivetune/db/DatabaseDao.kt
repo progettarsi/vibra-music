@@ -88,6 +88,9 @@ interface DatabaseDao {
     @Query("SELECT DISTINCT localId FROM spotify_import WHERE kind = :kind")
     suspend fun spotifyImportedIds(kind: String): List<String>
 
+    @Query("DELETE FROM spotify_import WHERE kind = :kind AND localId = :localId")
+    suspend fun deleteSpotifyImport(kind: String, localId: String)
+
     @Transaction
     @Query("SELECT song.* FROM song INNER JOIN format ON format.id = song.id WHERE song.isLocal = 0")
     fun downloadedSongsList(): List<Song>

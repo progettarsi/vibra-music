@@ -28,13 +28,14 @@ fun ControlSheetHeader(
   trailing: @Composable () -> Unit = {},
 ) {
   MenuCard(shape = shape) {
+    // Like the compact media header: one margin all round, the tile concentric in the corner.
     Row(
-      Modifier.padding(14.dp),
+      Modifier.padding(MenuTokens.CompactHeaderInset),
       verticalAlignment = Alignment.CenterVertically,
-      horizontalArrangement = Arrangement.spacedBy(16.dp),
+      horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
       Surface(
-        shape = CircleShape,
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(concentric(MenuTokens.CardRadius, MenuTokens.CompactHeaderInset)),
         color = MaterialTheme.colorScheme.secondaryContainer,
         contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
       ) {

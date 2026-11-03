@@ -66,8 +66,8 @@ android {
         applicationId = "vibra.music.com"
         minSdk = 26
         targetSdk = 37
-        versionCode = 24
-        versionName = "1.5.2"
+        versionCode = 25
+        versionName = "1.6.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true

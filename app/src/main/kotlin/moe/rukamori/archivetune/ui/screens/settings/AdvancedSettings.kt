@@ -73,6 +73,7 @@ fun AdvancedSettings(navController: NavController) {
 
     val (reorderWobble, onReorderWobbleChange) = rememberPreference(app.vibra.ui.motion.ReorderWobbleKey, true)
     val (canvasEnabled, onCanvasEnabledChange) = rememberPreference(app.vibra.canvas.CanvasEnabledKey, true)
+    val (songsOnly, onSongsOnlyChange) = rememberPreference(moe.rukamori.archivetune.constants.HideVideoKey, false)
 
     val (compactMenus, onCompactMenusChange) = rememberPreference(app.vibra.ui.components.CompactMediaMenusKey, false)
 
@@ -143,13 +144,23 @@ fun AdvancedSettings(navController: NavController) {
                 }
             }
 
-            PreferenceGroup(title = stringResource(R.string.canvas_section)) {
+            // Vibra: Canvas and music videos together; "Songs only" is the engine's hide-video switch,
+            // which also keeps videos out of queues, radios and results.
+            PreferenceGroup(title = stringResource(R.string.vibra_canvas_and_videos)) {
                 item {
                     SwitchPreference(
                         title = { Text(stringResource(R.string.canvas_enabled)) },
                         description = stringResource(R.string.canvas_enabled_desc),
                         checked = canvasEnabled,
                         onCheckedChange = onCanvasEnabledChange,
+                    )
+                }
+                item {
+                    SwitchPreference(
+                        title = { Text(stringResource(R.string.vibra_songs_only)) },
+                        description = stringResource(R.string.vibra_songs_only_desc),
+                        checked = songsOnly,
+                        onCheckedChange = onSongsOnlyChange,
                     )
                 }
             }

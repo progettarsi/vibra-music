@@ -92,7 +92,6 @@ fun AdvancedContentSettings(
             defaultValue = PlaylistSuggestionSource.BOTH,
         )
     val (hideExplicit, onHideExplicitChange) = rememberPreference(key = HideExplicitKey, defaultValue = false)
-    val (hideVideo, onHideVideoChange) = rememberPreference(key = HideVideoKey, defaultValue = false)
     val (lengthTop, onLengthTopChange) = rememberPreference(key = TopSize, defaultValue = "50")
     val (quickPicks, onQuickPicksChange) = rememberEnumPreference(key = QuickPicksKey, defaultValue = QuickPicks.QUICK_PICKS)
 
@@ -197,15 +196,6 @@ fun AdvancedContentSettings(
                     icon = { Icon(painterResource(R.drawable.explicit), null) },
                     checked = hideExplicit,
                     onCheckedChange = onHideExplicitChange,
-                )
-            }
-
-            item {
-                SwitchPreference(
-                    title = { Text(stringResource(R.string.hide_video)) },
-                    icon = { Icon(painterResource(R.drawable.slow_motion_video), null) },
-                    checked = hideVideo,
-                    onCheckedChange = onHideVideoChange,
                 )
             }
         }

@@ -39,6 +39,8 @@ class SpotifyAccountViewModel
 
         fun syncAll() = sync.sync()
 
+        fun setShowPlaylists(show: Boolean) = sync.setPlaylistsEnabled(show)
+
         fun restoreSession() {
             viewModelScope.launch(Dispatchers.IO) {
                 runCatching { repository.restoreSession() }
@@ -120,6 +122,8 @@ class SpotifyAccountViewModel
                 runCatching { repository.logout() }
                     .onSuccess {
                         _uiState.value = SpotifyAccountUiState()
+                        // Vibra: signing out takes the imported playlists away too.
+                        runCatching { sync.removeImportedPlaylists() }.onFailure(::reportException)
                     }.onFailure { error ->
                         if (error is CancellationException) throw error
                         reportException(error)

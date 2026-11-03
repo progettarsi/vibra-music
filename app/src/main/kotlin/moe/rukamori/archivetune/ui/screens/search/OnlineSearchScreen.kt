@@ -39,6 +39,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.filterIsInstance
 import moe.rukamori.archivetune.LocalPlayerConnection
 import moe.rukamori.archivetune.R
 import moe.rukamori.archivetune.extensions.togglePlayPause
@@ -98,12 +99,12 @@ fun OnlineSearchScreen(
 
     val lazyListState = rememberLazyListState()
 
-    LaunchedEffect(Unit) {
-        snapshotFlow { lazyListState.firstVisibleItemScrollOffset }
-            .drop(1)
-            .collect {
-                keyboardController?.hide()
-            }
+    // Vibra: only a scroll by the user hides the keyboard. The offset also moves when results,
+    // suggestions or the loading row arrive while typing, which closed the keyboard mid-word.
+    LaunchedEffect(lazyListState) {
+        lazyListState.interactionSource.interactions
+            .filterIsInstance<androidx.compose.foundation.interaction.DragInteraction.Start>()
+            .collect { keyboardController?.hide() }
     }
 
     LaunchedEffect(query) {

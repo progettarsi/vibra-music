@@ -12,6 +12,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import app.vibra.ui.motion.clickable
+import app.vibra.ui.motion.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -54,15 +55,17 @@ fun LibraryMediaListCard(
     title: String,
     subtitle: String,
     thumbnailUrl: String?,
-    sourceLabel: String,
-    sourceColor: Color,
     onClick: () -> Unit,
     onPlay: () -> Unit,
     onMenuClick: () -> Unit,
     modifier: Modifier = Modifier,
     contentAlpha: Float = 1f,
     metadataTrailingContent: (@Composable RowScope.() -> Unit)? = null,
+    titleTrailingContent: (@Composable RowScope.() -> Unit)? = null,
     additionalAction: (@Composable RowScope.() -> Unit)? = null,
+    // Vibra: long press (e.g. to start selecting) and selection mode — null when not selecting.
+    onLongClick: (() -> Unit)? = null,
+    selected: Boolean? = null,
 ) {
     val cardBackgroundColor =
         rememberArtworkCardColor(
@@ -87,10 +90,11 @@ fun LibraryMediaListCard(
                     scaleY = scale
                     alpha = contentAlpha
                 }.clip(RoundedCornerShape(32.dp))
-                .background(cardBackgroundColor)
-                .clickable(
+                .background(if (selected == true) MaterialTheme.colorScheme.primaryContainer else cardBackgroundColor)
+                .combinedClickable(
                     interactionSource = interactionSource,
                     indication = null,
+                    onLongClick = onLongClick,
                     onClick = onClick,
                 ).padding(12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -99,7 +103,8 @@ fun LibraryMediaListCard(
             thumbnailUrl = thumbnailUrl,
             isActive = false,
             isPlaying = false,
-            shape = RoundedCornerShape(24.dp),
+            // Vibra: concentric with the card (32 dp corner, 12 dp margin).
+            shape = RoundedCornerShape(20.dp),
             contentScale = ContentScale.Crop,
             showPlaceholder = true,
             modifier = Modifier.size(72.dp),
@@ -108,13 +113,17 @@ fun LibraryMediaListCard(
         Spacer(modifier = Modifier.width(16.dp))
 
         Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                color = MaterialTheme.colorScheme.onBackground,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    text = title,
+                    modifier = Modifier.weight(1f, fill = false),
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onBackground,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                titleTrailingContent?.invoke(this)
+            }
             Spacer(modifier = Modifier.height(4.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -129,24 +138,18 @@ fun LibraryMediaListCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Box(
-                    modifier =
-                        Modifier
-                            .clip(CircleShape)
-                            .background(sourceColor.copy(alpha = 0.12f))
-                            .padding(horizontal = 8.dp, vertical = 2.dp),
-                ) {
-                    Text(
-                        text = sourceLabel,
-                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
-                        color = sourceColor,
-                        maxLines = 1,
-                        softWrap = false,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
                 metadataTrailingContent?.invoke(this)
             }
+        }
+
+        if (selected != null) {
+            Icon(
+                painter = painterResource(if (selected) R.drawable.radio_button_checked else R.drawable.radio_button_unchecked),
+                contentDescription = null,
+                tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 8.dp).size(24.dp),
+            )
+            return@Row
         }
 
         IconButton(
@@ -179,4 +182,15 @@ fun LibraryMediaListCard(
 
         additionalAction?.invoke(this)
     }
+}
+
+/** Vibra: the small cloud by the name of an item synced with YouTube Music. */
+@Composable
+internal fun SyncedMark(modifier: Modifier = Modifier) {
+    Icon(
+        painter = painterResource(R.drawable.cloud),
+        contentDescription = stringResource(R.string.youtube_synced),
+        modifier = modifier.size(14.dp),
+        tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+    )
 }
