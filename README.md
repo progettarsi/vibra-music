@@ -8,6 +8,7 @@
 
 <p align="center">
   <a href="https://github.com/progettarsi/vibra-music/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/progettarsi/vibra-music?style=flat-square&label=release&labelColor=211F26&color=D0BCFF"></a>
+  <a href="https://github.com/progettarsi/vibra-music/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/progettarsi/vibra-music/ci.yml?branch=main&style=flat-square&label=CI&labelColor=211F26&color=4A4458"></a>
   <img alt="Downloads" src="https://img.shields.io/github/downloads/progettarsi/vibra-music/total?style=flat-square&label=downloads&labelColor=211F26&color=4A4458">
   <img alt="Android 8.0 or newer" src="https://img.shields.io/badge/android-8.0%2B-4A4458?style=flat-square&labelColor=211F26">
   <img alt="Kotlin and Jetpack Compose" src="https://img.shields.io/badge/kotlin-jetpack%20compose-4A4458?style=flat-square&labelColor=211F26">
