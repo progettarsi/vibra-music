@@ -436,7 +436,10 @@ fun VibraPlayerSheet(
             val revealedOffset = { coverSwipe.value + if (coverSwipe.value < 0f) fullWidthPx else -fullWidthPx }
             var coverSlot by remember { mutableStateOf<Rect?>(null) }
             var titleSlot by remember { mutableStateOf<Rect?>(null) }
-            val measureSlot = {
+            val measureSlot = measure@{
+                // The interface is scaled down while the queue is open: slots measured now would
+                // be the receded ones and the cover (which stays still) would follow them.
+                if (queueSheet.progress > 0.001f) return@measure
                 geometry.rectOf(geometry.cover)?.let { coverSlot = it }
                 geometry.rectOf(geometry.title)?.let { titleSlot = it }
             }
