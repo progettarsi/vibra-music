@@ -98,6 +98,9 @@ internal val PLAYLIST_OUTBOX_MIGRATION: Migration = object : Migration(39, 40) {
             """.trimIndent(),
         )
         db.execSQL("CREATE INDEX index_playlist_edit_account_playlistId ON playlist_edit (account, playlistId)")
+        // Room validates migrated tables against the entities, which do not declare this index.
+        // DatabaseCallback.onOpen creates it again right after validation.
+        db.execSQL("DROP INDEX IF EXISTS index_playlist_browseId")
     }
 }
 
