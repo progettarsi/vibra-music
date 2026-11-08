@@ -44,6 +44,8 @@ import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.semantics.invisibleToUser
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
@@ -89,7 +91,7 @@ import moe.rukamori.archivetune.LocalAnimationsDisabled
  *   brings the text back to following.
  */
 @Composable
-fun VibraLyricsList(
+internal fun VibraLyricsList(
     lyrics: SyncedLyrics,
     currentPosition: () -> Int,
     textColor: Color,
@@ -99,9 +101,13 @@ fun VibraLyricsList(
     onLineClicked: (ISyncedLine) -> Boolean,
     onLinePressed: (ISyncedLine) -> Unit,
     modifier: Modifier = Modifier,
+    entrance: LyricsEntrance? = null,
 ) {
     val lines = lyrics.lines
     val position = rememberUpdatedState(currentPosition)
+    val latestEntrance = rememberUpdatedState(entrance)
+    val revealRows = entrance?.shouldReveal == true
+    val waitingForRows = revealRows && entrance?.rowRanks == null
     val scope = rememberCoroutineScope()
     // The active line is known before the first frame, so a list opened mid-song never shows
     // its beginning for an instant.
@@ -160,15 +166,24 @@ fun VibraLyricsList(
                 },
     ) {
         // Placement without animation on opening and whenever the height changes.
-        LaunchedEffect(follow, constraints.maxHeight) { follow.drive(listState) }
+        LaunchedEffect(follow, constraints.maxHeight) {
+            follow.drive(listState) {
+                val currentEntrance = latestEntrance.value
+                val reveal = currentEntrance?.shouldReveal == true
+                if (reveal) currentEntrance.onPlaced(listState.layoutInfo)
+                reveal
+            }
+        }
         val half = maxHeight / 2
         LazyColumn(
             state = listState,
+            userScrollEnabled = !waitingForRows,
             // Half the height at both ends: the first and the last line can rest in the middle.
             contentPadding = PaddingValues(top = half, bottom = half),
             modifier =
                 Modifier
                     .fillMaxSize()
+                    .semantics { if (waitingForRows) invisibleToUser() }
                     .graphicsLayer { alpha = follow.visibility.value },
         ) {
             itemsIndexed(lines, key = { index, line -> "${line.start}:$index" }) { index, line ->
@@ -184,6 +199,8 @@ fun VibraLyricsList(
                     showTranslation = showTranslation,
                     onClick = { if (onLineClicked(line)) follow.seekedTo(index) },
                     onLongClick = { onLinePressed(line) },
+                    revealModifier = if (revealRows) entrance.rowModifier(index) else Modifier,
+                    enabled = !waitingForRows,
                 )
             }
         }
@@ -204,6 +221,8 @@ private fun LyricLine(
     showTranslation: Boolean,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
+    revealModifier: Modifier,
+    enabled: Boolean,
 ) {
     val active = distance == 0
     val lit =
@@ -227,6 +246,7 @@ private fun LyricLine(
         modifier =
             Modifier
                 .fillMaxWidth()
+                .then(revealModifier)
                 // Two layers: the offset changes every frame of a glide, the look only when
                 // the line's distance or the browsing focus changes.
                 .graphicsLayer { translationY = follow.offset(index) }
@@ -236,6 +256,7 @@ private fun LyricLine(
                     transformOrigin = TransformOrigin(if (endAligned) 1f else 0f, 0.5f)
                     renderEffect = softness.effect((blur.value * (1f - follow.focus.value)).dp.toPx())
                 }.combinedClickable(
+                    enabled = enabled,
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
                     onClick = onClick,

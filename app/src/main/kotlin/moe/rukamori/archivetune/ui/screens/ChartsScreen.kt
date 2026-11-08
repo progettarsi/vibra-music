@@ -7,6 +7,9 @@
 
 package moe.rukamori.archivetune.ui.screens
 
+// Vibra: independent radii follow the global rounding style.
+import app.vibra.ui.theme.adaptiveRoundedCornerShape
+
 import moe.rukamori.archivetune.ui.utils.backToMain
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -21,7 +24,6 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -138,7 +140,7 @@ fun ChartsScreen(
                                             modifier =
                                                 Modifier
                                                     .size(ListItemHeight - 16.dp)
-                                                    .clip(RoundedCornerShape(4.dp))
+                                                    .clip(adaptiveRoundedCornerShape(4.dp))
                                                     .background(MaterialTheme.colorScheme.onSurface),
                                         )
                                         Spacer(modifier = Modifier.width(8.dp))

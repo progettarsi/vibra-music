@@ -112,7 +112,7 @@ fun ControlSliderRow(
 @Composable
 fun ControlModeChoice(label: String, selected: Boolean, first: Boolean, onClick: () -> Unit) {
   val shape =
-    androidx.compose.foundation.shape.RoundedCornerShape(
+    app.vibra.ui.theme.adaptiveRoundedCornerShape(
       topStart = if (first) 16.dp else 4.dp,
       bottomStart = if (first) 16.dp else 4.dp,
       topEnd = if (first) 4.dp else 16.dp,

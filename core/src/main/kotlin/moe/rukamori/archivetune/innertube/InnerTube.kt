@@ -18,7 +18,9 @@ import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.asContextElement
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 import moe.rukamori.archivetune.innertube.models.Context
@@ -43,7 +45,30 @@ import kotlin.io.encoding.ExperimentalEncodingApi
  */
 @OptIn(ExperimentalEncodingApi::class)
 class InnerTube {
-    private var httpClient = createClient()
+    private val libraryAuth = ThreadLocal<PlaybackAuthState?>()
+    private var defaultClient = createClient()
+    private val libraryClientLock = Any()
+    private var libraryClient: HttpClient? = null
+    private val httpClient: HttpClient
+        get() = if (hasLibraryAuth()) {
+            synchronized(libraryClientLock) {
+                libraryClient ?: createClient(retryConnections = false).also { libraryClient = it }
+            }
+        } else defaultClient
+
+    internal fun hasLibraryAuth(): Boolean = libraryAuth.get() != null
+
+    internal suspend fun <T> withLibraryAuth(auth: PlaybackAuthState, block: suspend () -> T): T =
+        withContext(libraryAuth.asContextElement(auth)) { block() }
+
+    private fun recreateClients() {
+        defaultClient.close()
+        defaultClient = createClient()
+        synchronized(libraryClientLock) {
+            libraryClient?.close()
+            libraryClient = null
+        }
+    }
 
     private companion object {
         const val HTTP_HEADER_ACCEPT_LANGUAGE = "Accept-Language"
@@ -64,12 +89,12 @@ class InnerTube {
     private var authState: PlaybackAuthState = PlaybackAuthState.EMPTY
 
     var visitorData: String?
-        get() = authState.visitorData
+        get() = currentAuthState().visitorData
         set(value) {
             authState = authState.copy(visitorData = value).normalized()
         }
     var dataSyncId: String?
-        get() = authState.dataSyncId
+        get() = currentAuthState().dataSyncId
         set(value) {
             authState = authState.copy(dataSyncId = value).normalized()
         }
@@ -87,43 +112,40 @@ class InnerTube {
     var proxy: Proxy? = null
         set(value) {
             field = value
-            httpClient.close()
-            httpClient = createClient()
+            recreateClients()
         }
 
     var proxyUsername: String? = null
         set(value) {
             field = value
-            httpClient.close()
-            httpClient = createClient()
+            recreateClients()
         }
 
     var proxyPassword: String? = null
         set(value) {
             field = value
-            httpClient.close()
-            httpClient = createClient()
+            recreateClients()
         }
 
     var dns: Dns = Dns.SYSTEM
         set(value) {
             field = value
-            httpClient.close()
-            httpClient = createClient()
+            recreateClients()
         }
 
     var useLoginForBrowse: Boolean = false
 
-    fun currentAuthState(): PlaybackAuthState = authState
+    fun currentAuthState(): PlaybackAuthState = libraryAuth.get() ?: authState
 
     fun applyAuthState(value: PlaybackAuthState) {
         authState = value.normalized()
     }
 
     @OptIn(ExperimentalSerializationApi::class)
-    private fun createClient() =
+    private fun createClient(retryConnections: Boolean = true) =
         HttpClient(OkHttp) {
             expectSuccess = true
+            if (!retryConnections) followRedirects = false
 
             install(ContentNegotiation) {
                 json(
@@ -148,6 +170,11 @@ class InnerTube {
 
             engine {
                 config {
+                    retryOnConnectionFailure(retryConnections)
+                    if (!retryConnections) {
+                        followRedirects(false)
+                        followSslRedirects(false)
+                    }
                     addInterceptor(NetworkGatekeeper)
                     dns(this@InnerTube.dns)
                     if (this@InnerTube.proxy == null) {
@@ -243,6 +270,7 @@ class InnerTube {
         factor: Double = 2.0,
         block: suspend () -> T,
     ): T {
+        if (hasLibraryAuth()) return block()
         var currentDelay = initialDelay
         var attempt = 0
         while (true) {
@@ -434,12 +462,14 @@ class InnerTube {
         continuation: String? = null,
         setLogin: Boolean = false,
         useAccountContext: Boolean = true,
+        authState: PlaybackAuthState = currentAuthState(),
     ) = withRetry {
         httpClient.post("browse") {
             val shouldUseLogin = useAccountContext && (setLogin || useLoginForBrowse)
             ytClient(
                 client = client,
                 setLogin = shouldUseLogin,
+                authState = authState,
                 includeVisitorData = useAccountContext,
             )
             setBody(
@@ -447,8 +477,8 @@ class InnerTube {
                     context =
                         client.toContext(
                             locale,
-                            if (useAccountContext) visitorData else null,
-                            if (shouldUseLogin) dataSyncId else null,
+                            if (useAccountContext) currentAuthState().visitorData else null,
+                            if (shouldUseLogin) currentAuthState().dataSyncId else null,
                         ),
                     browseId = browseId,
                     params = params,
@@ -571,12 +601,13 @@ class InnerTube {
     suspend fun likeVideo(
         client: YouTubeClient,
         videoId: String,
+        authState: PlaybackAuthState = currentAuthState(),
     ) = withRetry {
         httpClient.post("like/like") {
-            ytClient(client, setLogin = true)
+            ytClient(client, setLogin = true, authState = authState)
             setBody(
                 LikeBody(
-                    context = client.toContext(locale, visitorData, dataSyncId),
+                    context = client.toContext(locale, authState.visitorData, authState.dataSyncId),
                     target = LikeBody.Target.VideoTarget(videoId),
                 ),
             )
@@ -586,12 +617,13 @@ class InnerTube {
     suspend fun unlikeVideo(
         client: YouTubeClient,
         videoId: String,
+        authState: PlaybackAuthState = currentAuthState(),
     ) = withRetry {
         httpClient.post("like/removelike") {
-            ytClient(client, setLogin = true)
+            ytClient(client, setLogin = true, authState = authState)
             setBody(
                 LikeBody(
-                    context = client.toContext(locale, visitorData, dataSyncId),
+                    context = client.toContext(locale, authState.visitorData, authState.dataSyncId),
                     target = LikeBody.Target.VideoTarget(videoId),
                 ),
             )
@@ -601,12 +633,13 @@ class InnerTube {
     suspend fun subscribeChannel(
         client: YouTubeClient,
         channelId: String,
+        authState: PlaybackAuthState = currentAuthState(),
     ) = withRetry {
         httpClient.post("subscription/subscribe") {
-            ytClient(client, setLogin = true)
+            ytClient(client, setLogin = true, authState = authState)
             setBody(
                 SubscribeBody(
-                    context = client.toContext(locale, visitorData, dataSyncId),
+                    context = client.toContext(locale, authState.visitorData, authState.dataSyncId),
                     channelIds = listOf(channelId),
                 ),
             )
@@ -616,12 +649,13 @@ class InnerTube {
     suspend fun unsubscribeChannel(
         client: YouTubeClient,
         channelId: String,
+        authState: PlaybackAuthState = currentAuthState(),
     ) = withRetry {
         httpClient.post("subscription/unsubscribe") {
-            ytClient(client, setLogin = true)
+            ytClient(client, setLogin = true, authState = authState)
             setBody(
                 SubscribeBody(
-                    context = client.toContext(locale, visitorData, dataSyncId),
+                    context = client.toContext(locale, authState.visitorData, authState.dataSyncId),
                     channelIds = listOf(channelId),
                 ),
             )
@@ -631,12 +665,13 @@ class InnerTube {
     suspend fun likePlaylist(
         client: YouTubeClient,
         playlistId: String,
+        authState: PlaybackAuthState = currentAuthState(),
     ) = withRetry {
         httpClient.post("like/like") {
-            ytClient(client, setLogin = true)
+            ytClient(client, setLogin = true, authState = authState)
             setBody(
                 LikeBody(
-                    context = client.toContext(locale, visitorData, dataSyncId),
+                    context = client.toContext(locale, authState.visitorData, authState.dataSyncId),
                     target = LikeBody.Target.PlaylistTarget(playlistId),
                 ),
             )
@@ -646,12 +681,13 @@ class InnerTube {
     suspend fun unlikePlaylist(
         client: YouTubeClient,
         playlistId: String,
+        authState: PlaybackAuthState = currentAuthState(),
     ) = withRetry {
         httpClient.post("like/removelike") {
-            ytClient(client, setLogin = true)
+            ytClient(client, setLogin = true, authState = authState)
             setBody(
                 LikeBody(
-                    context = client.toContext(locale, visitorData, dataSyncId),
+                    context = client.toContext(locale, authState.visitorData, authState.dataSyncId),
                     target = LikeBody.Target.PlaylistTarget(playlistId),
                 ),
             )

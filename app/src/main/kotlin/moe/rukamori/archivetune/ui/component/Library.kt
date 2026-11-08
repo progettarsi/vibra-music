@@ -7,13 +7,15 @@
 
 package moe.rukamori.archivetune.ui.component
 
+// Vibra: independent radii follow the global rounding style.
+import app.vibra.ui.theme.adaptiveRoundedCornerShape
+
 import androidx.compose.foundation.ExperimentalFoundationApi
 import app.vibra.ui.motion.clickable
 import app.vibra.ui.motion.combinedClickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -180,7 +182,7 @@ fun LibraryPlaylistListItem(
     coroutineScope: CoroutineScope,
     playlist: Playlist,
     modifier: Modifier = Modifier,
-    shape: Shape = RoundedCornerShape(26.dp),
+    shape: Shape = adaptiveRoundedCornerShape(26.dp),
     showDragHandle: Boolean = false,
     dragHandleModifier: Modifier = Modifier,
 ) {

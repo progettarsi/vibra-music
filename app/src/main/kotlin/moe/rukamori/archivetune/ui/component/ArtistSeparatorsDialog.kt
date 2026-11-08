@@ -9,6 +9,9 @@
 
 package moe.rukamori.archivetune.ui.component
 
+// Vibra: independent radii follow the global rounding style.
+import app.vibra.ui.theme.adaptiveRoundedCornerShape
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import app.vibra.ui.motion.clickable
@@ -25,7 +28,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import app.vibra.ui.components.VibraAlertDialog as AlertDialog
 import androidx.compose.material3.AlertDialogDefaults
 import app.vibra.ui.motion.VibraButton as Button
@@ -207,7 +209,7 @@ private fun SeparatorChip(
     onRemove: () -> Unit,
 ) {
     Surface(
-        shape = RoundedCornerShape(20.dp),
+        shape = adaptiveRoundedCornerShape(20.dp),
         color = MaterialTheme.colorScheme.surfaceVariant,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
     ) {

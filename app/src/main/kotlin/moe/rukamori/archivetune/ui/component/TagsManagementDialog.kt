@@ -12,6 +12,7 @@ package moe.rukamori.archivetune.ui.component
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.BorderStroke
+import app.vibra.ui.components.VibraLoadingIndicator
 import app.vibra.ui.motion.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -45,7 +46,6 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import app.vibra.ui.motion.VibraIconButton as IconButton
 import androidx.compose.material3.ListItemDefaults
-import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -529,7 +529,7 @@ private fun PlaylistTagsLoadingContent(modifier: Modifier = Modifier) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
     ) {
-        LoadingIndicator(modifier = Modifier.size(40.dp))
+        VibraLoadingIndicator(modifier = Modifier.size(40.dp))
         Text(
             text = stringResource(R.string.loading),
             style = MaterialTheme.typography.bodyMedium,

@@ -42,12 +42,12 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import app.vibra.ui.components.VibraLoadingIndicator
 import app.vibra.ui.motion.selectable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import app.vibra.ui.motion.VibraFilledTonalIconButton as FilledTonalIconButton
@@ -339,7 +339,7 @@ private fun AiIntegrationSettingsContent(
                             label = "testApiTrailing",
                         ) { isTesting ->
                             if (isTesting) {
-                                CircularWavyProgressIndicator(modifier = Modifier.size(24.dp))
+                                VibraLoadingIndicator(modifier = Modifier.size(24.dp))
                             }
                         }
                     },
@@ -505,7 +505,7 @@ private fun AiIntegrationLoadingState() {
                 .windowInsetsPadding(LocalPlayerAwareWindowInsets.current.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom)),
         contentAlignment = Alignment.Center,
     ) {
-        CircularWavyProgressIndicator()
+        VibraLoadingIndicator()
     }
 }
 
@@ -748,7 +748,7 @@ private fun ModelPickerPreference(
         icon = { Icon(painterResource(R.drawable.auto_awesome), null) },
         trailingContent = {
             if (isFetching) {
-                CircularWavyProgressIndicator(modifier = Modifier.size(24.dp))
+                VibraLoadingIndicator(modifier = Modifier.size(24.dp))
             } else {
                 FilledTonalIconButton(
                     onClick = onFetch,

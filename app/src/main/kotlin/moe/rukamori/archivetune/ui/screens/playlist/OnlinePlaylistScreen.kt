@@ -85,14 +85,13 @@ import androidx.media3.exoplayer.offline.Download
 import androidx.navigation.NavController
 import com.valentinilk.shimmer.shimmer
 import moe.rukamori.archivetune.LocalDatabase
+import moe.rukamori.archivetune.LocalSyncUtils
 import moe.rukamori.archivetune.LocalDownloadUtil
 import moe.rukamori.archivetune.LocalPlayerAwareWindowInsets
 import moe.rukamori.archivetune.LocalPlayerConnection
 import moe.rukamori.archivetune.R
 import moe.rukamori.archivetune.constants.AppBarHeight
 import moe.rukamori.archivetune.constants.HideExplicitKey
-import moe.rukamori.archivetune.db.entities.PlaylistEntity
-import moe.rukamori.archivetune.db.entities.PlaylistSongMap
 import moe.rukamori.archivetune.extensions.metadata
 import moe.rukamori.archivetune.extensions.toMediaItem
 import moe.rukamori.archivetune.extensions.togglePlayPause
@@ -138,6 +137,7 @@ fun OnlinePlaylistScreen(
     val context = LocalContext.current
     val menuState = LocalMenuState.current
     val database = LocalDatabase.current
+    val libraryActions = LocalSyncUtils.current.libraryActions
     val haptic = LocalHapticFeedback.current
     val playerConnection = LocalPlayerConnection.current ?: return
     val isPlaying by playerConnection.isPlaying.collectAsStateWithLifecycle()
@@ -404,73 +404,7 @@ fun OnlinePlaylistScreen(
                                         null
                                     } else {
                                         {
-                                            if (dbPlaylist?.playlist == null) {
-                                                database.transaction {
-                                                    val existingPlaylist =
-                                                        playlistEntityByBrowseId(playlist.id)
-                                                    val targetPlaylistId =
-                                                        if (existingPlaylist == null) {
-                                                            val playlistEntity =
-                                                                PlaylistEntity(
-                                                                    name = playlist.title,
-                                                                    browseId = playlist.id,
-                                                                    thumbnailUrl = playlist.thumbnail,
-                                                                    isEditable = playlist.isEditable,
-                                                                    playEndpointParams =
-                                                                        playlist.playEndpoint?.params,
-                                                                    shuffleEndpointParams =
-                                                                        playlist.shuffleEndpoint?.params,
-                                                                    radioEndpointParams =
-                                                                        playlist.radioEndpoint?.params,
-                                                                ).toggleLike()
-                                                            insert(playlistEntity)
-                                                            playlistEntityByBrowseId(playlist.id)?.id
-                                                                ?: playlistEntity.id
-                                                        } else {
-                                                            val refreshedPlaylist =
-                                                                existingPlaylist.copy(
-                                                                    name = playlist.title,
-                                                                    browseId = playlist.id,
-                                                                    thumbnailUrl = playlist.thumbnail,
-                                                                    isEditable = playlist.isEditable,
-                                                                    playEndpointParams =
-                                                                        playlist.playEndpoint?.params,
-                                                                    shuffleEndpointParams =
-                                                                        playlist.shuffleEndpoint?.params,
-                                                                    radioEndpointParams =
-                                                                        playlist.radioEndpoint?.params,
-                                                                )
-                                                            update(
-                                                                if (existingPlaylist.bookmarkedAt == null) {
-                                                                    refreshedPlaylist.toggleLike()
-                                                                } else {
-                                                                    refreshedPlaylist
-                                                                },
-                                                            )
-                                                            existingPlaylist.id
-                                                        }
-                                                    if (songs.isNotEmpty()) {
-                                                        clearPlaylist(targetPlaylistId)
-                                                        songs
-                                                            .onEach { song ->
-                                                                insert(song.toMediaMetadata())
-                                                            }.mapIndexed { index, song ->
-                                                                PlaylistSongMap(
-                                                                    songId = song.id,
-                                                                    playlistId = targetPlaylistId,
-                                                                    position = index,
-                                                                    setVideoId = song.setVideoId,
-                                                                )
-                                                            }.forEach(::insert)
-                                                    }
-                                                }
-                                            } else {
-                                                database.transaction {
-                                                    val currentPlaylist = dbPlaylist!!.playlist
-                                                    update(currentPlaylist, playlist)
-                                                    update(currentPlaylist.toggleLike())
-                                                }
-                                            }
+                                            libraryActions.togglePlaylist(playlist, songs)
                                         }
                                     },
                                 additionalPrimaryActions = { contentColor ->

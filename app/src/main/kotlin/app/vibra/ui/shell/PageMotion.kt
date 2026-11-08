@@ -6,6 +6,15 @@
 package app.vibra.ui.shell
 
 import android.os.SystemClock
+import app.vibra.ui.motion.ExpansionSource
+import androidx.compose.ui.unit.dp
+import app.vibra.ui.motion.ExpansionSession
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.flow.collect
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.core.CubicBezierEasing
@@ -17,7 +26,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -28,10 +36,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.GraphicsLayerScope
@@ -43,6 +49,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsNode
@@ -54,7 +61,8 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.navigation.NavBackStackEntry
 import app.vibra.ui.motion.Liquid
-import app.vibra.ui.motion.rememberScreenCornerRadius
+import app.vibra.ui.motion.rememberScreenCorners
+import app.vibra.ui.theme.WindowCornerPixels
 import moe.rukamori.archivetune.LocalAnimationsDisabled
 import moe.rukamori.archivetune.ui.screens.search.OnlineSearchResultRoute
 
@@ -122,6 +130,69 @@ internal data class PageRole(
  */
 @Stable
 class PageMotion {
+    internal var ownerView: android.view.View? = null
+    internal val expansionElements = mutableListOf<app.vibra.ui.motion.ExpansionElement>()
+    var expansion by mutableStateOf<ExpansionSession?>(null)
+        private set
+    private var pendingExpansion: ExpansionSource? = null
+    private var pendingTime = 0L
+    private val expansionOrigins = HashMap<String, String>()
+    private val expansionSources = HashMap<String, ExpansionSource>()
+    private val expansionDescriptors = HashMap<String, ExpansionSource>()
+    private val expansionKeys = HashMap<String, Set<String>>()
+    internal fun registerExpansion(source: ExpansionSource) {
+        expansionSources[source.id] = source
+        expansion?.takeIf { it.source.id == source.id }?.source = source
+    }
+    internal fun validateExpansion(session: ExpansionSession) {
+        if (expansion === session && expansionSources[session.source.id]?.bounds == null) {
+            roles[session.entry]?.let { roles[session.entry] = it.copy(style = PageStyle.Push, origin = null) }
+            finishExpansion(session)
+        }
+    }
+    internal fun unregisterExpansion(source: ExpansionSource) {
+        if (expansionSources[source.id] === source) expansionSources.remove(source.id)
+    }
+    internal fun disposeExpansion() {
+        expansion?.dispose()
+        expansion = null
+        pendingExpansion = null
+    }
+    fun prepareExpansion(source: ExpansionSource) {
+        pendingExpansion = source
+        pendingTime = SystemClock.uptimeMillis()
+    }
+    /** Retain the source before asynchronous work, then bind it only when navigation occurs. */
+    fun pendingExpansionSource(): ExpansionSource? = pendingExpansion
+    fun navigateFrom(source: ExpansionSource?, navigate: () -> Unit) {
+        pendingExpansion = null
+        pressPosition = null
+        if (source != null && expansionSources[source.id] === source && source.bounds != null) prepareExpansion(source)
+        navigate()
+    }
+    private fun startExpansion(source: ExpansionSource?, entry: String, fallbackBounds: Rect? = null) {
+        expansion?.dispose()
+        expansion = (source?.bounds ?: fallbackBounds)?.takeIf { source != null }?.let { bounds ->
+            ExpansionSession(source!!, bounds, entry).also { session ->
+                session.candidateKeys.addAll(expansionKeys[entry].orEmpty())
+                expansionElements.forEach { element ->
+                    val coordinates = element.coordinates
+                    if (element.owner == source.owner && coordinates?.isAttached == true &&
+                        coordinates.boundsInWindow().overlaps(bounds)) session.candidateKeys.add(element.pairingKey)
+                }
+            }
+        }
+    }
+    internal fun finishExpansion(session: ExpansionSession, restoreFocus: Boolean = false) {
+        if (expansion === session) {
+            session.dispose(); expansion = null
+            if (restoreFocus) {
+                try { expansionSources[session.source.id]?.focus?.requestFocus() }
+                catch (_: IllegalStateException) { /* Source was detached during navigation. */ }
+            }
+        }
+    }
+
     /** Size of the window the pages fill; origins from another size are dropped. */
     internal var window: IntSize = IntSize.Zero
 
@@ -163,7 +234,15 @@ class PageMotion {
         to: NavBackStackEntry,
     ) {
         if (!begin("forward", from, to)) return
-        val origin = if (to.isSearchResults) null else takeTapOrigin(hostId = from.id)
+        val source = pendingExpansion?.takeIf { !to.isSearchResults && it.owner == from.id && SystemClock.uptimeMillis() - pendingTime in 0..600 && it.bounds?.overlaps(Rect(0f, 0f, window.width.toFloat(), window.height.toFloat())) == true }
+        pendingExpansion = null
+        if (source != null) pressPosition = null
+        val origin = source?.bounds?.let { PageOrigin(it, minOf(it.minDimension / 2f, maxOriginCornerPx), from.id, window) }
+            ?: if (to.isSearchResults) null else takeTapOrigin(hostId = from.id)
+        if (source != null) expansionOrigins[to.id] = source.id
+        if (source != null) expansionDescriptors[to.id] = source
+        startExpansion(source, to.id)
+        expansion?.let { expansionKeys[to.id] = it.candidateKeys.toSet() }
         if (origin != null) origins[to.id] = origin else origins.remove(to.id)
         val style =
             when {
@@ -183,7 +262,11 @@ class PageMotion {
         if (!begin(if (predictive) "gesture" else "back", from, to)) return
         // Only into the element it came from, and only if that element is still there:
         // the same page beneath, in a window of the same size.
-        val origin = origins[from.id]?.takeIf { it.hostId == to.id && it.window == window }
+        var origin = origins[from.id]?.takeIf { it.hostId == to.id && it.window == window }
+        val sourceId = expansionOrigins[from.id]
+        val source = expansionSources[sourceId] ?: expansionDescriptors[from.id]
+        if (source?.bounds != null && origin != null) origin = origin.copy(bounds = source.bounds!!)
+        startExpansion(source?.takeIf { origin != null }, from.id, origin?.bounds)
         val style =
             when {
                 from.isSearchResults -> PageStyle.Fade
@@ -199,7 +282,11 @@ class PageMotion {
         entry.lifecycle.addObserver(
             LifecycleEventObserver { _, event ->
                 if (event == Lifecycle.Event.ON_DESTROY) {
+                    expansion?.takeIf { it.entry == entry.id }?.let { finishExpansion(it) }
                     origins.remove(entry.id)
+                    expansionOrigins.remove(entry.id)
+                    expansionDescriptors.remove(entry.id)
+                    expansionKeys.remove(entry.id)
                     roles.remove(entry.id)
                     watched.remove(entry.id)
                 }
@@ -268,7 +355,7 @@ val LocalPageMotion = staticCompositionLocalOf<PageMotion?> { null }
  */
 @Stable
 class PageFlight internal constructor(
-    private val entryId: String,
+    internal val entryId: String,
     private val motion: PageMotion?,
     private val shown: () -> Float,
     private val frame: FrameGeometry,
@@ -344,13 +431,21 @@ internal fun AnimatedVisibilityScope.PageFrame(
             transitionSpec = { if (motion?.role(entry.id)?.predictive == true) gestureSpec else springSpec },
             label = "page",
         ) { state -> if (state == EnterExitState.Visible) 1f else 0f }
-    val screenCornerPx = with(LocalDensity.current) { rememberScreenCornerRadius().toPx() }
+    val screenCorners = rememberScreenCorners().pixels(LocalDensity.current)
     val frame = remember { FrameGeometry() }
     val flight = remember(entry, motion) { PageFlight(entry.id, motion, { shown.value }, frame) }
     val background = MaterialTheme.colorScheme.background
-    DisposableEffect(entry, motion) {
-        motion?.watch(entry)
-        onDispose {}
+    DisposableEffect(entry, motion) { motion?.watch(entry); onDispose { motion?.expansion?.takeIf { it.entry == entry.id }?.let { motion.finishExpansion(it) } } }
+    val session = motion?.expansion?.takeIf { it.entry == entry.id }
+    if (session != null) {
+        session.endCorner = with(screenCorners) { minOf(topLeft, topRight, bottomRight, bottomLeft) }
+        session.progress = { PagePose.progress(shown.value, motion.role(entry.id)?.predictive == true) }
+        LaunchedEffect(session) {
+            androidx.compose.runtime.withFrameNanos { }
+            motion.validateExpansion(session)
+            snapshotFlow { transition.currentState == transition.targetState && !transition.isRunning }
+                .collect { settled -> if (settled) motion.finishExpansion(session, restoreFocus = shown.value < 0.001f) }
+        }
     }
 
     Box(
@@ -361,7 +456,7 @@ internal fun AnimatedVisibilityScope.PageFrame(
                 .graphicsLayer {
                     val shownNow = shown.value
                     val role = motion?.role(entry.id) ?: return@graphicsLayer
-                    poseContainer(role, PagePose.progress(shownNow, role.predictive), frame.windowOffset, screenCornerPx)
+                    poseContainer(role, PagePose.progress(shownNow, role.predictive), frame.windowOffset, screenCorners)
                 }.background(background)
                 .drawWithContent {
                     drawContent()
@@ -412,7 +507,7 @@ private fun GraphicsLayerScope.poseContainer(
     role: PageRole,
     progress: Float,
     windowOffset: Offset,
-    screenCornerPx: Float,
+    screenCorners: WindowCornerPixels,
 ) {
     if (progress >= 1f) return
     val origin = role.origin
@@ -428,7 +523,7 @@ private fun GraphicsLayerScope.poseContainer(
 
         role.style == PageStyle.Origin && origin != null -> {
             val rect = PagePose.originRect(origin.bounds.translate(-windowOffset), size, progress)
-            shape = RoundedRectClip(rect, PagePose.lerp(origin.cornerPx, screenCornerPx, progress))
+            shape = RoundedRectClip(rect, screenCorners, origin.cornerPx, progress)
             clip = true
             alpha = PagePose.containerAlpha(progress)
         }
@@ -444,7 +539,7 @@ private fun GraphicsLayerScope.poseContainer(
             scaleX = 1f - out * PagePose.PushShrink
             scaleY = scaleX
             alpha = PagePose.pushAlpha(progress)
-            shape = RoundedCornerShape(screenCornerPx)
+            shape = RoundedRectClip(Rect(Offset.Zero, size), screenCorners)
             clip = true
         }
     }
@@ -469,7 +564,9 @@ private fun GraphicsLayerScope.poseOriginContent(
 /** Clips a layer to [rect] (layer coordinates) with rounded corners. */
 private class RoundedRectClip(
     private val rect: Rect,
-    private val cornerPx: Float,
+    private val corners: WindowCornerPixels,
+    private val from: Float = 0f,
+    private val progress: Float = 1f,
 ) : Shape {
     override fun createOutline(
         size: Size,
@@ -479,7 +576,7 @@ private class RoundedRectClip(
         if (rect.width <= 0f || rect.height <= 0f) {
             RectangleShape.createOutline(Size.Zero, layoutDirection, density)
         } else {
-            Outline.Rounded(RoundRect(rect, CornerRadius(cornerPx)))
+            Outline.Rounded(corners.roundRect(rect, from, progress))
         }
 }
 

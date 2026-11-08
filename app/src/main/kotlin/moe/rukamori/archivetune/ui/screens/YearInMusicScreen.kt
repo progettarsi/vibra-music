@@ -9,6 +9,9 @@
 
 package moe.rukamori.archivetune.ui.screens
 
+// Vibra: independent radii follow the global rounding style.
+import app.vibra.ui.theme.adaptiveRoundedCornerShape
+
 import android.content.Intent
 import android.view.View
 import android.view.ViewTreeObserver
@@ -20,6 +23,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import app.vibra.ui.components.VibraLoadingIndicator
 import app.vibra.ui.motion.clickable
 import app.vibra.ui.motion.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -45,8 +49,6 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
@@ -612,7 +614,7 @@ private fun IntroRecapCard(
                         rotationZ = -18f
                         translationX = 44f
                         translationY = 30f
-                    }.clip(RoundedCornerShape(18.dp))
+                    }.clip(adaptiveRoundedCornerShape(18.dp))
                     .background(
                         Brush.linearGradient(
                             colors = listOf(Color(0xFFFFE569), RecapPink, Color(0xFFFF8A42)),
@@ -688,7 +690,7 @@ private fun IntroRecapCard(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(999.dp))
+                        .clip(adaptiveRoundedCornerShape(999.dp))
                         .background(RecapInk)
                         .padding(vertical = 14.dp),
                 contentAlignment = Alignment.Center,
@@ -816,11 +818,11 @@ private fun TopSongRecapCard(
                     modifier =
                         Modifier
                             .size(220.dp)
-                            .clip(RoundedCornerShape(26.dp))
+                            .clip(adaptiveRoundedCornerShape(26.dp))
                             .border(
                                 width = 2.dp,
                                 color = RecapCream.copy(alpha = 0.82f),
-                                shape = RoundedCornerShape(26.dp),
+                                shape = adaptiveRoundedCornerShape(26.dp),
                             ),
                 )
                 Text(
@@ -1080,7 +1082,7 @@ private fun SummaryRankColumn(
     modifier: Modifier = Modifier,
 ) {
     val imageModel = rememberShareSafeImageRequest(imageData)
-    val imageShape = if (circularImage) CircleShape else RoundedCornerShape(14.dp)
+    val imageShape = if (circularImage) CircleShape else adaptiveRoundedCornerShape(14.dp)
 
     Column(
         modifier = modifier,
@@ -1108,7 +1110,7 @@ private fun SummaryRankColumn(
                 modifier =
                     Modifier
                         .graphicsLayer { rotationZ = -4f }
-                        .clip(RoundedCornerShape(7.dp))
+                        .clip(adaptiveRoundedCornerShape(7.dp))
                         .background(RecapLime)
                         .padding(horizontal = 7.dp, vertical = 2.dp),
                 style = MaterialTheme.typography.titleMedium,
@@ -1166,7 +1168,7 @@ private fun PassportStamp(
             text = label,
             modifier =
                 Modifier
-                    .clip(RoundedCornerShape(999.dp))
+                    .clip(adaptiveRoundedCornerShape(999.dp))
                     .background(Color.White.copy(alpha = 0.72f))
                     .padding(horizontal = 8.dp, vertical = 2.dp),
             style = MaterialTheme.typography.labelSmall,
@@ -1182,7 +1184,7 @@ private fun PassportStamp(
             modifier =
                 Modifier
                     .size(width = 82.dp, height = 62.dp)
-                    .clip(RoundedCornerShape(10.dp))
+                    .clip(adaptiveRoundedCornerShape(10.dp))
                     .background(Color.White.copy(alpha = 0.5f))
                     .border(
                         width = 2.dp,
@@ -1190,7 +1192,7 @@ private fun PassportStamp(
                             Brush.horizontalGradient(
                                 colors = listOf(Color.White, RecapLime, Color.White),
                             ),
-                        shape = RoundedCornerShape(10.dp),
+                        shape = adaptiveRoundedCornerShape(10.dp),
                     ),
         )
         Text(
@@ -1292,12 +1294,12 @@ private fun HeroMetricTile(
     Column(
         modifier =
             modifier
-                .clip(RoundedCornerShape(RecapTokens.SectionRadius))
+                .clip(adaptiveRoundedCornerShape(RecapTokens.SectionRadius))
                 .background(RecapCream.copy(alpha = 0.13f))
                 .border(
                     width = 1.dp,
                     color = RecapCream.copy(alpha = 0.14f),
-                    shape = RoundedCornerShape(RecapTokens.SectionRadius),
+                    shape = adaptiveRoundedCornerShape(RecapTokens.SectionRadius),
                 ).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
@@ -1387,7 +1389,7 @@ private fun RankedAlbumRow(
             modifier =
                 Modifier
                     .size(46.dp)
-                    .clip(RoundedCornerShape(12.dp)),
+                    .clip(adaptiveRoundedCornerShape(12.dp)),
         )
         Column(
             modifier = Modifier.weight(1f),
@@ -1427,12 +1429,12 @@ private fun RankedRowContainer(
         modifier =
             modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(RecapTokens.ItemRadius))
+                .clip(adaptiveRoundedCornerShape(RecapTokens.ItemRadius))
                 .background(RecapSurfaceHigh.copy(alpha = 0.82f))
                 .border(
                     width = 1.dp,
                     color = RecapCream.copy(alpha = 0.08f),
-                    shape = RoundedCornerShape(RecapTokens.ItemRadius),
+                    shape = adaptiveRoundedCornerShape(RecapTokens.ItemRadius),
                 ).padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -1488,7 +1490,7 @@ private fun RecapStatRow(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(RecapTokens.SectionRadius))
+                .clip(adaptiveRoundedCornerShape(RecapTokens.SectionRadius))
                 .background(RecapSurfaceHigh.copy(alpha = 0.72f))
                 .padding(14.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -1532,12 +1534,12 @@ private fun RecapChip(
     Row(
         modifier =
             Modifier
-                .clip(RoundedCornerShape(999.dp))
+                .clip(adaptiveRoundedCornerShape(999.dp))
                 .background(color.copy(alpha = 0.2f))
                 .border(
                     width = 1.dp,
                     color = color.copy(alpha = 0.34f),
-                    shape = RoundedCornerShape(999.dp),
+                    shape = adaptiveRoundedCornerShape(999.dp),
                 ).padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -1563,12 +1565,12 @@ private fun RecapBadge(text: String) {
     Row(
         modifier =
             Modifier
-                .clip(RoundedCornerShape(999.dp))
+                .clip(adaptiveRoundedCornerShape(999.dp))
                 .background(RecapCream.copy(alpha = 0.14f))
                 .border(
                     width = 1.dp,
                     color = RecapCream.copy(alpha = 0.16f),
-                    shape = RoundedCornerShape(999.dp),
+                    shape = adaptiveRoundedCornerShape(999.dp),
                 ).padding(horizontal = 12.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -1675,7 +1677,7 @@ private fun RecapShareButton(
                 label = "shareProgress",
             ) { generating ->
                 if (generating) {
-                    CircularWavyProgressIndicator(
+                    VibraLoadingIndicator(
                         modifier = Modifier.size(22.dp),
                         color = RecapCream,
                     )

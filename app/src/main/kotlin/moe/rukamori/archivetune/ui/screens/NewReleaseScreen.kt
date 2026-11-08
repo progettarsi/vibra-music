@@ -9,6 +9,9 @@
 
 package moe.rukamori.archivetune.ui.screens
 
+// Vibra: independent radii follow the global rounding style.
+import app.vibra.ui.theme.adaptiveRoundedCornerShape
+
 import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
@@ -34,7 +37,6 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyHorizontalGrid
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Album
 import androidx.compose.material.icons.outlined.LibraryMusic
@@ -450,7 +452,7 @@ private fun NewReleaseSummaryCard(
     selectedTab: NewReleaseTab,
     onTabSelected: (NewReleaseTab) -> Unit,
 ) {
-    val summaryShape = remember { RoundedCornerShape(28.dp) }
+    val summaryShape = adaptiveRoundedCornerShape(28.dp)
 
     Surface(
         shape = summaryShape,
@@ -492,7 +494,7 @@ private fun NewReleaseTabs(
 ) {
     val tabs = remember { NewReleaseTab.entries.toList() }
     val selectedTabIndex = tabs.indexOf(selectedTab).coerceAtLeast(0)
-    val tabShape = remember { RoundedCornerShape(28.dp) }
+    val tabShape = adaptiveRoundedCornerShape(28.dp)
     val selectedContainer = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.56f)
     val unselectedContainer = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.42f)
     val selectedContentColor = MaterialTheme.colorScheme.onPrimaryContainer
@@ -517,7 +519,7 @@ private fun NewReleaseTabs(
                         Modifier
                             .width(76.dp)
                             .height(3.dp)
-                            .clip(RoundedCornerShape(3.dp))
+                            .clip(adaptiveRoundedCornerShape(3.dp))
                             .background(indicatorColor),
                 )
             }

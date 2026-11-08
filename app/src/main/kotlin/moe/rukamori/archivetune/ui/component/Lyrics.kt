@@ -9,6 +9,9 @@
 
 package moe.rukamori.archivetune.ui.component
 
+// Vibra: independent radii follow the global rounding style.
+import app.vibra.ui.theme.adaptiveRoundedCornerShape
+
 import android.annotation.SuppressLint
 import android.content.res.Configuration
 import android.os.Build
@@ -58,7 +61,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import app.vibra.ui.components.VibraBasicAlertDialog as BasicAlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -1020,7 +1022,7 @@ fun Lyrics(
                                         } else {
                                             Color.Transparent
                                         },
-                                    shape = RoundedCornerShape(8.dp),
+                                    shape = adaptiveRoundedCornerShape(8.dp),
                                 ).padding(
                                     horizontal = 24.dp,
                                     vertical = 8.dp,
@@ -2425,7 +2427,7 @@ fun Lyrics(
                         Modifier
                             .background(
                                 color = MaterialTheme.colorScheme.primaryContainer,
-                                shape = RoundedCornerShape(24.dp),
+                                shape = adaptiveRoundedCornerShape(24.dp),
                             ).clickable {
                                 isManualScrolling = false
                                 lastPreviewTime = 0L
@@ -2502,7 +2504,7 @@ fun Lyrics(
                                                 } else {
                                                     Color.White.copy(alpha = 0.5f)
                                                 },
-                                            shape = RoundedCornerShape(24.dp),
+                                            shape = adaptiveRoundedCornerShape(24.dp),
                                         ).clickable(enabled = selectedIndices.isNotEmpty()) {
                                             if (selectedIndices.isNotEmpty()) {
                                                 val sortedIndices = selectedIndices.sorted()

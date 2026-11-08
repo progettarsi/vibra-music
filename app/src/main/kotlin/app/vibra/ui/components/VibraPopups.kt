@@ -7,6 +7,9 @@
 
 package app.vibra.ui.components
 
+// Vibra: independent radii follow the global rounding style.
+import app.vibra.ui.theme.adaptiveRoundedCornerShape
+
 import androidx.compose.animation.core.AnimationVector
 import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.SpringSpec
@@ -33,7 +36,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ButtonShapes
@@ -533,7 +535,7 @@ fun VibraDialogButton(
 }
 
 /** Shape of the filled text fields used in dialogs and sheets. */
-val VibraFieldShape: Shape = RoundedCornerShape(20.dp)
+val VibraFieldShape: Shape @Composable get() = app.vibra.ui.theme.LocalVibraRadii.current.fieldShape
 
 /** Bordered name fields on the playlist form reference; labels sit above the field. */
 @Composable

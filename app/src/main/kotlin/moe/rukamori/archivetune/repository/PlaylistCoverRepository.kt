@@ -38,6 +38,7 @@ class PlaylistCoverRepository
     constructor(
         @ApplicationContext private val context: Context,
         private val database: MusicDatabase,
+        private val libraryActions: app.vibra.library.LibraryActions,
     ) {
         private val refreshLocks = Array(8) { Mutex() }
         private val refreshedCovers = LruCache<String, RefreshedCover>(64)
@@ -99,27 +100,12 @@ class PlaylistCoverRepository
             }
         }
 
-        suspend fun setRemoteCover(
-            playlist: PlaylistEntity,
-            uri: Uri,
-        ) = withContext(Dispatchers.IO) {
-            persistReadPermission(uri)
-            try {
-                val image = decodeUploadImage(uri)
-                val remoteCoverUrl =
-                    YouTube
-                        .uploadCustomPlaylistCover(
-                            playlistId = requireNotNull(playlist.browseId),
-                            image = image,
-                        ).getOrThrow()
-                val previous = updateThumbnail(playlist.id, remoteCoverUrl)
-                previous.thumbnailUrl
-                    ?.let(Uri::parse)
-                    ?.takeIf { it.scheme == "content" }
-                    ?.let(::releaseReadPermission)
-            } finally {
-                releaseReadPermission(uri)
-            }
+        suspend fun isPublishedOrPending(id: String): Boolean = libraryActions.isPublishedOrPending(id)
+
+        suspend fun setRemoteCover(playlist: PlaylistEntity, uri: Uri) = withContext(Dispatchers.IO) {
+            val image = decodeUploadImage(uri)
+            libraryActions.changePlaylistCover(playlist.id, image).getOrThrow()
+            releasePreviousLocalCover(playlist)
         }
 
         suspend fun removeLocalCover(playlist: PlaylistEntity) =
@@ -131,18 +117,14 @@ class PlaylistCoverRepository
                     ?.let(::releaseReadPermission)
             }
 
-        suspend fun removeRemoteCover(playlist: PlaylistEntity) =
-            withContext(Dispatchers.IO) {
-                val remoteCoverUrl =
-                    YouTube
-                        .removeCustomPlaylistCover(requireNotNull(playlist.browseId))
-                        .getOrThrow()
-                val previous = updateThumbnail(playlist.id, remoteCoverUrl)
-                previous.thumbnailUrl
-                    ?.let(Uri::parse)
-                    ?.takeIf { it.scheme == "content" }
-                    ?.let(::releaseReadPermission)
-            }
+        suspend fun removeRemoteCover(playlist: PlaylistEntity) = withContext(Dispatchers.IO) {
+            libraryActions.changePlaylistCover(playlist.id, null).getOrThrow()
+            releasePreviousLocalCover(playlist)
+        }
+
+        private fun releasePreviousLocalCover(playlist: PlaylistEntity) {
+            playlist.thumbnailUrl?.let(Uri::parse)?.takeIf { it.scheme == "content" }?.let(::releaseReadPermission)
+        }
 
         private suspend fun updateThumbnail(
             playlistId: String,

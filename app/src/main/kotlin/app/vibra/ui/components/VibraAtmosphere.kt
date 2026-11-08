@@ -14,7 +14,14 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -26,14 +33,22 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Matrix
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.asComposePath
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
@@ -42,6 +57,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.graphics.ColorUtils
+import androidx.graphics.shapes.RoundedPolygon
+import androidx.graphics.shapes.toPath
+import app.vibra.ui.theme.MoodTone
 import androidx.palette.graphics.Palette
 import coil3.imageLoader
 import coil3.request.ImageRequest
@@ -301,15 +319,141 @@ fun ArtworkGlow(
     )
 }
 
+/**
+ * The backdrop of a mood page: the mood's shape in its colours, large, blurred and drifting
+ * slowly, under the faint outlines of the profile wallpaper. It fades into the page before
+ * the content below it. Below Android 12 there is no blur, so soft round washes stand in.
+ */
+@Composable
+fun MoodAtmosphere(
+    polygon: RoundedPolygon,
+    tone: MoodTone,
+    modifier: Modifier = Modifier,
+) {
+    val background = MaterialTheme.colorScheme.background
+    BoxWithConstraints(modifier = modifier.fillMaxWidth().height(MoodAtmosphereHeight).clipToBounds()) {
+        // Placed for a 390 dp phone and scaled with the width, so tablets keep the composition.
+        val unit = maxWidth / 390f
+        val bright = listOf(tone.bright, tone.middle, tone.deep)
+        val deep = listOf(tone.deep, tone.middle, tone.bright)
+        MoodBlob(polygon, bright, side = unit * 400, x = unit * -110, y = unit * -90, alpha = 0.72f, drift = Offset(46f, 34f), driftMs = 21_000, turnMs = 140_000)
+        MoodBlob(polygon, deep, side = unit * 300, x = unit * 190, y = unit * 150, alpha = 0.55f, drift = Offset(-40f, -26f), driftMs = 27_000, turnMs = -180_000)
+        MoodBlob(polygon, bright, side = unit * 170, x = unit * 10, y = unit * 380, alpha = 0.55f, drift = Offset(30f, -40f), driftMs = 17_000, turnMs = 140_000, blur = 28.dp)
+        ShapeWallpaper(polygon = polygon, color = tone.accent.copy(alpha = 0.14f), modifier = Modifier.fillMaxWidth().height(MoodWallpaperHeight))
+        Box(
+            Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .height(MoodFadeHeight)
+                .background(Brush.verticalGradient(0f to Color.Transparent, 0.55f to background.copy(alpha = 0.75f), 1f to background)),
+        )
+    }
+}
+
+/**
+ * One blurred shape. Only the outer layer moves: the blurred layer inside it is drawn once
+ * and reused, so the drift costs no blur per frame.
+ *
+ * @param drift how far it wanders, in dp; it goes out and comes back once per [driftMs].
+ * @param turnMs one revolution; negative turns the other way.
+ */
+@Composable
+private fun MoodBlob(
+    polygon: RoundedPolygon,
+    colors: List<Color>,
+    side: Dp,
+    x: Dp,
+    y: Dp,
+    alpha: Float,
+    drift: Offset,
+    driftMs: Int,
+    turnMs: Int,
+    blur: Dp = 46.dp,
+) {
+    val moving = ambientMotionAllowed
+    val wander = rememberDrift(moving, driftMs)
+    val turn = rememberDrift(moving, abs(turnMs))
+    val direction = if (turnMs < 0) -1f else 1f
+    val canBlur = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+    Box(
+        Modifier
+            .offset(x, y)
+            .size(side)
+            .graphicsLayer {
+                val wave = (1f - cos(wander.value * 2f * PI.toFloat())) / 2f
+                translationX = drift.x.dp.toPx() * wave
+                translationY = drift.y.dp.toPx() * wave
+                rotationZ = turn.value * 360f * direction
+            }.then(if (canBlur) Modifier.blur(blur, BlurredEdgeTreatment.Unbounded) else Modifier)
+            .drawWithCache {
+                val path =
+                    polygon.toPath().asComposePath().apply {
+                        transform(Matrix().apply { scale(size.width, size.height) })
+                    }
+                val sharp = Brush.linearGradient(colors, Offset.Zero, Offset(size.width, size.height))
+                val soft = Brush.radialGradient(listOf(colors[1], Color.Transparent))
+                onDrawBehind {
+                    if (canBlur) drawPath(path, sharp, alpha = alpha) else drawCircle(soft, alpha = alpha)
+                }
+            },
+    )
+}
+
+/**
+ * Wallpaper: large, faint outlines of a shape that drift and turn very slowly (one
+ * revolution every few minutes), so a page feels alive without distracting.
+ */
+@Composable
+fun ShapeWallpaper(
+    polygon: RoundedPolygon,
+    color: Color,
+    modifier: Modifier = Modifier,
+) {
+    val path = remember(polygon) { polygon.toPath().asComposePath() }
+    val turn =
+        if (!ambientMotionAllowed) {
+            null
+        } else {
+            rememberInfiniteTransition(label = "wallpaper").animateFloat(
+                initialValue = 0f,
+                targetValue = 360f,
+                animationSpec = infiniteRepeatable(tween(180_000, easing = LinearEasing), RepeatMode.Restart),
+                label = "wallpaperTurn",
+            )
+        }
+    // (x, y, size) as fractions of the width — follows the Figma blob placement.
+    val placements = remember { listOf(Triple(-0.12f, -0.1f, 0.42f), Triple(0.78f, 0.62f, 0.26f), Triple(0.8f, -0.04f, 0.3f), Triple(-0.06f, 0.62f, 0.34f)) }
+    Canvas(modifier = modifier) {
+        val angle = turn?.value ?: 0f
+        placements.forEachIndexed { index, (fx, fy, fs) ->
+            val side = size.width * fs
+            val matrix = Matrix().apply { scale(side, side) }
+            val scaled = androidx.compose.ui.graphics.Path().apply { addPath(path) }.also { it.transform(matrix) }
+            translate(left = size.width * fx, top = size.width * fy) {
+                rotate(degrees = if (index % 2 == 0) angle else -angle, pivot = Offset(side / 2f, side / 2f)) {
+                    drawPath(scaled, color = color, style = Stroke(width = 3.dp.toPx()))
+                }
+            }
+        }
+    }
+}
+
+private val MoodAtmosphereHeight = 600.dp
+private val MoodWallpaperHeight = 380.dp
+private val MoodFadeHeight = 300.dp
+
 /** Slow 0‥1 phase; a still value when [moving] is false. */
 @Composable
-private fun rememberDrift(moving: Boolean): State<Float> {
+private fun rememberDrift(
+    moving: Boolean,
+    periodMs: Int = DriftPeriodMs,
+): State<Float> {
     if (!moving) return remember { mutableFloatStateOf(0.18f) }
     val transition = rememberInfiniteTransition(label = "atmosphereDrift")
     return transition.animateFloat(
         initialValue = 0f,
         targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(DriftPeriodMs, easing = LinearEasing), RepeatMode.Restart),
+        animationSpec = infiniteRepeatable(tween(periodMs, easing = LinearEasing), RepeatMode.Restart),
         label = "atmosphereDriftPhase",
     )
 }

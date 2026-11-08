@@ -1,6 +1,8 @@
 /* Vibra (2026) — GPL-3.0 License. Derived from ArchiveTune © Rukamori (github.com/rukamori). */
 package app.vibra.ui.components
 
+import androidx.compose.runtime.Composable
+import app.vibra.ui.theme.LocalVibraRadii
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -17,13 +19,13 @@ object MenuTokens {
   /** The grabber's band: as tall as the side margin, so the first card sits [Gutter] from three edges. */
   val SheetHandleHeight = 20.dp
   val Gutter = 20.dp
-  val CardRadius = 32.dp
+  val CardRadius: Dp @Composable get() = LocalVibraRadii.current.card
   /** Sheet top corners: concentric with the cards inside, [Gutter] away. */
-  val SheetRadius = CardRadius + Gutter
+  val SheetRadius: Dp @Composable get() = CardRadius + Gutter
   /** Inset of a list of rows inside its card. */
   val CardInset = 8.dp
   /** A row's press shape inside its card. */
-  val RowShape = RoundedCornerShape(concentric(CardRadius, CardInset))
+  val RowShape: androidx.compose.ui.graphics.Shape @Composable get() = RoundedCornerShape(concentric(CardRadius, CardInset))
   /** Inner margin of a header card, all four sides. */
   val ExpandedHeaderInset = 16.dp
   val CompactHeaderInset = 12.dp

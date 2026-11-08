@@ -146,9 +146,12 @@ internal class LyricsFollow(
     }
 
     /** Places the list and then keeps it on the active line for as long as it runs. */
-    suspend fun drive(state: LazyListState) {
+    suspend fun drive(
+        state: LazyListState,
+        onPlaced: () -> Boolean = { false },
+    ) {
         if (!browsing) guarded { centre(state, maxOf(active, 0)) }
-        visibility.animateTo(1f, specs.fade)
+        if (onPlaced()) visibility.snapTo(1f) else visibility.animateTo(1f, specs.fade)
         var returning = false
         snapshotFlow { browsing to active }.collect { (isBrowsing, line) ->
             if (isBrowsing) {

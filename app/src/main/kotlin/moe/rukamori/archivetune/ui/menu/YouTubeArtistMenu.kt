@@ -30,6 +30,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import app.vibra.ui.components.*
 import moe.rukamori.archivetune.LocalDatabase
+import moe.rukamori.archivetune.LocalSyncUtils
 import moe.rukamori.archivetune.LocalPlayerConnection
 import moe.rukamori.archivetune.R
 import moe.rukamori.archivetune.db.entities.ArtistEntity
@@ -42,6 +43,7 @@ import moe.rukamori.archivetune.ui.component.NewAction
 fun YouTubeArtistMenu(artist: ArtistItem, onDismiss: () -> Unit) {
   val context = LocalContext.current
   val database = LocalDatabase.current
+  val libraryActions = LocalSyncUtils.current.libraryActions
   val playerConnection = LocalPlayerConnection.current ?: return
   val libraryArtist by database.artist(artist.id).collectAsState(initial = null)
   val coroutineScope = rememberCoroutineScope()
@@ -152,22 +154,14 @@ fun YouTubeArtistMenu(artist: ArtistItem, onDismiss: () -> Unit) {
         },
         modifier =
           Modifier.clickable {
-            database.query {
-              val libraryArtist = libraryArtist
-              if (libraryArtist != null) {
-                update(libraryArtist.artist.toggleLike())
-              } else {
-                insert(
-                  ArtistEntity(
-                      id = artist.id,
-                      name = artist.title,
-                      channelId = artist.channelId,
-                      thumbnailUrl = artist.thumbnail,
-                    )
-                    .toggleLike()
-                )
-              }
-            }
+            libraryActions.toggleArtist(
+              libraryArtist?.artist ?: ArtistEntity(
+                id = artist.id,
+                name = artist.title,
+                channelId = artist.channelId,
+                thumbnailUrl = artist.thumbnail,
+              ),
+            )
           },
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
       )

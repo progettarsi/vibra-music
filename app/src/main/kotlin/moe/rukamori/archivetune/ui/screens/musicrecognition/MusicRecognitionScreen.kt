@@ -45,6 +45,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
+import app.vibra.ui.components.VibraLoadingIndicator
 import app.vibra.ui.motion.VibraButton as Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ButtonGroupDefaults
@@ -58,7 +59,6 @@ import androidx.compose.material3.Icon
 import app.vibra.ui.motion.VibraIconButton as IconButton
 import androidx.compose.material3.LargeFlexibleTopAppBar
 import androidx.compose.material3.ListItemDefaults
-import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
 import app.vibra.ui.motion.VibraOutlinedButton as OutlinedButton
@@ -447,7 +447,7 @@ private fun RecognitionTaskState(
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     if (phase == RecognitionPhaseUi.Processing) {
-                        LoadingIndicator(
+                        VibraLoadingIndicator(
                             modifier = Modifier.size(72.dp),
                             color = MaterialTheme.colorScheme.onPrimaryContainer,
                         )

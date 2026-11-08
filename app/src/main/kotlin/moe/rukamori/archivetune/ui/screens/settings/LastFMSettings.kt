@@ -9,6 +9,7 @@
 
 package moe.rukamori.archivetune.ui.screens.settings
 
+import app.vibra.ui.components.VibraLoadingIndicator
 import app.vibra.ui.motion.vibraControlFeedback
 import androidx.annotation.StringRes
 import androidx.compose.foundation.horizontalScroll
@@ -27,7 +28,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import app.vibra.ui.components.VibraAlertDialog as AlertDialog
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilterChip
@@ -227,7 +227,7 @@ private fun LastFmSettingsLoading() {
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        CircularWavyProgressIndicator(modifier = Modifier.size(28.dp))
+        VibraLoadingIndicator(modifier = Modifier.size(28.dp))
         Text(
             text = stringResource(R.string.loading),
             style = MaterialTheme.typography.bodyMedium,
@@ -431,7 +431,7 @@ private fun LastFmLoginDialog(
                         horizontalArrangement = Arrangement.Center,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        CircularWavyProgressIndicator(modifier = Modifier.size(24.dp))
+                        VibraLoadingIndicator(modifier = Modifier.size(24.dp))
                         Text(
                             text = stringResource(R.string.logging_in),
                             style = MaterialTheme.typography.bodyMedium,

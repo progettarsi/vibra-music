@@ -74,6 +74,7 @@ import androidx.media3.exoplayer.offline.Download
 import androidx.navigation.NavController
 import com.valentinilk.shimmer.shimmer
 import moe.rukamori.archivetune.LocalDatabase
+import moe.rukamori.archivetune.LocalSyncUtils
 import moe.rukamori.archivetune.LocalDownloadUtil
 import moe.rukamori.archivetune.LocalPlayerAwareWindowInsets
 import moe.rukamori.archivetune.LocalPlayerConnection
@@ -124,6 +125,7 @@ fun AlbumScreen(
     val context = LocalContext.current
     val menuState = LocalMenuState.current
     val database = LocalDatabase.current
+    val libraryActions = LocalSyncUtils.current.libraryActions
     val haptic = LocalHapticFeedback.current
     val playerConnection = LocalPlayerConnection.current ?: return
 
@@ -275,9 +277,7 @@ fun AlbumScreen(
                                 }
                             },
                         onToggleAdd = {
-                            database.query {
-                                update(albumWithSongs.album.toggleLike())
-                            }
+                            libraryActions.toggleAlbum(albumWithSongs.album)
                         },
                         additionalPrimaryActions = { contentColor ->
                             if (!albumWithSongs.album.isLocal && albumWithSongs.songs.any { !it.song.isLocal }) {

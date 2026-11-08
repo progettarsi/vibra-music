@@ -30,7 +30,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
@@ -66,6 +65,7 @@ import androidx.media3.exoplayer.offline.Download
 import androidx.media3.exoplayer.offline.DownloadService
 import androidx.navigation.NavController
 import app.vibra.ui.components.*
+import app.vibra.ui.components.VibraLoadingIndicator
 import coil3.compose.AsyncImage
 import kotlin.math.abs
 import kotlin.math.log2
@@ -351,7 +351,7 @@ fun PlayerMenu(
             Download.STATE_DOWNLOADING -> {
               MediaMenuRow(
                 headlineContent = { Text(text = stringResource(R.string.downloading)) },
-                leadingContent = { CircularWavyProgressIndicator(modifier = Modifier.size(24.dp)) },
+                leadingContent = { VibraLoadingIndicator(modifier = Modifier.size(24.dp)) },
                 modifier =
                   Modifier.clickable {
                     DownloadService.sendRemoveDownload(

@@ -48,7 +48,6 @@ import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
@@ -84,6 +83,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.vibra.ui.components.*
 import app.vibra.ui.components.VibraBasicAlertDialog as BasicAlertDialog
 import app.vibra.ui.components.VibraDialogButton
+import app.vibra.ui.components.VibraLoadingIndicator
 import app.vibra.ui.components.VibraWindowDialog as Dialog
 import app.vibra.ui.motion.VibraButton as Button
 import app.vibra.ui.motion.VibraFilledTonalButton as FilledTonalButton
@@ -139,7 +139,7 @@ fun LyricsMenu(
 ) {
   val context = LocalContext.current
   val renderState by lyricsRenderViewModel.state.collectAsStateWithLifecycle()
-  val preparedLyrics = (renderState as? LyricsRenderScreenState.Success)?.lyrics
+  val preparedLyrics = (renderState.forMedia(mediaMetadataProvider().id) as? LyricsRenderScreenState.Success)?.lyrics
   val hasTranslations = preparedLyrics?.hasTranslations == true
   val showTranslations = hasTranslations && preparedLyrics?.preferences?.showTranslations == true
   val onShowTranslationsChange =
@@ -246,7 +246,7 @@ fun LyricsMenu(
   if (isRefetching) {
     DefaultDialog(onDismiss = {}) {
       Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(12.dp)) {
-        LoadingIndicator(modifier = Modifier.size(40.dp))
+        VibraLoadingIndicator(modifier = Modifier.size(40.dp))
       }
     }
   }
@@ -635,7 +635,7 @@ fun LyricsMenu(
               shapes = ButtonDefaults.shapes(),
             ) {
               if (isTranslationInProgress) {
-                LoadingIndicator(modifier = Modifier.size(18.dp))
+                VibraLoadingIndicator(modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
               }
               Text(stringResource(R.string.translate))
@@ -940,7 +940,7 @@ private fun LyricsSearchResultHeader(
         )
       }
       if (isSearching) {
-        LoadingIndicator(
+        VibraLoadingIndicator(
           modifier = Modifier.size(28.dp),
           color = MaterialTheme.colorScheme.onPrimaryContainer,
         )
@@ -1174,7 +1174,7 @@ private fun LyricsSearchLoadingContent() {
     horizontalAlignment = Alignment.CenterHorizontally,
     verticalArrangement = Arrangement.spacedBy(16.dp),
   ) {
-    LoadingIndicator(modifier = Modifier.size(40.dp))
+    VibraLoadingIndicator(modifier = Modifier.size(40.dp))
     Text(
       text = stringResource(R.string.lyrics_searching_providers),
       style = MaterialTheme.typography.bodyMedium,
@@ -1191,7 +1191,7 @@ private fun LyricsSearchFooterLoading() {
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
   ) {
-    LoadingIndicator(modifier = Modifier.size(24.dp))
+    VibraLoadingIndicator(modifier = Modifier.size(24.dp))
     Text(
       text = stringResource(R.string.lyrics_search_still_searching),
       style = MaterialTheme.typography.bodySmall,

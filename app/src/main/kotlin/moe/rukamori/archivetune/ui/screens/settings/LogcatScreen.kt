@@ -9,6 +9,7 @@
 
 package moe.rukamori.archivetune.ui.screens.settings
 
+import app.vibra.ui.components.VibraLoadingIndicator
 import app.vibra.ui.motion.vibraControlFeedback
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -46,7 +47,6 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import app.vibra.ui.motion.VibraIconButton as IconButton
 import androidx.compose.material3.ListItemDefaults
-import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -265,7 +265,7 @@ private fun LogcatScreenContent(
         ) {
             when (state) {
                 LogcatScreenState.Loading -> {
-                    LoadingIndicator(
+                    VibraLoadingIndicator(
                         modifier =
                             Modifier
                                 .align(Alignment.Center)

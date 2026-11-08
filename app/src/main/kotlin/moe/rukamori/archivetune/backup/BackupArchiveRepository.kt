@@ -168,7 +168,7 @@ class BackupArchiveRepository
 
             preferences.forEach { (key, value) ->
                 if (
-                    key.name !in excludedKeyNames &&
+                    !isExcludedPreference(key.name, excludedKeyNames) &&
                     key.name !in ScheduledBackupRepository.NON_PORTABLE_PREFERENCE_KEYS
                 ) {
                     serializer.writePreference(key, value)
@@ -213,9 +213,22 @@ class BackupArchiveRepository
             const val SETTINGS_XML_FILENAME = "settings.xml"
             private const val BUFFER_SIZE = 64 * 1024
 
+            /** Vibra: per-account keys carry the account id in their name, so they cannot be listed. */
+            private const val ACCOUNT_PREFERENCE_PREFIX = "spotify_sync_completed_"
+
+            fun isExcludedPreference(
+                name: String,
+                excludedKeyNames: Set<String>,
+            ): Boolean =
+                name in excludedKeyNames ||
+                    (excludedKeyNames.isNotEmpty() && name.startsWith(ACCOUNT_PREFERENCE_PREFIX))
+
             val ACCOUNT_PREFERENCE_KEYS: Set<String> =
                 setOf(
                     "innerTubeCookie",
+                    // Vibra: each saved account holds its own cookie, visitorData and dataSyncId.
+                    "savedAccounts",
+                    "ai_api_key",
                     "visitorData",
                     "dataSyncId",
                     "poToken",
@@ -246,6 +259,7 @@ class BackupArchiveRepository
                     "spotify_access_token_expires_at",
                     "spotify_account_name",
                     "spotify_account_avatar_url",
+                    "spotify_library_playlists_cache",
                 )
         }
     }

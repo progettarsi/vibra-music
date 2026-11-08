@@ -21,6 +21,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -34,7 +35,9 @@ import app.vibra.ui.motion.noTapBounce
 import app.vibra.ui.motion.tapBounceInput
 import app.vibra.ui.motion.tapBounceLayer
 import app.vibra.ui.theme.VibraDimens
-import app.vibra.ui.theme.VibraShapes
+import app.vibra.ui.theme.LocalVibraRowShapes
+import app.vibra.ui.theme.LocalVibraRadii
+import app.vibra.ui.theme.VibraRowShapes
 
 /**
  * How a song row paints its container (Figma "Canzone" component variants).
@@ -70,7 +73,13 @@ fun VibraRow(
     isActive: Boolean = false,
     background: RowBackground = RowBackground.Card,
     bounceOnTap: Boolean = false,
+    containerInset: androidx.compose.ui.unit.Dp? = null,
 ) {
+    val radii = LocalVibraRadii.current
+    val nested = remember(radii, containerInset) {
+        containerInset?.let { VibraRowShapes(radii.inset(radii.card, it)) }
+    }
+    val shapes = nested ?: radii.rowShapes
     val containerColor by animateColorAsState(
         targetValue =
             when {
@@ -97,7 +106,7 @@ fun VibraRow(
             modifier =
                 modifier
                     .tapBounceLayer(bounce)
-                    .clip(VibraShapes.Row)
+                    .clip(shapes.container)
                     .background(containerColor)
                     .then(if (bounceOnTap && bounce != null) Modifier.tapBounceInput(bounce) else Modifier)
                     .then(interactionModifier)
@@ -110,9 +119,12 @@ fun VibraRow(
                     modifier =
                         Modifier
                             .size(VibraDimens.RowThumbnail)
-                            .clip(VibraShapes.RowThumbnail),
+                            .clip(shapes.thumbnail),
                     contentAlignment = Alignment.Center,
-                ) { thumbnail() }
+                ) {
+                    if (nested == null) thumbnail()
+                    else CompositionLocalProvider(LocalVibraRowShapes provides nested, content = thumbnail)
+                }
 
                 Column(
                     modifier =

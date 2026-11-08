@@ -19,11 +19,13 @@ android {
     buildFeatures { buildConfig = true }
     buildTypes {
         create("benchmark") {
+            initWith(getByName("debug"))
             isDebuggable = true
             buildConfigField("boolean", "GENERATE_PROFILE", "false")
             matchingFallbacks += listOf("release")
         }
         create("nonMinifiedBenchmark") {
+            initWith(getByName("debug"))
             isDebuggable = true
             buildConfigField("boolean", "GENERATE_PROFILE", "true")
             matchingFallbacks += listOf("release")

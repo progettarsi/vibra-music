@@ -21,17 +21,21 @@ import androidx.compose.ui.semantics.Role
  * elsewhere it scales what follows. A surface that draws its own clip and background before the
  * click should use [interactiveSurface] instead.
  */
-fun Modifier.clickable(enabled: Boolean = true, onClickLabel: String? = null, role: Role? = null, onClick: () -> Unit): Modifier =
+fun Modifier.clickable(enabled: Boolean = true, onClickLabel: String? = null, role: Role? = null, onClick: () -> Unit): Modifier = expandingClick(onClick) { click ->
     sharedTapBounce(enabled)
-        .foundationClickable(enabled = enabled, onClickLabel = onClickLabel, role = role, onClick = onClick)
+        .foundationClickable(enabled = enabled, onClickLabel = onClickLabel, role = role, onClick = click)
+}
 
-fun Modifier.clickable(interactionSource: MutableInteractionSource?, indication: Indication?, enabled: Boolean = true, onClickLabel: String? = null, role: Role? = null, onClick: () -> Unit): Modifier =
+fun Modifier.clickable(interactionSource: MutableInteractionSource?, indication: Indication?, enabled: Boolean = true, onClickLabel: String? = null, role: Role? = null, onClick: () -> Unit): Modifier = expandingClick(onClick) { click ->
     sharedTapBounce(enabled)
-        .foundationClickable(interactionSource = interactionSource, indication = indication, enabled = enabled, onClickLabel = onClickLabel, role = role, onClick = onClick)
+        .foundationClickable(interactionSource = interactionSource, indication = indication, enabled = enabled, onClickLabel = onClickLabel, role = role, onClick = click)
+}
 
 fun Modifier.clickable(interactionSource: MutableInteractionSource?, enabled: Boolean = true, onClickLabel: String? = null, role: Role? = null, onClick: () -> Unit): Modifier = composed {
+    expandingClick(onClick) { click ->
     sharedTapBounce(enabled)
-        .foundationClickable(interactionSource = interactionSource, indication = LocalIndication.current, enabled = enabled, onClickLabel = onClickLabel, role = role, onClick = onClick)
+        .foundationClickable(interactionSource = interactionSource, indication = LocalIndication.current, enabled = enabled, onClickLabel = onClickLabel, role = role, onClick = click)
+    }
 }
 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
@@ -41,11 +45,12 @@ fun Modifier.combinedClickable(
     onDoubleClick: (() -> Unit)? = null, hapticFeedbackEnabled: Boolean = true,
     interactionSource: MutableInteractionSource? = null, indication: Indication?,
     onClick: () -> Unit,
-): Modifier =
+): Modifier = expandingClick(onClick) { click ->
     sharedTapBounce(enabled)
         .foundationCombinedClickable(interactionSource = interactionSource, indication = indication,
             enabled = enabled, onClickLabel = onClickLabel, role = role, onLongClickLabel = onLongClickLabel,
-            onLongClick = onLongClick, onDoubleClick = onDoubleClick, hapticFeedbackEnabled = hapticFeedbackEnabled, onClick = onClick)
+            onLongClick = onLongClick, onDoubleClick = onDoubleClick, hapticFeedbackEnabled = hapticFeedbackEnabled, onClick = click)
+}
 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 fun Modifier.combinedClickable(
@@ -54,10 +59,12 @@ fun Modifier.combinedClickable(
     onDoubleClick: (() -> Unit)? = null, hapticFeedbackEnabled: Boolean = true,
     interactionSource: MutableInteractionSource? = null, onClick: () -> Unit,
 ): Modifier = composed {
+    expandingClick(onClick) { click ->
     sharedTapBounce(enabled)
         .foundationCombinedClickable(interactionSource = interactionSource, indication = LocalIndication.current,
             enabled = enabled, onClickLabel = onClickLabel, role = role, onLongClickLabel = onLongClickLabel,
-            onLongClick = onLongClick, onDoubleClick = onDoubleClick, hapticFeedbackEnabled = hapticFeedbackEnabled, onClick = onClick)
+            onLongClick = onLongClick, onDoubleClick = onDoubleClick, hapticFeedbackEnabled = hapticFeedbackEnabled, onClick = click)
+    }
 }
 
 /**
@@ -74,6 +81,7 @@ fun Modifier.interactiveSurface(
     interactionSource: MutableInteractionSource? = null,
     onClick: () -> Unit,
 ): Modifier = composed {
+    expandingClick(onClick, shape, containerColor) { click ->
     surfaceLayers(shape, containerColor, enabled)
         .foundationClickable(
             interactionSource = interactionSource,
@@ -81,8 +89,9 @@ fun Modifier.interactiveSurface(
             enabled = enabled,
             onClickLabel = onClickLabel,
             role = role,
-            onClick = onClick,
+            onClick = click,
         )
+    }
 }
 
 /** [interactiveSurface] for surfaces that also open something on a long press. */
@@ -98,6 +107,7 @@ fun Modifier.interactiveLongSurface(
     interactionSource: MutableInteractionSource? = null,
     onClick: () -> Unit,
 ): Modifier = composed {
+    expandingClick(onClick, shape, containerColor) { click ->
     surfaceLayers(shape, containerColor, enabled)
         .foundationCombinedClickable(
             interactionSource = interactionSource,
@@ -107,8 +117,9 @@ fun Modifier.interactiveLongSurface(
             role = role,
             onLongClickLabel = onLongClickLabel,
             onLongClick = onLongClick,
-            onClick = onClick,
+            onClick = click,
         )
+    }
 }
 
 /** Bounce, then mask, then background: all three move together while pressed. */

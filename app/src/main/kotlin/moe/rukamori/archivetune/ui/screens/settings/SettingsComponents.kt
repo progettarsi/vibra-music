@@ -9,8 +9,12 @@
 
 package moe.rukamori.archivetune.ui.screens.settings
 
+// Vibra: independent radii follow the global rounding style.
+import app.vibra.ui.theme.adaptiveRoundedCornerShape
+
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
+import app.vibra.ui.components.VibraLoadingIndicator
 import app.vibra.ui.motion.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -29,14 +33,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import app.vibra.ui.motion.VibraButton as Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -89,7 +91,7 @@ fun SettingsProfileHeader(
                 .fillMaxWidth()
                 .padding(horizontal = SettingsDimensions.ScreenHorizontalPadding)
                 .clickable(onClick = onClick),
-        shape = RoundedCornerShape(SettingsDimensions.BannerCardCornerRadius),
+        shape = adaptiveRoundedCornerShape(SettingsDimensions.BannerCardCornerRadius),
         colors =
             CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.primaryContainer,
@@ -112,7 +114,7 @@ fun SettingsProfileHeader(
                 contentAlignment = Alignment.Center,
             ) {
                 if (state.isLoading) {
-                    CircularWavyProgressIndicator(
+                    VibraLoadingIndicator(
                         modifier = Modifier.size(SettingsDimensions.BannerIconInnerSize),
                         color = MaterialTheme.colorScheme.onPrimaryContainer,
                     )
@@ -177,7 +179,7 @@ fun SettingsPermissionBanner(
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(SettingsDimensions.BannerCardCornerRadius),
+        shape = adaptiveRoundedCornerShape(SettingsDimensions.BannerCardCornerRadius),
         colors =
             CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.secondaryContainer,
@@ -278,7 +280,7 @@ fun SettingsUpdateBanner(
                     indication = null,
                     onClick = onClick,
                 ),
-        shape = RoundedCornerShape(SettingsDimensions.BannerCardCornerRadius),
+        shape = adaptiveRoundedCornerShape(SettingsDimensions.BannerCardCornerRadius),
         colors =
             CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.primaryContainer,
@@ -360,7 +362,7 @@ fun SettingsGroupCard(
         )
 
         Card(
-            shape = RoundedCornerShape(SettingsDimensions.GroupCardCornerRadius),
+            shape = adaptiveRoundedCornerShape(SettingsDimensions.GroupCardCornerRadius),
             colors =
                 CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -488,7 +490,7 @@ fun SettingsRow(
             item.badge?.let { badge ->
                 Spacer(modifier = Modifier.width(6.dp))
                 Surface(
-                    shape = RoundedCornerShape(8.dp),
+                    shape = adaptiveRoundedCornerShape(8.dp),
                     color = MaterialTheme.colorScheme.surfaceContainerHighest,
                 ) {
                     Text(
@@ -559,7 +561,7 @@ fun SettingsSegmentedItem(
         } else {
             MaterialTheme.colorScheme.surface
         }
-    val shape = remember(index, count) { segmentedSettingsItemShape(index, count) }
+    val shape = segmentedSettingsItemShape(index, count)
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(
@@ -660,7 +662,7 @@ fun SettingsSegmentedItem(
             item.badge?.let { badge ->
                 Spacer(modifier = Modifier.width(12.dp))
                 Surface(
-                    shape = RoundedCornerShape(50),
+                    shape = adaptiveRoundedCornerShape(50),
                     color = MaterialTheme.colorScheme.surfaceContainerHighest,
                 ) {
                     Text(
@@ -675,6 +677,7 @@ fun SettingsSegmentedItem(
     }
 }
 
+@Composable
 private fun segmentedSettingsItemShape(
     index: Int,
     count: Int,
@@ -683,11 +686,11 @@ private fun segmentedSettingsItemShape(
     val small = 6.dp
     return when {
         count <= 1 -> {
-            RoundedCornerShape(large)
+            adaptiveRoundedCornerShape(large)
         }
 
         index == 0 -> {
-            RoundedCornerShape(
+            adaptiveRoundedCornerShape(
                 topStart = large,
                 topEnd = large,
                 bottomEnd = small,
@@ -696,7 +699,7 @@ private fun segmentedSettingsItemShape(
         }
 
         index == count - 1 -> {
-            RoundedCornerShape(
+            adaptiveRoundedCornerShape(
                 topStart = small,
                 topEnd = small,
                 bottomEnd = large,
@@ -705,7 +708,7 @@ private fun segmentedSettingsItemShape(
         }
 
         else -> {
-            RoundedCornerShape(small)
+            adaptiveRoundedCornerShape(small)
         }
     }
 }
@@ -787,7 +790,7 @@ fun SettingsFlatItem(
             item.badge?.let { badge ->
                 Spacer(modifier = Modifier.width(6.dp))
                 Surface(
-                    shape = RoundedCornerShape(8.dp),
+                    shape = adaptiveRoundedCornerShape(8.dp),
                     color = MaterialTheme.colorScheme.surfaceContainerHighest,
                 ) {
                     Text(

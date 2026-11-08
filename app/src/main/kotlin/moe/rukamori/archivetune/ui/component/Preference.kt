@@ -9,6 +9,9 @@
 
 package moe.rukamori.archivetune.ui.component
 
+// Vibra: independent radii follow the global rounding style.
+import app.vibra.ui.theme.adaptiveRoundedCornerShape
+
 import app.vibra.ui.motion.vibraControlFeedback
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Spring
@@ -42,7 +45,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import app.vibra.ui.motion.selectable
 import app.vibra.ui.motion.toggleable
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -117,6 +119,7 @@ private val PreferenceEntryVerticalPadding = 18.dp
 @Composable
 private fun rememberPreferenceIconShape(): Shape = MaterialShapes.Ghostish.toShape()
 
+@Composable
 private fun segmentedPreferenceItemShape(
     index: Int,
     count: Int,
@@ -125,11 +128,11 @@ private fun segmentedPreferenceItemShape(
     val small = PreferenceGroupSmallCorner
     return when {
         count <= 1 -> {
-            RoundedCornerShape(large)
+            adaptiveRoundedCornerShape(large)
         }
 
         index == 0 -> {
-            RoundedCornerShape(
+            adaptiveRoundedCornerShape(
                 topStart = large,
                 topEnd = large,
                 bottomEnd = small,
@@ -138,7 +141,7 @@ private fun segmentedPreferenceItemShape(
         }
 
         index == count - 1 -> {
-            RoundedCornerShape(
+            adaptiveRoundedCornerShape(
                 topStart = small,
                 topEnd = small,
                 bottomEnd = large,
@@ -147,11 +150,12 @@ private fun segmentedPreferenceItemShape(
         }
 
         else -> {
-            RoundedCornerShape(small)
+            adaptiveRoundedCornerShape(small)
         }
     }
 }
 
+@Composable
 private fun preferenceItemShapeForPosition(position: PreferenceGroupPosition?): Shape =
     when (position) {
         null,
@@ -181,9 +185,7 @@ fun PreferenceEntry(
     val groupPosition = LocalPreferenceGroupPosition.current
     val preferenceIconShape = rememberPreferenceIconShape()
     val preferenceItemShape =
-        remember(groupPosition) {
-            preferenceItemShapeForPosition(groupPosition)
-        }
+        preferenceItemShapeForPosition(groupPosition)
     val resolvedShape = shape ?: preferenceItemShape
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
@@ -778,7 +780,7 @@ private fun PreferenceValueChip(text: String) {
     Box(
         modifier =
             Modifier
-                .clip(RoundedCornerShape(50))
+                .clip(adaptiveRoundedCornerShape(50))
                 .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
                 .padding(horizontal = 16.dp, vertical = 7.dp),
     ) {
@@ -1030,7 +1032,7 @@ fun SliderPreference(
                         track = {
                             SliderDefaults.Track(
                                 sliderState = sliderState,
-                                trackCornerSize = 12.dp,
+                                trackCornerSize = app.vibra.ui.theme.adaptiveRadius(12.dp),
                             )
                         },
                     )
@@ -1144,7 +1146,7 @@ fun CrossfadeSliderPreference(
                         track = {
                             SliderDefaults.Track(
                                 sliderState = crossfadeSliderState,
-                                trackCornerSize = 12.dp,
+                                trackCornerSize = app.vibra.ui.theme.adaptiveRadius(12.dp),
                             )
                         },
                     )
@@ -1250,7 +1252,7 @@ fun NumberPickerPreference(
                         track = {
                             SliderDefaults.Track(
                                 sliderState = pickerSliderState,
-                                trackCornerSize = 12.dp,
+                                trackCornerSize = app.vibra.ui.theme.adaptiveRadius(12.dp),
                             )
                         },
                     )

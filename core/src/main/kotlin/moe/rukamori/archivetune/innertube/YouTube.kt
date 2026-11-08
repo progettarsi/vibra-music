@@ -106,6 +106,8 @@ import kotlin.random.Random
  * Parse useful data with [InnerTube] sending requests.
  * Modified from [ViMusic](https://github.com/vfsfitvnm/ViMusic)
  */
+class PlaylistEditRejected : IllegalStateException()
+
 object YouTube {
     private const val BROWSE_ID_EXPLORE = "FEmusic_explore"
     private const val BROWSE_ID_NEW_RELEASE_ALBUMS = "FEmusic_new_releases_albums"
@@ -593,9 +595,9 @@ object YouTube {
             songs.values.toList()
         }
 
-    suspend fun artist(browseId: String): Result<ArtistPage> =
+    suspend fun artist(browseId: String, authState: PlaybackAuthState = currentPlaybackAuthState()): Result<ArtistPage> =
         runCatching {
-            val response = innerTube.browse(WEB_REMIX, browseId).body<BrowseResponse>()
+            val response = innerTube.browse(WEB_REMIX, browseId, authState = authState).body<BrowseResponse>()
             val immersiveHeader = response.header?.musicImmersiveHeaderRenderer
             val subscribeButtonRenderer = immersiveHeader?.subscriptionButton?.subscribeButtonRenderer
             val artistThumbnail =
@@ -879,8 +881,6 @@ object YouTube {
                 header.thumbnail
                     ?.musicThumbnailRenderer
                     ?.getBestThumbnail()
-                    ?: throw IllegalStateException("PLAYLIST_PRIVATE")
-
             val editable = base?.musicEditablePlaylistDetailHeaderRenderer != null
 
             val headerMenuItems =
@@ -943,9 +943,9 @@ object YouTube {
                                 ?.runs
                                 ?.firstOrNull()
                                 ?.text,
-                        thumbnail = thumbnail.normalizedUrl,
-                        thumbnailWidth = thumbnail.width,
-                        thumbnailHeight = thumbnail.height,
+                        thumbnail = thumbnail?.normalizedUrl,
+                        thumbnailWidth = thumbnail?.width,
+                        thumbnailHeight = thumbnail?.height,
                         description = description,
                         playEndpoint =
                             header.buttons
@@ -1279,7 +1279,11 @@ object YouTube {
             exception.response.status == HttpStatusCode.BadRequest
     }
 
+    suspend fun <T> withLibraryAuth(auth: PlaybackAuthState, block: suspend () -> T): T =
+        innerTube.withLibraryAuth(auth, block)
+
     private suspend fun <T> withPlaylistMutationAuthRecovery(block: suspend () -> T): T {
+        if (innerTube.hasLibraryAuth()) return block()
         val initialAuthState = authState
         return try {
             block()
@@ -1886,33 +1890,36 @@ object YouTube {
     suspend fun likeVideo(
         videoId: String,
         like: Boolean,
+        authState: PlaybackAuthState = currentPlaybackAuthState(),
     ) = runCatching {
         if (like) {
-            innerTube.likeVideo(WEB_REMIX, videoId)
+            innerTube.likeVideo(WEB_REMIX, videoId, authState)
         } else {
-            innerTube.unlikeVideo(WEB_REMIX, videoId)
+            innerTube.unlikeVideo(WEB_REMIX, videoId, authState)
         }
     }
 
     suspend fun likePlaylist(
         playlistId: String,
         like: Boolean,
+        authState: PlaybackAuthState = currentPlaybackAuthState(),
     ) = runCatching {
         if (like) {
-            innerTube.likePlaylist(WEB_REMIX, playlistId)
+            innerTube.likePlaylist(WEB_REMIX, playlistId, authState)
         } else {
-            innerTube.unlikePlaylist(WEB_REMIX, playlistId)
+            innerTube.unlikePlaylist(WEB_REMIX, playlistId, authState)
         }
     }
 
     suspend fun subscribeChannel(
         channelId: String,
         subscribe: Boolean,
+        authState: PlaybackAuthState = currentPlaybackAuthState(),
     ) = runCatching {
         if (subscribe) {
-            innerTube.subscribeChannel(WEB_REMIX, channelId)
+            innerTube.subscribeChannel(WEB_REMIX, channelId, authState)
         } else {
-            innerTube.unsubscribeChannel(WEB_REMIX, channelId)
+            innerTube.unsubscribeChannel(WEB_REMIX, channelId, authState)
         }
     }
 
@@ -1940,6 +1947,9 @@ object YouTube {
                 .firstOrNull { result -> result.videoId == videoId }
                 ?.setVideoId
                 ?.takeIf(String::isNotBlank)
+        if (innerTube.hasLibraryAuth()) {
+            return@runCatchingCancellable checkNotNull(responseSetVideoId)
+        }
         val setVideoId =
             responseSetVideoId
                 ?: playlistEntrySetVideoIds(playlistId, videoId)
@@ -2014,9 +2024,7 @@ object YouTube {
         }
 
     private fun AddItemYouTubePlaylistResponse.requireSuccessfulPlaylistEdit(): AddItemYouTubePlaylistResponse {
-        check(status == PLAYLIST_EDIT_STATUS_SUCCEEDED) {
-            "Playlist edit failed with status $status"
-        }
+        if (status != PLAYLIST_EDIT_STATUS_SUCCEEDED) throw PlaylistEditRejected()
         return this
     }
 
@@ -2075,6 +2083,7 @@ object YouTube {
     ) = runCatching {
         withPlaylistMutationAuthRecovery {
             innerTube.removeFromPlaylist(WEB_REMIX, playlistId, videoId, setVideoId)
+                .also { if (innerTube.hasLibraryAuth()) it.body<AddItemYouTubePlaylistResponse>().requireSuccessfulPlaylistEdit() }
         }
     }
 
@@ -2085,6 +2094,7 @@ object YouTube {
     ) = runCatching {
         withPlaylistMutationAuthRecovery {
             innerTube.moveSongPlaylist(WEB_REMIX, playlistId, setVideoId, successorSetVideoId)
+                .also { if (innerTube.hasLibraryAuth()) it.body<AddItemYouTubePlaylistResponse>().requireSuccessfulPlaylistEdit() }
         }
     }
 
@@ -2103,6 +2113,7 @@ object YouTube {
     ) = runCatching {
         withPlaylistMutationAuthRecovery {
             innerTube.renamePlaylist(WEB_REMIX, playlistId, name)
+                .also { if (innerTube.hasLibraryAuth()) it.body<AddItemYouTubePlaylistResponse>().requireSuccessfulPlaylistEdit() }
         }
     }
 

@@ -7,6 +7,7 @@
 
 package moe.rukamori.archivetune.db
 
+import app.vibra.library.PlaylistEdit
 import androidx.room.Dao
 import androidx.room.Delete
 import androidx.room.Insert
@@ -78,6 +79,108 @@ import java.util.Locale
 
 @Dao
 interface DatabaseDao {
+    @Upsert
+    suspend fun saveLibraryMutation(mutation: app.vibra.library.LibraryMutation)
+
+    @Query("SELECT * FROM library_mutation WHERE account = :account AND completedAt IS NULL AND rejected = 0 ORDER BY createdAt")
+    suspend fun pendingLibraryMutations(account: String): List<app.vibra.library.LibraryMutation>
+
+    @Query("SELECT * FROM library_mutation WHERE account = :account AND target = :target AND targetId = :targetId")
+    suspend fun libraryMutation(account: String, target: String, targetId: String): app.vibra.library.LibraryMutation?
+
+    @Query("""
+        SELECT EXISTS(SELECT 1 FROM library_mutation
+        WHERE account = :account AND (localId = :localId OR (target = :target AND targetId = :targetId))
+        AND (completedAt IS NULL OR completedAt >= :protectSince))
+    """)
+    suspend fun hasProtectedLibraryMutation(
+        account: String, localId: String, target: String, targetId: String?, protectSince: Long,
+    ): Boolean
+
+    @Query("DELETE FROM library_mutation WHERE completedAt < :before")
+    suspend fun deleteCompletedLibraryMutations(before: Long)
+
+    @Insert
+    suspend fun enqueuePlaylistEdit(edit: PlaylistEdit): Long
+
+    @Update
+    suspend fun updatePlaylistEdit(edit: PlaylistEdit)
+
+    @Query("SELECT * FROM playlist_edit WHERE id = :id")
+    suspend fun playlistEdit(id: Long): PlaylistEdit?
+
+    @Query("SELECT * FROM playlist_edit WHERE account = :account AND completedAt IS NULL ORDER BY id")
+    suspend fun pendingPlaylistEdits(account: String): List<PlaylistEdit>
+
+    @Query("SELECT * FROM playlist_edit WHERE playlistId = :id AND completedAt IS NULL ORDER BY id")
+    suspend fun playlistEdits(id: String): List<PlaylistEdit>
+
+    @Query("SELECT * FROM playlist_edit WHERE playlistId = :id AND completedAt IS NULL ORDER BY id")
+    fun observePlaylistEdits(id: String): Flow<List<PlaylistEdit>>
+
+    @Query("""
+        SELECT CASE
+            WHEN EXISTS (SELECT 1 FROM playlist_edit e
+                WHERE e.account = :account AND e.completedAt IS NULL AND (e.blocked OR (e.attempt IS NOT NULL AND e.nextAttemptAt IS NOT NULL))
+                AND NOT EXISTS (SELECT 1 FROM playlist p WHERE p.id = e.playlistId)) THEN 3
+            WHEN EXISTS (SELECT 1 FROM playlist_edit
+                WHERE account = :account AND completedAt IS NULL AND (blocked OR (attempt IS NOT NULL AND nextAttemptAt IS NOT NULL))) THEN 2
+            WHEN EXISTS (SELECT 1 FROM playlist_edit WHERE account = :account AND completedAt IS NULL)
+                OR EXISTS (SELECT 1 FROM library_mutation WHERE account = :account AND completedAt IS NULL AND rejected = 0) THEN 1
+            ELSE 0
+        END
+    """)
+    fun observeLibraryOutboxState(account: String): Flow<Int>
+
+    @Query("""
+        UPDATE playlist_edit SET blocked = 0, nextAttemptAt = NULL WHERE account = :account AND completedAt IS NULL
+        AND NOT EXISTS (SELECT 1 FROM playlist p WHERE p.id = playlist_edit.playlistId)
+    """)
+    suspend fun retryRemovedPlaylistEdits(account: String)
+
+    @Query("SELECT value FROM playlist_edit WHERE kind = 'cover' AND completedAt IS NULL AND value IS NOT NULL")
+    suspend fun activeCoverFiles(): List<String>
+
+    @Query("SELECT account FROM playlist_edit WHERE playlistId = :id ORDER BY id DESC LIMIT 1")
+    suspend fun playlistEditAccount(id: String): String?
+
+    @Query("""
+        SELECT EXISTS(SELECT 1 FROM playlist_edit WHERE
+            (playlistId = :id OR remoteId = :remoteId)
+            AND (completedAt IS NULL OR completedAt >= :since))
+    """)
+    suspend fun protectsPlaylistEdit(id: String, remoteId: String?, since: Long): Boolean
+
+    @Query("""
+        DELETE FROM playlist_edit WHERE completedAt < :before
+        AND id NOT IN (SELECT MAX(e.id) FROM playlist_edit e JOIN playlist p ON p.id = e.playlistId GROUP BY e.playlistId)
+    """)
+    suspend fun prunePlaylistEdits(before: Long)
+
+    @Query("DELETE FROM playlist_edit WHERE id = :id")
+    suspend fun deletePlaylistEdit(id: Long)
+
+    @Query("""
+        UPDATE playlist_edit SET
+            setId = CASE WHEN entryId = :entryId THEN :setId ELSE setId END,
+            beforeSetId = CASE WHEN beforeId = :entryId THEN :setId ELSE beforeSetId END,
+            afterSetId = CASE WHEN afterId = :entryId THEN :setId ELSE afterSetId END
+        WHERE playlistId = :playlistId AND completedAt IS NULL
+    """)
+    suspend fun bindPlaylistEditEntry(playlistId: String, entryId: Int, setId: String)
+
+    @Query("SELECT * FROM playlist_song_map WHERE playlistId = :id ORDER BY position")
+    suspend fun playlistEntries(id: String): List<PlaylistSongMap>
+
+    @Insert
+    suspend fun insertPlaylistEntry(map: PlaylistSongMap): Long
+
+    @Query("UPDATE playlist_song_map SET setVideoId = :setId WHERE playlistId = :id AND id = :entryId")
+    suspend fun bindPlaylistEntry(id: String, entryId: Int, setId: String)
+
+    @Query("SELECT * FROM album WHERE id = :id")
+    suspend fun libraryAlbumEntity(id: String): AlbumEntity?
+
     // Vibra: persistent import provenance, kept separate from YouTube account membership.
     @Query("SELECT * FROM spotify_import WHERE accountId = :accountId AND kind = :kind AND sourceId = :sourceId")
     suspend fun spotifyImport(accountId: String, kind: String, sourceId: String): app.vibra.spotify.SpotifyImportMap?
@@ -90,6 +193,12 @@ interface DatabaseDao {
 
     @Query("DELETE FROM spotify_import WHERE kind = :kind AND localId = :localId")
     suspend fun deleteSpotifyImport(kind: String, localId: String)
+
+    @Query("SELECT localId FROM spotify_import WHERE kind = :kind AND sourceId = :sourceId LIMIT 1")
+    suspend fun spotifyImportValue(kind: String, sourceId: String): String?
+
+    @Query("DELETE FROM spotify_import WHERE kind = :kind AND sourceId = :sourceId")
+    suspend fun deleteSpotifyImportBySource(kind: String, sourceId: String)
 
     @Transaction
     @Query("SELECT song.* FROM song INNER JOIN format ON format.id = song.id WHERE song.isLocal = 0")

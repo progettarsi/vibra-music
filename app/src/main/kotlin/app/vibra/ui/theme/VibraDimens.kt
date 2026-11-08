@@ -8,7 +8,6 @@
 package app.vibra.ui.theme
 
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.toShape
@@ -33,8 +32,8 @@ object VibraDimens {
     /** Height of the song row ("Canzone", 67.54). */
     val RowHeight = 68.dp
 
-    /** Artwork thumbnail inside a song row (13.33 % insets of 75 → 50). */
-    val RowThumbnail = 50.dp
+    /** Artwork thumbnail with exact 8 dp margins in a 68 dp song row. */
+    val RowThumbnail = RowHeight - 16.dp
 
     /** Floating dock height (dock symbol 55.46). */
     val DockHeight = 56.dp
@@ -61,34 +60,34 @@ object VibraDimens {
 /** Corner radii and expressive shapes used by the design. */
 object VibraShapes {
     /** Home/profile cards ("Rectangle" bg, radius 32). */
-    val Card: Shape = RoundedCornerShape(32.dp)
+    val Card: Shape @Composable get() = LocalVibraRadii.current.cardShape
 
     /** Nested artwork inside cards (cover cards 22–24). */
-    val InnerArtwork: Shape = RoundedCornerShape(24.dp)
+    val InnerArtwork: Shape @Composable get() = LocalVibraRadii.current.innerArtworkShape
 
     /** Song row container (radius 24). */
-    val Row: Shape = RoundedCornerShape(24.dp)
+    val Row: Shape @Composable get() = LocalVibraRowShapes.current?.container ?: LocalVibraRadii.current.rowShapes.container
 
-    /** Song row thumbnail (radius 14). */
-    val RowThumbnail: Shape = RoundedCornerShape(14.dp)
+    /** Song row thumbnail: the row radius minus its 8 dp inset. */
+    val RowThumbnail: Shape @Composable get() = LocalVibraRowShapes.current?.thumbnail ?: LocalVibraRadii.current.rowShapes.thumbnail
 
     /** Album hero cover. */
-    val AlbumCover: Shape = RoundedCornerShape(28.dp)
+    val AlbumCover: Shape @Composable get() = LocalVibraRadii.current.albumCoverShape
 
     /** Bottom sheets / list containers ("Rectangle 18" with top corners 32). */
-    val SheetTop: Shape = RoundedCornerShape(topStart = 52.dp, topEnd = 52.dp)
+    val SheetTop: Shape @Composable get() = LocalVibraRadii.current.sheetShape
 
     /** Dock pills are full stadiums. */
     val Pill: Shape = CircleShape
 
     /** Centred dialogs (same radius as Material's AlertDialog, so both families match). */
-    val Dialog: Shape = RoundedCornerShape(32.dp)
+    val Dialog: Shape @Composable get() = LocalVibraRadii.current.cardShape
 
     /** Anchored dropdown menus. */
-    val Menu: Shape = RoundedCornerShape(24.dp)
+    val Menu: Shape @Composable get() = LocalVibraRadii.current.menuShape
 
     /** Groups of rows inside a sheet (action menus, pickers). */
-    val SheetGroup: Shape = RoundedCornerShape(32.dp)
+    val SheetGroup: Shape @Composable get() = LocalVibraRadii.current.cardShape
 
     // ── M3 Expressive shape set (Figma "Shape Set" instances) ──────────────────────
     // MaterialShapes.toShape() is composable (it caches the outline per composition).

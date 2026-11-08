@@ -7,6 +7,9 @@
 
 package moe.rukamori.archivetune.ui.screens.search
 
+// Vibra: independent radii follow the global rounding style.
+import app.vibra.ui.theme.adaptiveRoundedCornerShape
+
 import androidx.compose.foundation.ExperimentalFoundationApi
 import app.vibra.ui.motion.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -31,7 +34,6 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import app.vibra.ui.motion.VibraButton as Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -420,7 +422,7 @@ private fun SearchMoodAndGenresGrid(
                     stripeColor = item.stripeColor,
                     endpoint = item.endpoint,
                     onClick = {
-                        navController.navigate("youtube_browse/${item.endpoint.browseId}?params=${item.endpoint.params}")
+                        navController.navigate(moe.rukamori.archivetune.ui.screens.youtubeBrowseRoute(item))
                     },
                     modifier =
                         Modifier
@@ -440,6 +442,7 @@ private val SuggestedSongGroupItemSpacing = 2.dp
 private val SuggestedSongGroupLargeCorner = 28.dp
 private val SuggestedSongGroupSmallCorner = 6.dp
 
+@Composable
 private fun segmentedSuggestedSongShape(
     index: Int,
     count: Int,
@@ -448,11 +451,11 @@ private fun segmentedSuggestedSongShape(
     val small = SuggestedSongGroupSmallCorner
     return when {
         count <= 1 -> {
-            RoundedCornerShape(large)
+            adaptiveRoundedCornerShape(large)
         }
 
         index == 0 -> {
-            RoundedCornerShape(
+            adaptiveRoundedCornerShape(
                 topStart = large,
                 topEnd = large,
                 bottomEnd = small,
@@ -461,7 +464,7 @@ private fun segmentedSuggestedSongShape(
         }
 
         index == count - 1 -> {
-            RoundedCornerShape(
+            adaptiveRoundedCornerShape(
                 topStart = small,
                 topEnd = small,
                 bottomEnd = large,
@@ -470,7 +473,7 @@ private fun segmentedSuggestedSongShape(
         }
 
         else -> {
-            RoundedCornerShape(small)
+            adaptiveRoundedCornerShape(small)
         }
     }
 }

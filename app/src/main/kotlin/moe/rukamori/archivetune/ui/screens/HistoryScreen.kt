@@ -22,6 +22,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
+import app.vibra.ui.components.VibraLoadingIndicator
 import app.vibra.ui.motion.clickable
 import app.vibra.ui.motion.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -51,7 +52,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ButtonGroupDefaults
-import androidx.compose.material3.ContainedLoadingIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import app.vibra.ui.motion.VibraFilledTonalButton as FilledTonalButton
@@ -666,7 +666,7 @@ private fun LocalHistoryFeed(
                     modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp),
                     contentAlignment = Alignment.Center,
                 ) {
-                    ContainedLoadingIndicator()
+                    VibraLoadingIndicator(contained = true)
                 }
             }
         } else if (visibleEvents.isEmpty()) {
@@ -755,7 +755,7 @@ private fun LocalHistoryFeed(
                         contentAlignment = Alignment.Center,
                     ) {
                         if (isLoadingMore) {
-                            ContainedLoadingIndicator()
+                            VibraLoadingIndicator(contained = true)
                         }
                     }
                 }
@@ -996,7 +996,8 @@ private fun HistorySongGroupItem(
     content: @Composable (containerColor: Color) -> Unit,
 ) {
     val outerShape = MaterialTheme.shapes.extraLarge
-    val innerCorner = remember { CornerSize(4.dp) }
+    val seam = app.vibra.ui.theme.adaptiveRadius(4.dp)
+    val innerCorner = remember(seam) { CornerSize(seam) }
     val shape =
         remember(index, lastIndex, outerShape, innerCorner) {
             when {
@@ -1161,7 +1162,7 @@ private fun HistoryStateCard(
             modifier = Modifier.padding(horizontal = 24.dp, vertical = 40.dp),
         ) {
             if (loading) {
-                ContainedLoadingIndicator()
+                VibraLoadingIndicator(contained = true)
             } else if (icon != null) {
                 val stateShape = MaterialShapes.Cookie9Sided.toShape()
                 Surface(

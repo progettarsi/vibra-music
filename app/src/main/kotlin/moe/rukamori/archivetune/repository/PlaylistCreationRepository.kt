@@ -16,13 +16,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import moe.rukamori.archivetune.constants.InnerTubeCookieKey
 import moe.rukamori.archivetune.constants.YtmSyncKey
-import moe.rukamori.archivetune.db.MusicDatabase
-import moe.rukamori.archivetune.db.entities.PlaylistEntity
-import moe.rukamori.archivetune.extensions.isInternetConnected
-import moe.rukamori.archivetune.innertube.YouTube
 import moe.rukamori.archivetune.innertube.utils.hasYouTubeLoginCookie
 import moe.rukamori.archivetune.utils.dataStore
-import java.time.LocalDateTime
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -36,7 +31,7 @@ class PlaylistCreationRepository
     @Inject
     constructor(
         @ApplicationContext private val context: Context,
-        private val database: MusicDatabase,
+        private val libraryActions: app.vibra.library.LibraryActions,
     ) {
         suspend fun getAvailability(): PlaylistCreationAvailability =
             withContext(Dispatchers.IO) {
@@ -46,25 +41,18 @@ class PlaylistCreationRepository
                     isSignedIn = isSignedIn,
                     isSyncEnabled =
                         isSignedIn &&
-                            (preferences[YtmSyncKey] ?: true) &&
-                            context.isInternetConnected(),
+                            (preferences[YtmSyncKey] ?: true),
                 )
             }
 
-        suspend fun createRemotePlaylist(name: String): Result<String> =
-            withContext(Dispatchers.IO) {
-                YouTube.createPlaylist(name)
-            }
-
-        suspend fun createLocalPlaylist(
+        suspend fun createPlaylist(
             name: String,
-            browseId: String?,
-            coverStyle: String = "Pentagon",
-        ) = withContext(Dispatchers.IO) {
-            val entity = PlaylistEntity(name = name, browseId = browseId, bookmarkedAt = LocalDateTime.now(), isEditable = true)
+            syncRequested: Boolean,
+            coverStyle: String,
+        ): String = withContext(Dispatchers.IO) {
+            val id = libraryActions.createPlaylist(name, syncRequested).getOrThrow()
             val style = app.vibra.ui.components.parsePlaylistCoverStyle(coverStyle).name
-            database.withTransaction { insert(entity) }
-            context.dataStore.edit { it[playlistCoverStyleKey(entity.id)] = style }
-            entity.id
+            context.dataStore.edit { it[playlistCoverStyleKey(id)] = style }
+            id
         }
     }

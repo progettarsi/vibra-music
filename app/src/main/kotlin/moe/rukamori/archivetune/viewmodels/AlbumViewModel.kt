@@ -124,10 +124,11 @@ class AlbumViewModel
                         version.artists.orEmpty().none { artist -> artist.id in blockedArtistIds }
                     }
                     database.withTransaction {
-                        if (album == null) {
+                        val current = libraryAlbumEntity(albumId)
+                        if (current == null) {
                             insert(page)
                         } else {
-                            update(album.album, page, album.artists)
+                            update(current, page, album?.artists)
                         }
                     }
                     _fetchState.value = FetchState.Success

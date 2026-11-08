@@ -30,6 +30,7 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.Alignment
 import androidx.compose.runtime.saveable.rememberSaveable
 import app.vibra.ui.components.VibraBottomSheet
+import app.vibra.ui.components.VibraLoadingIndicator
 import kotlinx.coroutines.CancellationException
 import moe.rukamori.archivetune.ui.component.MarkdownText
 import androidx.compose.ui.unit.dp
@@ -170,7 +171,7 @@ private fun PatchNotesSheet(version: String, onDismiss: () -> Unit) {
                         modifier = Modifier.padding(vertical = 16.dp),
                     ) { Text(stringResource(R.string.vibra_about_notes_open)) }
                 }
-                else -> CircularProgressIndicator(modifier = Modifier.padding(vertical = 24.dp).align(Alignment.CenterHorizontally))
+                else -> VibraLoadingIndicator(modifier = Modifier.padding(vertical = 24.dp).align(Alignment.CenterHorizontally))
             }
         }
     }
@@ -205,7 +206,7 @@ fun ThirdPartyLicensesScreen(navController: NavController, viewModel: AboutViewM
     val state by viewModel.state.collectAsStateWithLifecycle()
     InformationPage(navController, stringResource(R.string.about_third_party_licenses), scrollable = false) {
         when {
-            state.loading -> CircularProgressIndicator(modifier = Modifier.padding(24.dp))
+            state.loading -> VibraLoadingIndicator(modifier = Modifier.padding(24.dp))
             state.failed -> {
                 Text(stringResource(R.string.error_unknown), modifier = Modifier.padding(16.dp))
                 TextButton(onClick = viewModel::retry) { Text(stringResource(R.string.retry)) }

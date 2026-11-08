@@ -37,6 +37,7 @@ import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -154,7 +155,9 @@ fun VibraAppShell(
     // Every page goes back the way it came: into the element it was opened from, or to
     // the right (see PageMotion). Taps on the player or the search overlay never count.
     val pageMotion = remember { PageMotion() }
+    DisposableEffect(pageMotion) { onDispose { pageMotion.disposeExpansion() } }
     val view = LocalView.current
+    pageMotion.ownerView = view
     pageMotion.window = LocalWindowInfo.current.containerSize
     pageMotion.maxOriginCornerPx = with(LocalDensity.current) { MaxOriginCorner.toPx() }
     pageMotion.semantics = { (view as? RootForTest)?.semanticsOwner }
@@ -322,6 +325,7 @@ fun VibraAppShell(
         }
 
         // ── Profile picture in flight (above pages and dock, below the player) ───────────
+        app.vibra.ui.motion.ExpansionOverlay(pageMotion.expansion, offset = { shellOffset })
         AvatarFlightOverlay(flight = avatarFlight, shellOffset = { shellOffset })
 
         // ── Full player (on top of everything while open) ─────────────────────────────

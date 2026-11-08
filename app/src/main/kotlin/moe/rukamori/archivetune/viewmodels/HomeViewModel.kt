@@ -16,6 +16,7 @@ import com.google.common.collect.ImmutableList
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
@@ -114,14 +115,14 @@ data class AccountChannelUiModel(
     val isSelected: Boolean,
 )
 
-private data class HomeLocalContent(
+internal data class HomeLocalContent(
     val quickPicks: List<Song>,
     val speedDialItems: List<LocalItem>,
     val forgottenFavorites: List<Song>,
     val keepListening: List<LocalItem>,
 )
 
-private data class HomeRemoteContent(
+internal data class HomeRemoteContent(
     val homePage: HomePage?,
     val remoteQuickPicks: HomePage.Section?,
     val communitySection: HomePage.Section?,
@@ -131,7 +132,7 @@ private data class HomeRemoteContent(
     val accountImageUrl: String?,
 )
 
-private data class HomeContent(
+internal data class HomeContent(
     val local: HomeLocalContent,
     val remote: HomeRemoteContent,
     val selectedChip: HomePage.Chip?,
@@ -149,7 +150,7 @@ private data class HomeContent(
                 remote.homePage?.sections?.any { it.items.isNotEmpty() } == true
 }
 
-private data class HomeStateInputs(
+internal data class HomeStateInputs(
     val content: HomeContent,
     val preferences: HomePresentationPreferences,
     val isLoading: Boolean,
@@ -160,7 +161,8 @@ private data class HomeStateInputs(
         isRefreshing: Boolean,
         isLoadingMore: Boolean,
     ): HomeScreenState {
-        if (!isInitialLoadComplete) {
+        // Vibra: ready sections must not wait for unrelated recommendations.
+        if (!isInitialLoadComplete && !(app.vibra.startup.StartupOptions.progressive && content.hasContent)) {
             return HomeScreenState.Loading
         }
 
@@ -215,6 +217,7 @@ class HomeViewModel
         private val prepareCommunityHomePageUseCase: PrepareCommunityHomePageUseCase,
         private val loadCommunityPlaylistPreviewsUseCase: LoadCommunityPlaylistPreviewsUseCase,
         private val networkMonitor: moe.rukamori.archivetune.network.NetworkMonitor,
+        private val snapshots: app.vibra.home.HomeSnapshotRepository,
     ) : ViewModel() {
         private val isRefreshing = MutableStateFlow(false)
         private val isLoading = MutableStateFlow(false)
@@ -226,6 +229,14 @@ class HomeViewModel
         @Volatile
         private var feedExhausted = false
         private val homeLoadMutex = Mutex()
+        private val homeLoads = app.vibra.home.HomeLoadCoordinator(kotlinx.coroutines.CoroutineScope(viewModelScope.coroutineContext + Dispatchers.IO))
+        @Volatile private var activeHomeContext: String? = null
+        private val _showingCachedHome = MutableStateFlow(false)
+        val showingCachedHome = _showingCachedHome.asStateFlow()
+        private val cachedQuickPicks = app.vibra.home.CachedPlaceholder<HomePage.Section>()
+
+        // The list asks for more only once per last row, so a request made on the cached page is kept.
+        @Volatile private var paginationAwaitingFreshPage = false
 
         private val quickPicksMode =
             context.dataStore.data
@@ -468,16 +479,17 @@ class HomeViewModel
             )
         }
 
-        private suspend fun loadPersonalizedQuickPicks(): Boolean {
+        private suspend fun loadPersonalizedQuickPicks(requestKey: String? = null): Boolean {
             if (quickPicksMode.first() != QuickPicks.QUICK_PICKS) return false
-            val excludedSongIds = remoteQuickPicks.value?.items.orEmpty().mapTo(mutableSetOf(), YTItem::id)
+            val excludedSongIds = cachedQuickPicks.fresh(remoteQuickPicks.value)?.items.orEmpty().mapTo(mutableSetOf(), YTItem::id)
             val songs =
                 loadPersonalizedQuickPicksUseCase(excludedSongIds).getOrElse { throwable ->
                     if (throwable is CancellationException) throw throwable
                     reportException(throwable)
                     return false
                 }
-            if (songs.isEmpty()) return false
+            kotlinx.coroutines.currentCoroutineContext().ensureActive()
+            if (songs.isEmpty() || !isCurrentHome(requestKey)) return false
 
             remoteQuickPicks.value =
                 HomePage.Section(
@@ -488,6 +500,7 @@ class HomeViewModel
                     items = songs,
                     numItemsPerColumn = 4,
                 )
+            updateAllYtItems()
             return true
         }
 
@@ -662,17 +675,53 @@ class HomeViewModel
         }
 
         private suspend fun load() {
-            homeLoadMutex.withLock {
-                loadInternal()
+            if (app.vibra.startup.StartupOptions.progressive) {
+                val key = activeHomeContext ?: return
+                homeLoads.run(key) { app.vibra.startup.StartupWork.trace("home_load") { loadInternal(key) } }
+            } else {
+                homeLoadMutex.withLock {
+                    app.vibra.startup.StartupWork.trace("home_load") { loadInternal() }
+                }
             }
         }
 
-        private suspend fun loadInternal() {
+        private fun isCurrentHome(key: String?): Boolean = key == null || key == activeHomeContext
+
+        private suspend fun restoreHome(key: String) {
+            if (!app.vibra.startup.StartupOptions.cache) return
+            val snapshot = app.vibra.startup.StartupWork.trace("home_cache") { snapshots.read(key) } ?: return
+            val prefs = context.dataStore.data.first()
+            val blocked = database.getBlockedArtistIds().toSet()
+            val policy = loadAiContentFilterPolicy(refresh = false)
+            fun List<YTItem>.filtered() = filterAiContent(
+                filterExplicit(prefs[HideExplicitKey] ?: false).filterVideo(prefs[HideVideoKey] ?: false)
+                    .filterBlockedArtists(blocked), policy)
+            val page = snapshot.page().let { page -> page.copy(sections = page.sections.map { section ->
+                val items = section.items.filtered()
+                val visibleIds = items.mapTo(mutableSetOf(), YTItem::id)
+                section.copy(items = items, featuredCards = section.featuredCards.map { card -> card.copy(itemIds = card.itemIds.filter(visibleIds::contains)) })
+            }.filter { it.hasVisibleContent() }) }.extractQuickPicks().first
+            val picks = if (quickPicksMode.first() == QuickPicks.QUICK_PICKS) snapshot.picks().filtered() else emptyList()
+            if (!isCurrentHome(key)) return
+            if (page.sections.isNotEmpty() || picks.isNotEmpty()) {
+                _showingCachedHome.value = true
+                // No preview fetch or pagination is started for a cached page.
+                val prepared = prepareCommunityHomePageUseCase(page, allowStructuralFallback = true)
+                homePage.value = prepared.homePage
+                communitySection.value = prepared.communitySection
+                if (picks.isNotEmpty()) remoteQuickPicks.value = cachedQuickPicks.mark(HomePage.Section("", null, null, null, picks))
+                updateAllYtItems()
+                app.vibra.startup.StartupWork.mark("home_cache_restored")
+            }
+        }
+
+        private suspend fun loadInternal(requestKey: String? = null) {
             isLoading.value = true
             loadError.value = null
 
             try {
-                val aiContentFilterPolicy = loadAiContentFilterPolicy()
+                val initialPolicy = if (app.vibra.startup.StartupOptions.progressive) null else loadAiContentFilterPolicy()
+                var pageToCache: HomePage? = null
                 supervisorScope {
                     val hideExplicit = context.dataStore.get(HideExplicitKey, false)
                     val hideVideo = context.dataStore.get(HideVideoKey, false)
@@ -680,7 +729,7 @@ class HomeViewModel
                     val fromTimeStamp = System.currentTimeMillis() - 86400000 * 7 * 2
 
                     launch { loadSpeedDialItems() }
-                    val personalizedQuickPicks = async { loadPersonalizedQuickPicks() }
+                    val personalizedQuickPicks = async { app.vibra.startup.StartupWork.trace("personalized_picks") { loadPersonalizedQuickPicks(requestKey) } }
                     launch {
                         forgottenFavorites.value =
                             database
@@ -720,11 +769,22 @@ class HomeViewModel
                     }
 
                     launch {
+                        // A failure in this child would otherwise escape the supervisor and close the app.
+                        val aiContentFilterPolicy =
+                            try {
+                                initialPolicy ?: loadAiContentFilterPolicy()
+                            } catch (e: CancellationException) {
+                                throw e
+                            } catch (e: Exception) {
+                                reportException(e)
+                                if (isCurrentHome(requestKey)) loadError.value = R.string.error_unknown
+                                return@launch
+                            }
                         ensureVisitorData()
                         val page =
-                            YouTube.home().getOrElse { throwable ->
+                            app.vibra.startup.StartupWork.trace("home_request") { YouTube.home() }.getOrElse { throwable ->
                                 reportException(throwable)
-                                loadError.value = R.string.error_unknown
+                                if (isCurrentHome(requestKey)) loadError.value = R.string.error_unknown
                                 return@launch
                             }
                         val filteredPage =
@@ -744,10 +804,12 @@ class HomeViewModel
                                         )
                                     }.filter(HomePage.Section::hasVisibleContent),
                             )
+                        kotlinx.coroutines.currentCoroutineContext().ensureActive()
+                        if (!isCurrentHome(requestKey)) return@launch
                         val (pageWithoutQuickPicks, remoteQuickPicksFallback) = filteredPage.extractQuickPicks()
                         if (
                             quickPicksMode.first() == QuickPicks.QUICK_PICKS &&
-                            !personalizedQuickPicks.await()
+                            (if (app.vibra.startup.StartupOptions.progressive) cachedQuickPicks.fresh(remoteQuickPicks.value)?.items.isNullOrEmpty() else !personalizedQuickPicks.await())
                         ) {
                             remoteQuickPicksFallback?.takeIf { it.items.isNotEmpty() }?.let { fallback ->
                                 remoteQuickPicks.value = fallback
@@ -757,13 +819,30 @@ class HomeViewModel
                             page = pageWithoutQuickPicks,
                             replaceCommunitySection = true,
                         )
+                        updateAllYtItems()
+                        _showingCachedHome.value = false
+                        app.vibra.startup.StartupWork.mark("home_fresh_published")
+                        pageToCache = filteredPage
+                        if (paginationAwaitingFreshPage) {
+                            paginationAwaitingFreshPage = false
+                            homePage.value?.continuation?.let(::loadMoreYouTubeItems)
+                        }
                     }
                 }
 
+                if (!isCurrentHome(requestKey)) return
+                // Saved once personalized picks have finished, and without any picks that came from the cache:
+                // resaving those with a new date would keep them alive past the 24 hour limit.
+                val freshPage = pageToCache
+                if (freshPage != null && app.vibra.startup.StartupOptions.cache && requestKey != null) {
+                    snapshots.write(requestKey, freshPage, cachedQuickPicks.fresh(remoteQuickPicks.value)?.items.orEmpty())
+                }
                 updateAllLocalItems()
 
                 viewModelScope.launch(Dispatchers.IO) {
-                    loadSimilarRecommendations()
+                    if (app.vibra.startup.StartupOptions.deferred) {
+                        app.vibra.startup.StartupWork.optional("similar_recommendations") { loadSimilarRecommendations(requestKey) }
+                    } else loadSimilarRecommendations(requestKey)
                 }
 
                 updateAllYtItems()
@@ -773,10 +852,13 @@ class HomeViewModel
                 throw e
             } catch (e: Exception) {
                 reportException(e)
-                loadError.value = R.string.error_unknown
+                if (isCurrentHome(requestKey)) loadError.value = R.string.error_unknown
             } finally {
-                isInitialLoadComplete.value = true
-                isLoading.value = false
+                if (isCurrentHome(requestKey)) {
+                    isInitialLoadComplete.value = true
+                    isLoading.value = false
+                    app.vibra.startup.StartupWork.mark("home_refresh_complete")
+                }
             }
         }
 
@@ -790,7 +872,7 @@ class HomeViewModel
             }
         }
 
-        private suspend fun loadSimilarRecommendations() {
+        private suspend fun loadSimilarRecommendations(requestKey: String? = null) {
             val hideExplicit = context.dataStore.get(HideExplicitKey, false)
             val hideVideo = context.dataStore.get(HideVideoKey, false)
             val blockedArtistIds = database.getBlockedArtistIds().toSet()
@@ -864,6 +946,8 @@ class HomeViewModel
                         )
                     }
 
+            kotlinx.coroutines.currentCoroutineContext().ensureActive()
+            if (!isCurrentHome(requestKey)) return
             similarRecommendations.value = (artistRecommendations + songRecommendations).shuffled()
 
             updateAllYtItems()
@@ -981,8 +1065,13 @@ class HomeViewModel
         }
 
         private fun loadMoreYouTubeItems(continuation: String?) {
+            if (_showingCachedHome.value) {
+                paginationAwaitingFreshPage = true
+                return
+            }
             if (feedExhausted || homePage.value == null || !_isLoadingMore.compareAndSet(false, true)) return
             val account = feedAccountKey()
+            val requestContext = activeHomeContext
             viewModelScope.launch(Dispatchers.IO) {
                 try {
                     homeLoadMutex.withLock {
@@ -1002,7 +1091,7 @@ class HomeViewModel
                             if (error is CancellationException) throw error
                             return@withLock
                         }
-                        if (homePage.value !== original || feedAccountKey() != account) return@withLock
+                        if (homePage.value !== original || feedAccountKey() != account || !isCurrentHome(requestContext)) return@withLock
                         val blocked = database.getBlockedArtistIds().toSet()
                         val aiPolicy = loadAiContentFilterPolicy()
                         val hideExplicit = context.dataStore.get(HideExplicitKey, false)
@@ -1030,6 +1119,7 @@ class HomeViewModel
                             sections = original.sections + additions,
                             continuation = if (repeatedToken) null else next.continuation,
                         )
+                        if (!isCurrentHome(requestContext) || homePage.value !== original) return@withLock
                         applyRemoteHomePage(merged, replaceCommunitySection = false)
                         updateAllYtItems()
                     }
@@ -1217,7 +1307,7 @@ class HomeViewModel
         init {
             observeQuickPicks()
 
-            viewModelScope.launch(Dispatchers.IO) {
+            if (!app.vibra.startup.StartupOptions.progressive) viewModelScope.launch(Dispatchers.IO) {
                 load()
             }
 
@@ -1240,9 +1330,12 @@ class HomeViewModel
             }
 
             viewModelScope.launch(Dispatchers.IO) {
-                kotlinx.coroutines.delay(3000)
-
-                syncUtils.cleanupDuplicatePlaylists()
+                if (app.vibra.startup.StartupOptions.deferred) {
+                    app.vibra.startup.StartupWork.optional("playlist_cleanup") { syncUtils.cleanupDuplicatePlaylists() }
+                } else {
+                    kotlinx.coroutines.delay(3000)
+                    syncUtils.cleanupDuplicatePlaylists()
+                }
             }
 
             // Started offline: the feed never arrived. Load it again as soon as the connection is back.
@@ -1251,24 +1344,60 @@ class HomeViewModel
                     .drop(1)
                     .filter { it }
                     .collect {
-                        if (homePage.value == null || accountPlaylists.value == null) {
+                        val needsFeed = app.vibra.home.needsFreshFeed(homePage.value != null, _showingCachedHome.value)
+                        if (needsFeed || accountPlaylists.value == null) {
                             val cookie = context.dataStore.get(InnerTubeCookieKey, "")
                             if (hasYouTubeLoginCookie(cookie)) {
                                 val refreshGeneration = beginAccountRefresh()
                                 launch { refreshAccountIdentity(refreshGeneration) }
                                 launch { refreshAccountPlaylistsInternal(refreshGeneration) }
                             }
-                            if (homePage.value == null) refresh()
+                            if (needsFeed) refresh()
                         }
                     }
             }
 
             viewModelScope.launch(Dispatchers.IO) {
                 context.dataStore.data
-                    .map { it[InnerTubeCookieKey] }
-                    .distinctUntilChanged()
-                    .collectLatest { cookie ->
+                    .map { prefs ->
+                        // Vibra: the UI may force English; content defaults still follow the system locale.
+                        val systemLocale = android.content.res.Resources.getSystem().configuration.locales[0] ?: java.util.Locale.getDefault()
+                        val key = if (app.vibra.startup.StartupOptions.progressive) app.vibra.home.HomeSnapshotDisk.contextKey(
+                            prefs[InnerTubeCookieKey], prefs[DataSyncIdKey],
+                            prefs[moe.rukamori.archivetune.constants.ContentCountryKey]?.takeUnless { it == moe.rukamori.archivetune.constants.SYSTEM_DEFAULT } ?: systemLocale.country,
+                            prefs[moe.rukamori.archivetune.constants.ContentLanguageKey]?.takeUnless { it == moe.rukamori.archivetune.constants.SYSTEM_DEFAULT } ?: systemLocale.toLanguageTag(),
+                        ) else prefs[InnerTubeCookieKey].orEmpty()
+                        Triple(key, prefs[InnerTubeCookieKey], prefs.toPlaybackAuthState())
+                    }
+                    .distinctUntilChanged { old, new -> old.first == new.first }
+                    .collectLatest { (key, cookie, auth) ->
                         try {
+                            if (app.vibra.startup.StartupOptions.progressive) {
+                                val previous = activeHomeContext
+                                activeHomeContext = key
+                                YouTube.authState = auth
+                                if (previous != null && previous != key) {
+                                    chipLoadJob?.cancel()
+                                    paginationAwaitingFreshPage = false
+                                    clearAccountData()
+                                    homePage.value = null
+                                    remoteQuickPicks.value = null
+                                    similarRecommendations.value = null
+                                    updateCommunitySection(null)
+                                    selectedChip.value = null
+                                    previousHomePage.value = null
+                                    previousRemoteQuickPicks.value = null
+                                    previousCommunitySection.value = null
+                                    isInitialLoadComplete.value = false
+                                    _showingCachedHome.value = false
+                                    updateAllYtItems()
+                                }
+                                // The cache is optional: if it breaks, the real load below must still run.
+                                app.vibra.home.optionalStep({ failure ->
+                                    reportException(failure)
+                                    _showingCachedHome.value = false
+                                }) { restoreHome(key) }
+                            }
                             val isLoggedIn = hasYouTubeLoginCookie(cookie)
                             val shouldSynchronize =
                                 shouldSynchronizeAuthenticatedSession(
@@ -1280,6 +1409,8 @@ class HomeViewModel
                             if (isLoggedIn && cookie != null && cookie.isNotEmpty()) {
                                 if (!prepareYouTubeAccount(cookie)) {
                                     clearAccountData()
+                                    // This observer owns the first load: returning without one leaves the skeleton forever.
+                                    if (app.vibra.startup.StartupOptions.progressive) load()
                                     return@collectLatest
                                 }
 
@@ -1304,12 +1435,14 @@ class HomeViewModel
                                 }
                             } else {
                                 clearAccountData()
+                                if (app.vibra.startup.StartupOptions.progressive) load()
                             }
                         } catch (e: CancellationException) {
                             throw e
                         } catch (e: Exception) {
                             Timber.e(e, "Error processing cookie change")
                             clearAccountData()
+                            if (app.vibra.startup.StartupOptions.progressive && !isInitialLoadComplete.value) load()
                         }
                     }
             }

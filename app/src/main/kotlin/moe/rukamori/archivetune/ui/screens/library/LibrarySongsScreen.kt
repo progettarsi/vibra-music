@@ -7,6 +7,9 @@
 
 package moe.rukamori.archivetune.ui.screens.library
 
+// Vibra: independent radii follow the global rounding style.
+import app.vibra.ui.theme.adaptiveRoundedCornerShape
+
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import app.vibra.ui.motion.clickable
@@ -33,7 +36,6 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import app.vibra.ui.motion.VibraButton as Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenuItem
@@ -334,7 +336,7 @@ fun LibrarySongsScreen(
                         modifier =
                             Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(28.dp))
+                                .clip(adaptiveRoundedCornerShape(28.dp))
                                 .background(
                                     Brush.verticalGradient(
                                         colors =
@@ -460,7 +462,7 @@ fun LibrarySongsScreen(
                             Modifier
                                 .fillMaxWidth()
                                 .padding(top = topPadding, bottom = 0.dp)
-                                .clip(RoundedCornerShape(cornerRadius))
+                                .clip(adaptiveRoundedCornerShape(cornerRadius))
                                 .background(
                                     if (isActive) activeCardColor else inactiveCardColor,
                                 ).combinedClickable(
@@ -496,7 +498,7 @@ fun LibrarySongsScreen(
                             thumbnailUrl = song.song.thumbnailUrl,
                             isActive = isActive,
                             isPlaying = isPlaying,
-                            shape = RoundedCornerShape(thumbCorner),
+                            shape = adaptiveRoundedCornerShape(thumbCorner),
                             contentScale = ContentScale.Crop,
                             showPlaceholder = true,
                             modifier =

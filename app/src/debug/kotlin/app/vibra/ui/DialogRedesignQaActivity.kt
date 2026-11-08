@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import androidx.datastore.preferences.core.edit
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.compose.rememberNavController
+import app.vibra.ui.RoundingQaTheme as ArchiveTuneTheme
 import app.vibra.ui.components.*
 import app.vibra.ui.motion.*
 import dagger.hilt.android.AndroidEntryPoint
@@ -34,7 +35,6 @@ import moe.rukamori.archivetune.models.toMediaMetadata
 import moe.rukamori.archivetune.playback.*
 import moe.rukamori.archivetune.ui.component.*
 import moe.rukamori.archivetune.ui.menu.*
-import moe.rukamori.archivetune.ui.theme.ArchiveTuneTheme
 import moe.rukamori.archivetune.utils.SyncUtils
 import moe.rukamori.archivetune.utils.dataStore
 import org.json.JSONObject

@@ -1,0 +1,11 @@
+<!-- Vibra (2026) — GPL-3.0. Derived from ArchiveTune © Rukamori (github.com/rukamori).
+     Centre mark from repeat_one; the shared arrows remain stationary during its reveal. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="960"
+    android:viewportHeight="960">
+    <path
+        android:fillColor="@android:color/white"
+        android:pathData="M460,600L460,420L400,420L400,360L520,360L520,600L460,600Z" />
+</vector>

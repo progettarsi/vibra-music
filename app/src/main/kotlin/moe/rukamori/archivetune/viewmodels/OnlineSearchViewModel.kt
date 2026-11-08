@@ -37,13 +37,19 @@ import moe.rukamori.archivetune.innertube.models.YTItem
 import moe.rukamori.archivetune.innertube.models.filterExplicit
 import moe.rukamori.archivetune.innertube.models.filterVideo
 import moe.rukamori.archivetune.innertube.pages.SearchSummaryPage
+import androidx.annotation.StringRes
+import moe.rukamori.archivetune.R
 import moe.rukamori.archivetune.models.ItemsPage
 import moe.rukamori.archivetune.ui.screens.search.OnlineSearchResultArgument
 import moe.rukamori.archivetune.ui.screens.search.decodeOnlineSearchQuery
 import moe.rukamori.archivetune.utils.dataStore
 import moe.rukamori.archivetune.utils.get
 import moe.rukamori.archivetune.utils.reportException
+import java.io.IOException
 import javax.inject.Inject
+import kotlinx.coroutines.CancellationException
+
+private const val SUMMARY_LOAD = "summary"
 
 enum class OnlineSearchSort {
     DEFAULT,
@@ -67,6 +73,10 @@ class OnlineSearchViewModel
         var summaryPage by mutableStateOf<SearchSummaryPage?>(null)
         val viewStateMap = mutableStateMapOf<String, ItemsPage?>()
 
+        // Vibra: what failed to load, with the message to show for it. A key absent from
+        // here and from the pages above is still loading.
+        private val failedLoads = mutableStateMapOf<String, Int>()
+
         private val allModeFilters =
             listOf(
                 FILTER_SONG,
@@ -82,27 +92,58 @@ class OnlineSearchViewModel
 
         init {
             viewModelScope.launch {
-                filter.collect { selectedFilter ->
-                    if (selectedFilter == null) {
-                        viewModelScope.launch {
-                            loadSummaryIfNeeded()
-                        }
-                        allModeFilters.forEach { allModeFilter ->
-                            viewModelScope.launch {
-                                loadFilterIfNeeded(allModeFilter)
-                            }
-                        }
-                    } else {
-                        loadFilterIfNeeded(selectedFilter)
+                filter.collect { selectedFilter -> load(selectedFilter) }
+            }
+        }
+
+        private suspend fun load(selectedFilter: YouTube.SearchFilter?) {
+            if (selectedFilter == null) {
+                viewModelScope.launch {
+                    loadSummaryIfNeeded()
+                }
+                allModeFilters.forEach { allModeFilter ->
+                    viewModelScope.launch {
+                        loadFilterIfNeeded(allModeFilter)
                     }
                 }
+            } else {
+                loadFilterIfNeeded(selectedFilter)
             }
+        }
+
+        /** The message for a selected filter that failed to load, or null. */
+        @StringRes
+        fun failureOf(selectedFilter: YouTube.SearchFilter): Int? = failedLoads[selectedFilter.value]
+
+        /** The message when the "all" view has settled with a failure and nothing to show, or null. */
+        @StringRes
+        fun allModeFailure(): Int? {
+            val summarySettled = summaryPage != null || failedLoads.containsKey(SUMMARY_LOAD)
+            val filtersSettled = allModeFilters.all { viewStateMap.containsKey(it.value) || failedLoads.containsKey(it.value) }
+            if (!summarySettled || !filtersSettled) return null
+            // Filters that all answered empty are a real "no results", whatever the summary did.
+            return allModeFilters.firstNotNullOfOrNull { failedLoads[it.value] }
+        }
+
+        fun retry() {
+            failedLoads.clear()
+            viewModelScope.launch { load(filter.value) }
+        }
+
+        private fun recordFailure(
+            key: String,
+            error: Throwable,
+        ) {
+            if (error is CancellationException) return
+            reportException(error)
+            failedLoads[key] = if (error is IOException) R.string.error_no_internet else R.string.error_unknown
         }
 
         private suspend fun loadSummaryIfNeeded() {
             if (summaryPage != null || isSummaryLoading) return
 
             isSummaryLoading = true
+            failedLoads.remove(SUMMARY_LOAD)
             try {
                 YouTube
                     .searchSummary(query)
@@ -122,7 +163,7 @@ class OnlineSearchViewModel
                                     },
                             )
                     }.onFailure {
-                        reportException(it)
+                        recordFailure(SUMMARY_LOAD, it)
                     }
             } finally {
                 isSummaryLoading = false
@@ -133,6 +174,7 @@ class OnlineSearchViewModel
             val filterKey = filter.value
             if (viewStateMap.containsKey(filterKey) || !loadingFilters.add(filterKey)) return
 
+            failedLoads.remove(filterKey)
             try {
                 YouTube
                     .search(query, filter)
@@ -154,7 +196,7 @@ class OnlineSearchViewModel
                                 result.continuation,
                             )
                     }.onFailure {
-                        reportException(it)
+                        recordFailure(filterKey, it)
                     }
             } finally {
                 loadingFilters.remove(filterKey)

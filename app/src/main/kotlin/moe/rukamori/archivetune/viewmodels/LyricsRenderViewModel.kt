@@ -42,14 +42,21 @@ enum class LyricsRenderError {
     INVALID_LYRICS,
 }
 
+/** A result belongs to the track that requested it, even while the player is rebinding. */
+@Immutable
+data class LyricsRenderSnapshot(val mediaId: String?, val state: LyricsRenderScreenState) {
+    fun forMedia(mediaId: String): LyricsRenderScreenState =
+        if (this.mediaId == mediaId) state else LyricsRenderScreenState.Loading
+}
+
 @HiltViewModel
 class LyricsRenderViewModel
     @Inject
     constructor(
         private val prepareLyrics: PrepareLyricsUseCase,
     ) : ViewModel() {
-        private val _state = MutableStateFlow<LyricsRenderScreenState>(LyricsRenderScreenState.Loading)
-        val state: StateFlow<LyricsRenderScreenState> = _state.asStateFlow()
+        private val _state = MutableStateFlow(LyricsRenderSnapshot(null, LyricsRenderScreenState.Loading))
+        val state: StateFlow<LyricsRenderSnapshot> = _state.asStateFlow()
 
         private val _playbackPositionMs = MutableStateFlow(0L)
         val playbackPositionMs: StateFlow<Long> = _playbackPositionMs.asStateFlow()
@@ -60,7 +67,8 @@ class LyricsRenderViewModel
         private var translationVisibilityJob: Job? = null
 
         fun onShowTranslationsChanged(show: Boolean) {
-            val lyrics = (_state.value as? LyricsRenderScreenState.Success)?.lyrics ?: return
+            val snapshot = _state.value
+            val lyrics = (snapshot.state as? LyricsRenderScreenState.Success)?.lyrics ?: return
             if (!lyrics.hasTranslations) return
             translationVisibilityJob?.cancel()
             translationVisibilityJob = viewModelScope.launch {
@@ -70,7 +78,9 @@ class LyricsRenderViewModel
                     throw exception
                 } catch (exception: Exception) {
                     reportException(exception)
-                    _state.value = LyricsRenderScreenState.Error(LyricsRenderError.INVALID_LYRICS)
+                    if (_state.value.mediaId == snapshot.mediaId) {
+                        _state.value = snapshot.copy(state = LyricsRenderScreenState.Error(LyricsRenderError.INVALID_LYRICS))
+                    }
                 }
             }
         }
@@ -100,11 +110,15 @@ class LyricsRenderViewModel
             val mediaChanged = binding?.mediaId != mediaId
             binding = nextBinding
             observationJob?.cancel()
-            if (mediaChanged) _state.value = LyricsRenderScreenState.Loading
+            if (mediaChanged) {
+                translationVisibilityJob?.cancel()
+                _state.value = LyricsRenderSnapshot(mediaId, LyricsRenderScreenState.Loading)
+            }
             observationJob =
                 viewModelScope.launch {
                     prepareLyrics.observe(nextBinding.mediaId, nextBinding.durationMs).collect { result ->
-                        _state.value =
+                        if (binding != nextBinding) return@collect
+                        val renderState =
                             result.fold(
                                 onSuccess = { lyrics ->
                                     when {
@@ -119,6 +133,7 @@ class LyricsRenderViewModel
                                     LyricsRenderScreenState.Error(LyricsRenderError.INVALID_LYRICS)
                                 },
                             )
+                        _state.value = LyricsRenderSnapshot(nextBinding.mediaId, renderState)
                     }
                 }
         }

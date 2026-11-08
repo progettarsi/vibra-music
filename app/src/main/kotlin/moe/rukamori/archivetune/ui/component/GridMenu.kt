@@ -11,6 +11,7 @@ package moe.rukamori.archivetune.ui.component
 
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
+import app.vibra.ui.components.VibraLoadingIndicator
 import app.vibra.ui.motion.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -23,7 +24,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyGridScope
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
@@ -145,7 +145,7 @@ fun LazyGridScope.DownloadGridMenu(
         Download.STATE_QUEUED, Download.STATE_DOWNLOADING -> {
             GridMenuItem(
                 icon = {
-                    CircularWavyProgressIndicator(
+                    VibraLoadingIndicator(
                         modifier = Modifier.size(24.dp),
                     )
                 },

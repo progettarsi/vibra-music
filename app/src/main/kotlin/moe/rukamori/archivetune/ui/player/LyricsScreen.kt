@@ -123,6 +123,7 @@ fun LyricsScreen(
     // slider and transport (and those stay touchable).
     embeddedControlsInset: Dp? = null,
     lyricsRenderViewModel: LyricsRenderViewModel = hiltViewModel(),
+    paneActive: Boolean = true,
 ) {
     val playerConnection = LocalPlayerConnection.current ?: return
     val player = playerConnection.player
@@ -136,7 +137,8 @@ fun LyricsScreen(
     val canSkipPrevious by playerConnection.canSkipPrevious.collectAsStateWithLifecycle()
     val canSkipNext by playerConnection.canSkipNext.collectAsStateWithLifecycle()
     val currentLyrics by playerConnection.currentLyrics.collectAsStateWithLifecycle(initialValue = null)
-    val lyricsRenderState by lyricsRenderViewModel.state.collectAsStateWithLifecycle()
+    val lyricsSnapshot by lyricsRenderViewModel.state.collectAsStateWithLifecycle()
+    val lyricsRenderState = lyricsSnapshot.forMedia(mediaMetadata.id)
 
     val (enableHapticFeedback) = rememberPreference(EnableHapticFeedbackKey, true)
     val lyricsMode = LyricsMode.ENHANCED
@@ -309,6 +311,7 @@ fun LyricsScreen(
                     LyricsPane(
                         lyricsMode = lyricsMode,
                         lyricsState = lyricsRenderState,
+                        paneActive = paneActive,
                         sliderPositionProvider = { sliderPosition },
                         lyricsSyncOffset = lyricsSyncOffset,
                         modifier =
@@ -327,6 +330,7 @@ fun LyricsScreen(
                 LyricsPane(
                     lyricsMode = lyricsMode,
                     lyricsState = lyricsRenderState,
+                    paneActive = paneActive,
                     sliderPositionProvider = { sliderPosition },
                     lyricsSyncOffset = lyricsSyncOffset,
                     modifier =
@@ -420,6 +424,7 @@ private fun LyricsPane(
     lyricsState: LyricsRenderScreenState,
     sliderPositionProvider: () -> Long?,
     lyricsSyncOffset: Int,
+    paneActive: Boolean,
     modifier: Modifier = Modifier,
 ) {
     LyricsContent(
@@ -427,6 +432,7 @@ private fun LyricsPane(
         lyricsState = lyricsState,
         sliderPositionProvider = sliderPositionProvider,
         lyricsSyncOffset = lyricsSyncOffset,
+        paneActive = paneActive,
         modifier =
             modifier
                 .fillMaxSize()
@@ -539,6 +545,7 @@ private fun LyricsContent(
     sliderPositionProvider: () -> Long?,
     lyricsSyncOffset: Int,
     textColor: Color,
+    paneActive: Boolean,
     modifier: Modifier = Modifier,
 ) {
     when (lyricsMode) {
@@ -559,6 +566,7 @@ private fun LyricsContent(
                 lyricsSyncOffset = lyricsSyncOffset,
                 modifier = modifier,
                 textColorOverride = textColor,
+                paneActive = paneActive,
             )
         }
     }

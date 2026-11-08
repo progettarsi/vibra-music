@@ -105,7 +105,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
@@ -164,7 +163,7 @@ import app.vibra.ui.motion.liquidPress
 import app.vibra.ui.motion.nudge
 import app.vibra.ui.motion.rememberLiquidNudge
 import app.vibra.ui.motion.rememberLiquidSheetState
-import app.vibra.ui.motion.rememberScreenCornerRadius
+import app.vibra.ui.motion.rememberScreenCorners
 import app.vibra.ui.theme.VibraDimens
 import app.vibra.ui.theme.VibraTextStyles
 import kotlin.math.roundToInt
@@ -296,7 +295,8 @@ fun VibraPlayerSheet(
     // A closing player takes the timer panel with it.
     LaunchedEffect(sheet.isExpanded) { if (!sheet.isExpanded) timerPanel.close() }
 
-    val screenCorner = rememberScreenCornerRadius()
+    val screenCorners = rememberScreenCorners()
+    val screenCornerPixels = screenCorners.pixels(LocalDensity.current)
     val spin = LocalPlaybackSpin.current
     val accent = rememberArtworkAccent(metadata.thumbnailUrl)
 
@@ -351,7 +351,7 @@ fun VibraPlayerSheet(
                             }
                         }.graphicsLayer {
                             val p = sheet.progress.coerceIn(0f, 1f)
-                            shape = RoundedCornerShape(lerp(pillCorner, screenCorner, p))
+                            shape = screenCorners.shape(pillCorner, p)
                             clip = true
                         }.background(MaterialTheme.colorScheme.surfaceContainer),
             ) {
@@ -502,7 +502,9 @@ fun VibraPlayerSheet(
                                 shape =
                                     PlayerContainerShape(
                                         bounds = playerContainerRect(origin, Rect(0f, 0f, fullWidthPx, fullHeightPx), p),
-                                        cornerPx = lerp(pillCorner, screenCorner, p).toPx(),
+                                        corners = screenCornerPixels,
+                                        from = pillCorner.toPx(),
+                                        progress = p,
                                     )
                             }
                             // The scene (cover and backdrop) never moves for the queue: only the interface recedes.
@@ -733,6 +735,7 @@ fun VibraPlayerSheet(
                 var lyricsSyncOffset by rememberSaveable(metadata.id) { mutableIntStateOf(0) }
                 LyricsScreen(
                     mediaMetadata = metadata,
+                    paneActive = lyricsVisible,
                     onBackClick = { lyricsVisible = false },
                     navController = navController,
                     lyricsSyncOffset = lyricsSyncOffset,
@@ -932,7 +935,8 @@ private fun FlyingCover(
         if (canvas != null) layerCanvases[url] = canvas else layerCanvases.remove(url)
     }
     layerCanvases.keys.retainAll(setOfNotNull(url, fadingUrl))
-    val cornerPx = if (fullBleed) 0f else with(density) { CoverCorner.toPx() }
+    val coverCorner = app.vibra.ui.theme.adaptiveRadius(CoverCorner)
+    val cornerPx = if (fullBleed) 0f else with(density) { coverCorner.toPx() }
     val morph =
         remember(to.width, cornerPx) {
             val rounding = (cornerPx / to.width.coerceAtLeast(1f)).coerceIn(0f, 0.5f)
@@ -941,7 +945,7 @@ private fun FlyingCover(
                 RoundedPolygon.rectangle(width = 1f, height = 1f, centerX = 0.5f, centerY = 0.5f, rounding = CornerRounding(rounding)),
             )
         }
-    val finalShape = if (fullBleed) RectangleShape else RoundedCornerShape(CoverCorner)
+    val finalShape = if (fullBleed) RectangleShape else RoundedCornerShape(coverCorner)
     val coverCrop = rememberCoverCrop(url)
 
     Box(
@@ -1719,14 +1723,15 @@ private fun PlayerBottomRow(
             )
         }
         Spacer(Modifier.width(8.dp))
-        val (repeatIcon, repeatLabel) =
+        val repeatLabel =
             when (nowPlaying.repeatMode) {
-                REPEAT_MODE_ALL -> R.drawable.repeat to R.string.vibra_repeat_all
-                REPEAT_MODE_ONE -> R.drawable.repeat_one to R.string.vibra_repeat_one
-                else -> R.drawable.repeat to R.string.vibra_repeat_off
+                REPEAT_MODE_ALL -> R.string.vibra_repeat_all
+                REPEAT_MODE_ONE -> R.string.vibra_repeat_one
+                else -> R.string.vibra_repeat_off
             }
-        StateGlyph(
-            icon = repeatIcon,
+        PlayerModeButton(
+            icon = R.drawable.repeat,
+            repeatOne = nowPlaying.repeatMode == REPEAT_MODE_ONE,
             contentDescription = stringResource(repeatLabel),
             active = nowPlaying.repeatMode != REPEAT_MODE_OFF,
             onClick = {
@@ -1734,7 +1739,7 @@ private fun PlayerBottomRow(
                 connection.player.toggleRepeatMode()
             },
         )
-        StateGlyph(
+        PlayerModeButton(
             icon = R.drawable.shuffle,
             contentDescription =
                 stringResource(if (nowPlaying.shuffleEnabled) R.string.vibra_shuffle_on else R.string.vibra_shuffle_off),
@@ -1747,42 +1752,6 @@ private fun PlayerBottomRow(
         )
     }
 }
-
-/**
- * Repeat / shuffle. On, the glyph sits deep black in a solid white disc; off, it is a translucent
- * white glyph with no disc. A tint alone (the cover's accent) vanished on white or pale covers;
- * the disc reads on any cover: white against a dark one, the black glyph against a light one.
- */
-@Composable
-private fun StateGlyph(
-    @DrawableRes icon: Int,
-    contentDescription: String,
-    active: Boolean,
-    onClick: () -> Unit,
-) {
-    val on by animateFloatAsState(
-        targetValue = if (active) 1f else 0f,
-        animationSpec = Liquid.effects(),
-        label = "stateGlyph",
-    )
-    VibraGlyphButton(
-        icon = icon,
-        contentDescription = contentDescription,
-        tint = androidx.compose.ui.graphics.lerp(OnBackdrop.copy(alpha = 0.6f), StateGlyphOnInk, on.coerceIn(0f, 1f)),
-        iconSize = 24.dp,
-        onClick = onClick,
-        modifier =
-            Modifier
-                .semantics { selected = active }
-                .drawBehind { drawCircle(OnBackdrop, radius = StateGlyphDisc.toPx() / 2f * (0.8f + 0.2f * on), alpha = on.coerceIn(0f, 1f)) },
-    )
-}
-
-/** Diameter of the white disc behind an active repeat / shuffle glyph. */
-private val StateGlyphDisc = 40.dp
-
-/** The active glyph's ink: deep black on the white disc. */
-private val StateGlyphOnInk = Color.Black
 
 /** Translucent round button for use on the player backdrop (Apple Music style). */
 @Composable

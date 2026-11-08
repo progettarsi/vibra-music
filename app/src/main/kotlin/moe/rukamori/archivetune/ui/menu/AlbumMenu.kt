@@ -25,7 +25,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
@@ -66,10 +65,12 @@ import androidx.media3.exoplayer.offline.Download.STATE_STOPPED
 import androidx.media3.exoplayer.offline.DownloadService
 import androidx.navigation.NavController
 import app.vibra.ui.components.*
+import app.vibra.ui.components.VibraLoadingIndicator
 import coil3.compose.AsyncImage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import moe.rukamori.archivetune.LocalDatabase
+import moe.rukamori.archivetune.LocalSyncUtils
 import moe.rukamori.archivetune.LocalDownloadUtil
 import moe.rukamori.archivetune.LocalPlayerConnection
 import moe.rukamori.archivetune.R
@@ -96,6 +97,7 @@ import moe.rukamori.archivetune.ui.utils.sendAddMissingDownloads
 fun AlbumMenu(originalAlbum: Album, navController: NavController, onDismiss: () -> Unit) {
   val context = LocalContext.current
   val database = LocalDatabase.current
+  val libraryActions = LocalSyncUtils.current.libraryActions
   val downloadUtil = LocalDownloadUtil.current
   val playerConnection = LocalPlayerConnection.current ?: return
   val scope = rememberCoroutineScope()
@@ -390,7 +392,7 @@ fun AlbumMenu(originalAlbum: Album, navController: NavController, onDismiss: () 
         STATE_DOWNLOADING -> {
           NewAction(
             id = MenuActionId.Download,
-            icon = { CircularWavyProgressIndicator(modifier = Modifier.size(24.dp)) },
+            icon = { VibraLoadingIndicator(modifier = Modifier.size(24.dp)) },
             text = stringResource(R.string.downloading),
             onClick = {
               remoteSongs.forEach { song ->
@@ -480,7 +482,7 @@ fun AlbumMenu(originalAlbum: Album, navController: NavController, onDismiss: () 
         toggle = {
           MediaMenuToggle(
             selected = album.album.bookmarkedAt != null,
-            onClick = { database.query { update(album.album.toggleLike()) } },
+            onClick = { libraryActions.toggleAlbum(album.album) },
           ) {
             Icon(
               painter =

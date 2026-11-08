@@ -22,6 +22,7 @@ import moe.rukamori.archivetune.network.NetworkMonitor
 import moe.rukamori.archivetune.constants.ShowSpotifyPlaylistsKey
 import moe.rukamori.archivetune.constants.SpotifySpDcKey
 import moe.rukamori.archivetune.utils.dataStore
+import java.security.MessageDigest
 import java.time.LocalDateTime
 
 /** The complete import reports partial failures explicitly; no remote account writes. */
@@ -161,13 +162,24 @@ class SpotifySyncRepository @Inject constructor(
                             existing = matches.singleOrNull()
                         }
                         val entity = existing?.playlist ?: PlaylistEntity(name = source.name, isLocal = true, bookmarkedAt = LocalDateTime.now())
-                        val extras = existing?.let { database.playlistSongs(it.id).first().map { row -> row.song.id }.filterNot { it in ids } }.orEmpty()
+                        val current = existing?.let { database.playlistSongs(it.id).first().map { row -> row.song.id } }.orEmpty()
+                        val extras = current.filterNot { it in ids }
+                        // Only a playlist this import made can be removed later. One adopted by name stays the user's;
+                        // one mapped before snapshots existed counts only while it still matches Spotify exactly.
+                        val snapshot = nextImportSnapshot(
+                            isNew = existing == null,
+                            wasMapped = mapping != null,
+                            current = current,
+                            incoming = ids,
+                            previous = database.spotifyImportValue(PLAYLIST_SNAPSHOT, entity.id),
+                        )
                         database.withTransaction {
                             guard()
                             if (existing == null) insert(entity) else update(entity.copy(name = source.name))
                             clearPlaylist(entity.id)
                             mergeImportedPlaylist(ids, extras).forEachIndexed { index, id -> insert(PlaylistSongMap(playlistId = entity.id, songId = id, position = index)) }
                             saveSpotifyImport(SpotifyImportMap(account, "playlist", source.id, entity.id))
+                            saveSpotifyImport(SpotifyImportMap(account, PLAYLIST_SNAPSHOT, entity.id, snapshot))
                         }
                         mutable.update { it.copy(imported = it.imported + 1) }
                     }
@@ -197,40 +209,75 @@ class SpotifySyncRepository @Inject constructor(
 
     /**
      * Deletes the playlists imported from Spotify (signing out, playlists turned off). A playlist the
-     * user has made their own stays: one with songs added by hand, or synced to YouTube Music.
+     * user has made their own stays: one whose songs or order differ from the last import, one that
+     * existed before the import, or one synced to YouTube Music.
      */
     suspend fun removeImportedPlaylists() {
         // A running import must not bring them back.
         generation++
         job?.cancelAndJoin()
-        val importedSongs = database.spotifyImportedIds("song").toSet()
         for (playlistId in database.spotifyImportedIds("playlist")) {
-            val playlist = database.playlist(playlistId).first()
-            if (playlist == null) {
-                database.deleteSpotifyImport("playlist", playlistId)
-                continue
-            }
-            val songs = database.playlistSongs(playlistId).first().map { it.song.id }
-            if (!isUntouchedImport(playlist.playlist.browseId, songs, importedSongs)) continue
+            // Compare and delete in the same transaction: a concurrent edit must not slip between them.
             database.withTransaction {
+                val playlist = playlist(playlistId).first()
+                if (playlist == null) {
+                    deleteSpotifyImport("playlist", playlistId)
+                    deleteSpotifyImportBySource(PLAYLIST_SNAPSHOT, playlistId)
+                    return@withTransaction
+                }
+                val songs = playlistSongs(playlistId).first().map { it.song.id }
+                val snapshot = spotifyImportValue(PLAYLIST_SNAPSHOT, playlistId)
+                if (!isUntouchedImport(playlist.playlist.browseId, songs, snapshot)) return@withTransaction
                 delete(playlist.playlist)
                 deleteSpotifyImport("playlist", playlistId)
+                deleteSpotifyImportBySource(PLAYLIST_SNAPSHOT, playlistId)
             }
         }
     }
 
     companion object {
         private const val SIX_HOURS = 6 * 60 * 60 * 1000L
+
+        /** Provenance row: sourceId is the local playlist, localId the digest of its last imported songs. */
+        private const val PLAYLIST_SNAPSHOT = "playlist_snapshot"
         private val PlaylistsOffKey = booleanPreferencesKey("vibraSpotifyPlaylistsOff")
     }
 }
 
-/** An imported playlist still as Spotify made it: not synced to YouTube Music, no song added by hand. */
+/**
+ * An imported playlist still exactly as the last import left it, and not synced to YouTube Music.
+ * Without a [snapshot] nothing proves the import made it, so it is never considered untouched.
+ */
 internal fun isUntouchedImport(
     browseId: String?,
     songs: List<String>,
-    importedSongs: Set<String>,
-): Boolean = browseId == null && songs.all { it in importedSongs }
+    snapshot: String?,
+): Boolean = browseId == null && snapshot != null && playlistSnapshot(songs) == snapshot
+
+// A non-digest provenance value prevents adopted or edited playlists from becoming deletable on reimport.
+private const val USER_OWNED_PLAYLIST = "user-owned"
+
+/** Preserve user ownership across subsequent syncs, including adoption of an existing playlist by name. */
+internal fun nextImportSnapshot(
+    isNew: Boolean,
+    wasMapped: Boolean,
+    current: List<String>,
+    incoming: List<String>,
+    previous: String?,
+): String = when {
+    isNew -> playlistSnapshot(incoming)
+    previous == USER_OWNED_PLAYLIST -> USER_OWNED_PLAYLIST
+    // The merge keeps songs Spotify no longer returns, so it is the merged list that must match next time.
+    previous != null && previous == playlistSnapshot(current) -> playlistSnapshot(mergeImportedPlaylist(incoming, current))
+    previous == null && wasMapped && current == incoming -> playlistSnapshot(incoming)
+    else -> USER_OWNED_PLAYLIST
+}
+
+/** Digest of a playlist's songs in order: any addition, removal or reorder changes it. */
+internal fun playlistSnapshot(songs: List<String>): String =
+    MessageDigest.getInstance("SHA-256")
+        .digest(songs.joinToString("\u0000").toByteArray())
+        .joinToString("") { "%02x".format(it) }
 
 /** Additive ordering: Spotify order first, retained local content follows once. */
 internal fun mergeImportedPlaylist(remote: List<String>, local: List<String>): List<String> = (remote + local).distinct()

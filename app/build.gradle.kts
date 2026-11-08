@@ -64,6 +64,9 @@ android {
 
     defaultConfig {
         applicationId = "vibra.music.com"
+        buildConfigField("boolean", "STARTUP_PROGRESSIVE", "true")
+        buildConfigField("boolean", "STARTUP_CACHE", "true")
+        buildConfigField("boolean", "STARTUP_DEFERRED", "true")
         minSdk = 26
         targetSdk = 37
         versionCode = 25
@@ -195,6 +198,11 @@ android {
         }
     }
 
+    // The deterministic motion journey is available in debug and optimized benchmark builds only.
+    sourceSets {
+        maybeCreate("benchmark").assets.srcDir("src/motionQa/assets")
+    }
+
     buildTypes {
         release {
             buildConfigField("String", "VIBRA_UPDATE_URL", (vibraUpdateUrl ?: vibraReleaseUpdateUrl).asBuildConfigString())
@@ -213,6 +221,11 @@ android {
         }
         create("benchmark") {
             initWith(getByName("release"))
+            val experiment = providers.gradleProperty("startupExperiment").orElse("combined").get()
+            require(experiment in setOf("baseline", "progressive", "cache", "deferred", "combined"))
+            buildConfigField("boolean", "STARTUP_PROGRESSIVE", (experiment != "baseline").toString())
+            buildConfigField("boolean", "STARTUP_CACHE", (experiment in setOf("cache", "combined")).toString())
+            buildConfigField("boolean", "STARTUP_DEFERRED", (experiment in setOf("deferred", "combined")).toString())
             applicationIdSuffix = ".benchmark"
             buildConfigField("String", "VIBRA_UPDATE_URL", "\"\"")
             signingConfig = signingConfigs.getByName("debug")
@@ -257,6 +270,14 @@ android {
         targetCompatibility = JavaVersion.VERSION_21
     }
 
+    sourceSets {
+        listOf("benchmark", "nonMinifiedBenchmark").forEach { name ->
+            getByName(name) {
+                kotlin.srcDir("src/benchmarkShared/kotlin")
+            }
+        }
+    }
+
     buildFeatures {
         compose = true
         buildConfig = true
@@ -270,8 +291,10 @@ android {
 
     lint {
         lintConfig = file("lint.xml")
+        baseline = file("lint-baseline.xml")
         warningsAsErrors = false
-        abortOnError = false
+        // Vibra: CI turns this on. Local and release builds keep lint informative.
+        abortOnError = providers.gradleProperty("vibra.lintGate").isPresent
         checkDependencies = false
     }
 
@@ -413,6 +436,8 @@ dependencies {
     coreLibraryDesugaring(libs.desugaring)
 
     implementation(libs.timber)
+    androidTestImplementation("androidx.test:runner:1.5.2")
+    androidTestImplementation(libs.junit)
     testImplementation(libs.junit)
     testImplementation(libs.turbine)
     implementation(libs.translator)

@@ -7,6 +7,9 @@
 
 package moe.rukamori.archivetune.ui.component
 
+// Vibra: independent radii follow the global rounding style.
+import app.vibra.ui.theme.adaptiveRoundedCornerShape
+
 import app.vibra.ui.motion.vibraControlFeedback
 import android.annotation.SuppressLint
 import androidx.compose.animation.AnimatedContent
@@ -29,7 +32,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.DropdownMenuItem
@@ -95,7 +97,7 @@ fun <E> ChipsRow(
                         )
                     }
                 },
-                shape = RoundedCornerShape(16.dp),
+                shape = adaptiveRoundedCornerShape(16.dp),
                 border = null,
                 colors =
                     FilterChipDefaults.filterChipColors(
@@ -160,7 +162,7 @@ fun <Int> ChoiceChipsRow(
                         modifier = Modifier.graphicsLayer(rotationZ = rotationAnimation),
                     )
                 },
-                shape = RoundedCornerShape(16.dp),
+                shape = adaptiveRoundedCornerShape(16.dp),
                 border = null,
                 colors =
                     AssistChipDefaults.assistChipColors(
@@ -219,7 +221,7 @@ fun <Int> ChoiceChipsRow(
                                 containerColor = containerColor,
                             ),
                         onClick = { onValueUpdate(value) },
-                        shape = RoundedCornerShape(16.dp),
+                        shape = adaptiveRoundedCornerShape(16.dp),
                         border = null,
                         modifier = Modifier.vibraControlFeedback(enabled = true),
                     )

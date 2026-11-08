@@ -9,13 +9,16 @@
 
 package moe.rukamori.archivetune.ui.screens.settings
 
+// Vibra: independent radii follow the global rounding style.
+import app.vibra.ui.theme.adaptiveRoundedCornerShape
+
 import androidx.compose.ui.res.painterResource
+import app.vibra.ui.components.VibraLoadingIndicator
 import moe.rukamori.archivetune.ui.component.IconButton
 import moe.rukamori.archivetune.ui.utils.backToMain
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import app.vibra.ui.motion.VibraTextButton as TextButton
 import androidx.compose.runtime.*
@@ -105,7 +108,7 @@ fun ChangelogScreen(
         ) {
             when {
                 isLoading -> {
-                    CircularWavyProgressIndicator(
+                    VibraLoadingIndicator(
                         modifier = Modifier.align(Alignment.Center),
                     )
                 }
@@ -186,7 +189,7 @@ private fun ReleaseCard(release: ReleaseInfo) {
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = adaptiveRoundedCornerShape(16.dp),
         colors =
             CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),

@@ -7,6 +7,9 @@
 
 package moe.rukamori.archivetune.ui.screens.library
 
+// Vibra: independent radii follow the global rounding style.
+import app.vibra.ui.theme.adaptiveRoundedCornerShape
+
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import app.vibra.ui.motion.clickable
@@ -35,7 +38,6 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import app.vibra.ui.motion.VibraButton as Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenuItem
@@ -170,7 +172,7 @@ fun LibraryArtistsScreen(
                             Modifier
                                 .weight(1.3f)
                                 .fillMaxHeight()
-                                .clip(RoundedCornerShape(36.dp))
+                                .clip(adaptiveRoundedCornerShape(36.dp))
                                 .background(MaterialTheme.colorScheme.primaryContainer)
                                 .clickable {
                                     topArtist?.let { navController.navigateToArtist(it.artist.id) }
@@ -294,7 +296,7 @@ fun LibraryArtistsScreen(
                             Modifier
                                 .weight(1f)
                                 .fillMaxHeight()
-                                .clip(RoundedCornerShape(36.dp))
+                                .clip(adaptiveRoundedCornerShape(36.dp))
                                 .background(MaterialTheme.colorScheme.secondaryContainer)
                                 .clickable {
                                     filter = if (filter == ArtistFilter.LIKED) ArtistFilter.LIBRARY else ArtistFilter.LIKED
@@ -515,7 +517,7 @@ fun LibraryArtistsScreen(
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(28.dp))
+                            .clip(adaptiveRoundedCornerShape(28.dp))
                             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
                             .combinedClickable(
                                 onClick = { navController.navigateToArtist(artist.id) },

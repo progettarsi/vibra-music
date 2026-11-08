@@ -13,6 +13,7 @@
 
 package moe.rukamori.archivetune.ui.component
 
+import app.vibra.ui.components.VibraLoadingIndicator
 import app.vibra.ui.motion.vibraControlFeedback
 import android.content.Context
 import android.content.Intent
@@ -48,7 +49,6 @@ import app.vibra.ui.components.VibraBasicAlertDialog as BasicAlertDialog
 import app.vibra.ui.motion.VibraButton as Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
@@ -340,7 +340,7 @@ private fun LyricsShareLoadingDialog() {
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                LoadingIndicator(modifier = Modifier.size(40.dp))
+                VibraLoadingIndicator(modifier = Modifier.size(40.dp))
                 Text(
                     text = stringResource(R.string.generating_image),
                     style = MaterialTheme.typography.titleLarge,

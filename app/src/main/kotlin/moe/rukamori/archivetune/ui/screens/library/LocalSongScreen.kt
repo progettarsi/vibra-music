@@ -7,6 +7,9 @@
 
 package moe.rukamori.archivetune.ui.screens.library
 
+// Vibra: independent radii follow the global rounding style.
+import app.vibra.ui.theme.adaptiveRoundedCornerShape
+
 import android.Manifest
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -26,6 +29,7 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
+import app.vibra.ui.components.VibraLoadingIndicator
 import app.vibra.ui.motion.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -48,11 +52,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import app.vibra.ui.motion.VibraButton as Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.HorizontalDivider
@@ -555,7 +557,7 @@ private fun LocalSongBadge(
     text: String,
 ) {
     Surface(
-        shape = RoundedCornerShape(20.dp),
+        shape = adaptiveRoundedCornerShape(20.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.92f),
     ) {
         Row(
@@ -637,7 +639,7 @@ private fun LocalSongControlsCard(
 @Composable
 private fun LocalSongEmptyState(query: String) {
     Surface(
-        shape = RoundedCornerShape(28.dp),
+        shape = adaptiveRoundedCornerShape(28.dp),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
         modifier =
             Modifier
@@ -803,7 +805,7 @@ private fun LocalSongScanSheet(
                     .padding(bottom = 28.dp),
         ) {
             Surface(
-                shape = RoundedCornerShape(32.dp),
+                shape = adaptiveRoundedCornerShape(32.dp),
                 color = heroContainerColor,
                 modifier = Modifier.size(80.dp),
             ) {
@@ -854,7 +856,7 @@ private fun LocalSongScanSheet(
                 exit = shrinkVertically(spring(stiffness = Spring.StiffnessLow)) + fadeOut(),
             ) {
                 Surface(
-                    shape = RoundedCornerShape(24.dp),
+                    shape = adaptiveRoundedCornerShape(24.dp),
                     color = MaterialTheme.colorScheme.primaryContainer,
                     modifier =
                         Modifier
@@ -866,7 +868,7 @@ private fun LocalSongScanSheet(
                         horizontalArrangement = Arrangement.Center,
                         modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
                     ) {
-                        CircularWavyProgressIndicator(
+                        VibraLoadingIndicator(
                             modifier = Modifier.size(24.dp),
                             color = MaterialTheme.colorScheme.primary,
                         )
@@ -882,21 +884,21 @@ private fun LocalSongScanSheet(
             }
 
             Surface(
-                shape = RoundedCornerShape(28.dp),
+                shape = adaptiveRoundedCornerShape(28.dp),
                 color = MaterialTheme.colorScheme.surfaceContainer,
                 modifier =
                     Modifier
                         .fillMaxWidth()
                         .alpha(contentAlpha),
             ) {
-                Column(modifier = Modifier.padding(vertical = 6.dp)) {
+                Column(modifier = Modifier.padding(6.dp)) {
                     ScanSheetInfoRow(
                         iconRes = R.drawable.storage,
                         title = stringResource(R.string.permission_storage_title),
                         description = stringResource(R.string.permission_storage_desc),
                         trailing = {
                             Surface(
-                                shape = RoundedCornerShape(16.dp),
+                                shape = app.vibra.ui.theme.concentricRoundedCornerShape(28.dp, 6.dp),
                                 color =
                                     if (hasStoragePermission) {
                                         MaterialTheme.colorScheme.primaryContainer
@@ -961,7 +963,7 @@ private fun LocalSongScanSheet(
             Spacer(modifier = Modifier.height(16.dp))
 
             Surface(
-                shape = RoundedCornerShape(28.dp),
+                shape = adaptiveRoundedCornerShape(28.dp),
                 color = MaterialTheme.colorScheme.surfaceContainer,
                 modifier =
                     Modifier
@@ -1114,7 +1116,7 @@ private fun LocalSongScanSheet(
                         disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                         disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
                     ),
-                shape = RoundedCornerShape(28.dp),
+                shape = adaptiveRoundedCornerShape(28.dp),
                 contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp),
                 modifier = Modifier.fillMaxWidth(),
             ) {
@@ -1134,7 +1136,7 @@ private fun LocalSongScanSheet(
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         if (isScanning) {
-                            CircularWavyProgressIndicator(
+                            VibraLoadingIndicator(
                                 modifier = Modifier.size(20.dp),
                                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
                             )
@@ -1169,7 +1171,7 @@ private fun LocalSongScanSheet(
                 exit = shrinkVertically(spring(stiffness = Spring.StiffnessLow)) + fadeOut(),
             ) {
                 Surface(
-                    shape = RoundedCornerShape(20.dp),
+                    shape = adaptiveRoundedCornerShape(20.dp),
                     color = MaterialTheme.colorScheme.errorContainer,
                     modifier =
                         Modifier
@@ -1210,7 +1212,7 @@ private fun LocalSongScanSettingCard(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Surface(
-        shape = RoundedCornerShape(24.dp),
+        shape = adaptiveRoundedCornerShape(24.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         modifier = Modifier.fillMaxWidth(),
     ) {
@@ -1224,7 +1226,7 @@ private fun LocalSongScanSettingCard(
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Surface(
-                    shape = RoundedCornerShape(18.dp),
+                    shape = app.vibra.ui.theme.concentricRoundedCornerShape(24.dp, 16.dp),
                     color = MaterialTheme.colorScheme.surfaceContainerHighest,
                     modifier = Modifier.size(44.dp),
                 ) {
@@ -1255,7 +1257,7 @@ private fun LocalSongScanSettingCard(
 
                     if (actionLabel != null && onActionClick != null) {
                         Surface(
-                            shape = RoundedCornerShape(18.dp),
+                            shape = adaptiveRoundedCornerShape(18.dp),
                             color = MaterialTheme.colorScheme.secondaryContainer,
                             modifier = Modifier.padding(top = 8.dp),
                         ) {
@@ -1297,14 +1299,14 @@ private fun LocalSongFolderChip(
     onRemove: () -> Unit,
 ) {
     Surface(
-        shape = RoundedCornerShape(20.dp),
+        shape = adaptiveRoundedCornerShape(20.dp),
         color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.65f),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.padding(start = 12.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
+            modifier = Modifier.padding(start = 12.dp, end = 7.dp, top = 7.dp, bottom = 7.dp),
         ) {
             Icon(
                 painter = painterResource(R.drawable.snippet_folder),
@@ -1318,7 +1320,7 @@ private fun LocalSongFolderChip(
                 color = MaterialTheme.colorScheme.onSecondaryContainer,
             )
             Surface(
-                shape = RoundedCornerShape(12.dp),
+                shape = app.vibra.ui.theme.concentricRoundedCornerShape(20.dp, 7.dp),
                 color = MaterialTheme.colorScheme.surface.copy(alpha = 0.55f),
                 modifier = Modifier.alpha(if (enabled) 1f else 0.5f),
             ) {
@@ -1357,7 +1359,7 @@ private fun ScanSheetInfoRow(
                 .padding(horizontal = 20.dp, vertical = 16.dp),
     ) {
         Surface(
-            shape = RoundedCornerShape(16.dp),
+            shape = adaptiveRoundedCornerShape(16.dp),
             color = MaterialTheme.colorScheme.surfaceContainerHighest,
             modifier = Modifier.size(44.dp),
         ) {

@@ -12,7 +12,6 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.net.Uri
 import android.webkit.CookieManager
-import android.webkit.JavascriptInterface
 import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
@@ -57,6 +56,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import app.vibra.ui.components.VibraDialogButton
 import kotlinx.coroutines.delay
+import app.vibra.login.isTrustedLoginStartUrl
+import app.vibra.login.isTrustedLoginUrl
 import moe.rukamori.archivetune.LocalPlayerAwareWindowInsets
 import moe.rukamori.archivetune.R
 import moe.rukamori.archivetune.innertube.utils.hasCompleteYouTubeLoginCookies
@@ -66,6 +67,7 @@ import moe.rukamori.archivetune.utils.resetAuthWebViewSession
 import moe.rukamori.archivetune.viewmodels.LoginError
 import moe.rukamori.archivetune.viewmodels.LoginScreenState
 import moe.rukamori.archivetune.viewmodels.LoginViewModel
+import org.json.JSONObject
 
 const val LOGIN_ROUTE = "login"
 const val LOGIN_URL_ARGUMENT = "url"
@@ -81,7 +83,7 @@ private const val LOGIN_CONTEXT_RETRY_DELAY_MS = 1_000L
 private const val LOGIN_CONTEXT_EXTRACTION_ATTEMPTS = 10
 
 private const val LOGIN_CONTEXT_SCRIPT =
-    "(function(){try{var c=window.ytcfg;var y=window.yt&&window.yt.config_;var s=document.querySelectorAll('script');var v=c&&c.get&&c.get('VISITOR_DATA')||y&&y.VISITOR_DATA;var d=c&&c.get&&c.get('DATASYNC_ID')||y&&y.DATASYNC_ID;for(var i=0;i<s.length&&(!v||!d);i++){var x=s[i].textContent;if(!v){var vm=x.match(/[\"']VISITOR_DATA[\"']\\s*:\\s*[\"']([^\"']+)[\"']/);if(vm)v=vm[1]}if(!d){var dm=x.match(/[\"'](?:DATASYNC_ID|dataSyncId)[\"']\\s*:\\s*[\"']([^\"']+)[\"']/);if(dm)d=dm[1]}}if(v)Android.onRetrieveVisitorData(v);if(d)Android.onRetrieveDataSyncId(d)}catch(e){}})();"
+    "(function(){try{var c=window.ytcfg;var y=window.yt&&window.yt.config_;var s=document.querySelectorAll('script');var v=c&&c.get&&c.get('VISITOR_DATA')||y&&y.VISITOR_DATA;var d=c&&c.get&&c.get('DATASYNC_ID')||y&&y.DATASYNC_ID;for(var i=0;i<s.length&&(!v||!d);i++){var x=s[i].textContent;if(!v){var vm=x.match(/[\"']VISITOR_DATA[\"']\\s*:\\s*[\"']([^\"']+)[\"']/);if(vm)v=vm[1]}if(!d){var dm=x.match(/[\"'](?:DATASYNC_ID|dataSyncId)[\"']\\s*:\\s*[\"']([^\"']+)[\"']/);if(dm)d=dm[1]}}return {v:v||null,d:d||null}}catch(e){return null}})();"
 
 private val YOUTUBE_COOKIE_URLS =
     listOf(
@@ -165,6 +167,8 @@ fun LoginScreen(
                             YouTubeLoginWebViewClient(
                                 cookieManager = cookieManager,
                                 onCookiesCaptured = viewModel::onCookiesCaptured,
+                                onVisitorData = viewModel::onVisitorDataExtracted,
+                                onDataSyncId = viewModel::onDataSyncIdExtracted,
                                 onHistoryChanged = { webViewCanGoBack = it },
                                 onPageLoadingChanged = { loading ->
                                     pageLoading = loading
@@ -183,35 +187,15 @@ fun LoginScreen(
                             builtInZoomControls = true
                             displayZoomControls = false
                         }
-                        val loginWebView = this
-                        addJavascriptInterface(
-                            object {
-                                @JavascriptInterface
-                                fun onRetrieveVisitorData(newVisitorData: String?) {
-                                    loginWebView.post {
-                                        viewModel.onVisitorDataExtracted(newVisitorData)
-                                    }
-                                }
-
-                                @JavascriptInterface
-                                fun onRetrieveDataSyncId(newDataSyncId: String?) {
-                                    loginWebView.post {
-                                        viewModel.onDataSyncIdExtracted(newDataSyncId)
-                                    }
-                                }
-
-                            },
-                            "Android",
-                        )
                         webView = this
                         resetAuthWebViewSession(context, this, clearCookies = true) {
-                            loadUrl(startUrl?.takeIf { it.isNotBlank() } ?: DEFAULT_LOGIN_URL)
+                            // Vibra: this route can be reached from outside the app.
+                            loadUrl(startUrl?.takeIf(::isTrustedLoginStartUrl) ?: DEFAULT_LOGIN_URL)
                         }
                     }
                 },
                 onRelease = { releasedWebView ->
                     (releasedWebView.webViewClient as? YouTubeLoginWebViewClient)?.release(releasedWebView)
-                    releasedWebView.removeJavascriptInterface("Android")
                     releasedWebView.stopLoading()
                     releasedWebView.destroy()
                     if (webView === releasedWebView) {
@@ -282,6 +266,8 @@ fun LoginScreen(
 private class YouTubeLoginWebViewClient(
     private val cookieManager: CookieManager,
     private val onCookiesCaptured: (String) -> Unit,
+    private val onVisitorData: (String?) -> Unit,
+    private val onDataSyncId: (String?) -> Unit,
     private val onHistoryChanged: (Boolean) -> Unit,
     private val onPageLoadingChanged: (Boolean) -> Unit,
     private val onMainFrameError: () -> Unit,
@@ -289,9 +275,17 @@ private class YouTubeLoginWebViewClient(
 ) : WebViewClient() {
     private var extractionRunnable: Runnable? = null
     private var lastCapturedCookie: String? = null
+    private var extractionGeneration = 0
 
     override fun onPageStarted(view: WebView, url: String?, favicon: Bitmap?) {
         super.onPageStarted(view, url, favicon)
+        release(view)
+        // Vibra: shouldOverrideUrlLoading is not called for POST navigations.
+        if (url != null && url != "about:blank" && !isTrustedLoginUrl(url)) {
+            view.stopLoading()
+            onMainFrameError()
+            return
+        }
         onPageLoadingChanged(true)
         onHistoryChanged(view.canGoBack())
     }
@@ -302,6 +296,7 @@ private class YouTubeLoginWebViewClient(
     ): Boolean {
         // Handled: the screen shows the error and recreates the WebView instead of the
         // whole app being killed with the renderer.
+        release(view)
         onRenderProcessGone()
         return true
     }
@@ -319,7 +314,7 @@ private class YouTubeLoginWebViewClient(
         request: WebResourceRequest,
     ): Boolean {
         val targetUrl = request.url.toString()
-        if (!request.isForMainFrame && !targetUrl.isWebViewLoadableUrl()) return true
+        if (!request.isForMainFrame) return !targetUrl.isHttpUrl()
         return handleUrlLoading(view, targetUrl)
     }
 
@@ -350,6 +345,7 @@ private class YouTubeLoginWebViewClient(
     }
 
     fun release(view: WebView) {
+        extractionGeneration++
         extractionRunnable?.let(view::removeCallbacks)
         extractionRunnable = null
     }
@@ -358,18 +354,24 @@ private class YouTubeLoginWebViewClient(
         view: WebView,
         url: String?,
     ) {
-        extractionRunnable?.let(view::removeCallbacks)
-        extractionRunnable = null
-
-        if (!url.isYouTubeUrl()) return
+        release(view)
+        val generation = extractionGeneration
+        if (!isTrustedLoginUrl(url.orEmpty()) || !url.isYouTubeUrl()) return
 
         var remainingAttempts = LOGIN_CONTEXT_EXTRACTION_ATTEMPTS
         val runnable =
             object : Runnable {
                 override fun run() {
-                    if (!view.url.isYouTubeUrl()) return
+                    if (generation != extractionGeneration || !view.url.isYouTubeUrl() || !isTrustedLoginUrl(view.url.orEmpty())) return
 
-                    view.evaluateJavascript(LOGIN_CONTEXT_SCRIPT, null)
+                    // Vibra: the page answers through the script's result. No bridge object is
+                    // exposed, so no page or frame can call into the app on its own.
+                    view.evaluateJavascript(LOGIN_CONTEXT_SCRIPT) { result ->
+                        if (generation != extractionGeneration || !view.url.isYouTubeUrl() || !isTrustedLoginUrl(view.url.orEmpty())) return@evaluateJavascript
+                        val context = runCatching { JSONObject(result) }.getOrNull() ?: return@evaluateJavascript
+                        if (!context.isNull("v")) onVisitorData(context.opt("v") as? String)
+                        if (!context.isNull("d")) onDataSyncId(context.opt("d") as? String)
+                    }
                     captureCookies(view.url)
 
                     remainingAttempts -= 1
@@ -396,20 +398,13 @@ private class YouTubeLoginWebViewClient(
     ): Boolean {
         val targetUrl = url?.takeIf(String::isNotBlank) ?: return false
         if (targetUrl.isYouTubeMusicStoreListingUrl()) return true
-        if (targetUrl.isWebViewLoadableUrl()) return false
+        if (isTrustedLoginUrl(targetUrl)) return false
 
-        targetUrl.intentWebViewUrl()?.let(view::loadUrl)
+        targetUrl.intentWebViewUrl()?.takeIf(::isTrustedLoginUrl)?.let(view::loadUrl)
+        // Vibra: a page we refuse (for example a company sign-in elsewhere) must not look like a dead button.
+        if (targetUrl.isHttpUrl()) onMainFrameError()
         return true
     }
-}
-
-private fun String.isWebViewLoadableUrl(): Boolean {
-    val scheme = runCatching { Uri.parse(this).scheme?.lowercase() }.getOrNull()
-    return scheme == "http" ||
-        scheme == "https" ||
-        scheme == "javascript" ||
-        scheme == "data" ||
-        scheme == "blob"
 }
 
 private fun String.intentWebViewUrl(): String? {

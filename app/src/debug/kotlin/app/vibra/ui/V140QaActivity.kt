@@ -11,10 +11,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import app.vibra.ui.RoundingQaTheme as ArchiveTuneTheme
 import app.vibra.ui.blocks.*
 import app.vibra.ui.motion.VibraTextButton
 import app.vibra.ui.onboarding.*
-import moe.rukamori.archivetune.ui.theme.ArchiveTuneTheme
 
 /**
  * Debug-only production-component previews. Sign-in callbacks are simulated, never real
@@ -26,8 +26,13 @@ class V140QaActivity : ComponentActivity() {
     val mode = intent.getStringExtra("mode") ?: "home"
     val count = intent.getIntExtra("count", 2)
     setContent {
-      ArchiveTuneTheme(darkTheme = true) {
-        if (mode == "feedback") {
+      ArchiveTuneTheme(
+        darkTheme = true,
+        disableAnimations = intent.getBooleanExtra("reduced", false),
+      ) {
+        if (mode == "home-player") {
+          HomePlayerMotionQa()
+        } else if (mode == "feedback") {
           FeedbackBoundsQa(bounce = intent.getBooleanExtra("bounce", true))
         } else if (mode == "onboarding") {
           val vm = remember {

@@ -9,6 +9,9 @@
 
 package moe.rukamori.archivetune.ui.menu
 
+// Vibra: independent radii follow the global rounding style.
+import app.vibra.ui.theme.adaptiveRoundedCornerShape
+
 import android.annotation.SuppressLint
 import android.content.Intent
 import android.content.res.Configuration
@@ -21,9 +24,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
@@ -54,6 +55,7 @@ import androidx.compose.ui.unit.dp
 import androidx.media3.exoplayer.offline.Download
 import androidx.media3.exoplayer.offline.DownloadService
 import app.vibra.ui.components.*
+import app.vibra.ui.components.VibraLoadingIndicator
 import app.vibra.ui.motion.VibraTextButton as TextButton
 import app.vibra.ui.motion.vibraControlFeedback
 import coil3.compose.AsyncImage
@@ -258,7 +260,7 @@ fun YouTubePlaylistMenu(
               AsyncImage(
                 model = song.thumbnailUrl,
                 contentDescription = null,
-                modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(ThumbnailCornerRadius)),
+                modifier = Modifier.fillMaxSize().clip(app.vibra.ui.theme.VibraShapes.RowThumbnail),
               )
             }
           },
@@ -382,7 +384,7 @@ fun YouTubePlaylistMenu(
       Download.STATE_DOWNLOADING -> {
         NewAction(
           id = MenuActionId.Download,
-          icon = { CircularWavyProgressIndicator(modifier = Modifier.size(24.dp)) },
+          icon = { VibraLoadingIndicator(modifier = Modifier.size(24.dp)) },
           text = stringResource(R.string.downloading),
           onClick = { showRemoveDownloadDialog = true },
         )
@@ -487,80 +489,7 @@ fun YouTubePlaylistMenu(
             MediaMenuToggle(
               selected = dbPlaylist?.playlist?.bookmarkedAt != null,
               onClick = {
-                if (dbPlaylist?.playlist == null) {
-                  coroutineScope.launch(Dispatchers.IO) {
-                    val fetchedSongs =
-                      songs.ifEmpty {
-                        YouTube.playlist(playlist.id).completed().getOrNull()?.songs.orEmpty()
-                      }
-                    database.withTransaction {
-                      val existingPlaylist = playlistEntityByBrowseId(playlist.id)
-                      val targetPlaylistId =
-                        if (existingPlaylist == null) {
-                          val playlistEntity =
-                            PlaylistEntity(
-                                name = playlist.title,
-                                browseId = playlist.id,
-                                thumbnailUrl = playlist.thumbnail,
-                                isEditable = false,
-                                remoteSongCount =
-                                  playlist.songCountText?.let {
-                                    Regex("""\d+""").find(it)?.value?.toIntOrNull()
-                                  },
-                                playEndpointParams = playlist.playEndpoint?.params,
-                                shuffleEndpointParams = playlist.shuffleEndpoint?.params,
-                                radioEndpointParams = playlist.radioEndpoint?.params,
-                              )
-                              .toggleLike()
-                          insert(playlistEntity)
-                          playlistEntityByBrowseId(playlist.id)?.id ?: playlistEntity.id
-                        } else {
-                          val refreshedPlaylist =
-                            existingPlaylist.copy(
-                              name = playlist.title,
-                              browseId = playlist.id,
-                              thumbnailUrl = playlist.thumbnail,
-                              isEditable = playlist.isEditable,
-                              remoteSongCount =
-                                playlist.songCountText?.let {
-                                  Regex("""\d+""").find(it)?.value?.toIntOrNull()
-                                },
-                              playEndpointParams = playlist.playEndpoint?.params,
-                              shuffleEndpointParams = playlist.shuffleEndpoint?.params,
-                              radioEndpointParams = playlist.radioEndpoint?.params,
-                            )
-                          update(
-                            if (existingPlaylist.bookmarkedAt == null) {
-                              refreshedPlaylist.toggleLike()
-                            } else {
-                              refreshedPlaylist
-                            }
-                          )
-                          existingPlaylist.id
-                        }
-                      if (fetchedSongs.isNotEmpty()) {
-                        clearPlaylist(targetPlaylistId)
-                        fetchedSongs.forEach { song -> insert(song.toMediaMetadata()) }
-                        fetchedSongs
-                          .mapIndexed { index, song ->
-                            PlaylistSongMap(
-                              songId = song.id,
-                              playlistId = targetPlaylistId,
-                              position = index,
-                              setVideoId = song.setVideoId,
-                            )
-                          }
-                          .forEach(::insert)
-                      }
-                    }
-                  }
-                } else {
-                  database.transaction {
-                    val currentPlaylist = dbPlaylist!!.playlist
-                    update(currentPlaylist, playlist)
-                    update(currentPlaylist.toggleLike())
-                  }
-                }
+                syncUtils.libraryActions.togglePlaylist(playlist, songs)
               },
             ) {
               Icon(

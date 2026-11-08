@@ -5,6 +5,8 @@
 
 package app.vibra.ui.components
 
+import app.vibra.ui.motion.expansionElement
+import app.vibra.ui.motion.ExpansionArtworkContent
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -56,7 +58,7 @@ fun VibraArtwork(
 ) {
     val context = LocalPlatformContext.current
     var failed by remember(url) { mutableStateOf(false) }
-    Box(modifier = modifier.clip(shape), contentAlignment = Alignment.Center) {
+    Box(modifier = modifier.expansionElement(url, "artwork", url?.let { ExpansionArtworkContent(it, shape) }).clip(shape), contentAlignment = Alignment.Center) {
         if (url.isNullOrBlank() || failed) {
             ArtworkPlaceholder(fallbackIcon)
         } else {

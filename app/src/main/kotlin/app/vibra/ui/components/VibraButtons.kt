@@ -8,6 +8,7 @@
 package app.vibra.ui.components
 
 import androidx.annotation.DrawableRes
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
@@ -234,20 +235,21 @@ fun VibraPrimaryButton(
     enabled: Boolean = true,
     height: Dp = VibraDimens.PrimaryActionHeight,
     contentDescription: String? = null,
+    containerColor: Color = MaterialTheme.colorScheme.primary,
+    contentColor: Color = MaterialTheme.colorScheme.onPrimary,
+    loading: Boolean = false,
 ) {
     val haptics = rememberVibraHaptics()
+    val colors = ButtonDefaults.buttonColors(containerColor = containerColor, contentColor = contentColor)
     Button(
         onClick = {
             haptics.press()
             onClick()
         },
-        enabled = enabled,
+        enabled = enabled && !loading,
         shapes = ButtonDefaults.shapes(),
-        colors =
-            ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-            ),
+        // Loading is not "unavailable": the button keeps its colours and shows the wait instead.
+        colors = if (loading) colors.copy(disabledContainerColor = containerColor, disabledContentColor = contentColor) else colors,
         contentPadding = PaddingValues(horizontal = if (text.isEmpty()) 16.dp else 24.dp),
         modifier =
             modifier
@@ -260,14 +262,25 @@ fun VibraPrimaryButton(
                     },
                 ),
     ) {
-        Icon(
-            painter = painterResource(icon),
-            contentDescription = null,
-            modifier = Modifier.size(24.dp),
-        )
+        if (loading) {
+            VibraLoadingIndicator(color = contentColor, modifier = Modifier.size(24.dp))
+        } else {
+            Icon(
+                painter = painterResource(icon),
+                contentDescription = null,
+                modifier = Modifier.size(24.dp),
+            )
+        }
         if (text.isNotEmpty()) {
             Spacer(Modifier.width(12.dp))
-            Text(text = text, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Medium, maxLines = 1)
+            // Sized here, inside the pill: a new label resizes the button without clipping its shape.
+            Text(
+                text = text,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                modifier = Modifier.animateContentSize(Liquid.spatial()),
+            )
         }
     }
 }

@@ -7,6 +7,9 @@
 
 package moe.rukamori.archivetune.ui.component
 
+// Vibra: independent radii follow the global rounding style.
+import app.vibra.ui.theme.adaptiveRoundedCornerShape
+
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -22,7 +25,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -105,7 +107,7 @@ fun TagChip(
     )
 
     Surface(
-        shape = RoundedCornerShape(20.dp),
+        shape = adaptiveRoundedCornerShape(20.dp),
         color = animatedBackgroundColor,
         border =
             BorderStroke(
@@ -117,7 +119,7 @@ fun TagChip(
         Row(
             modifier =
                 Modifier
-                    .clip(RoundedCornerShape(20.dp))
+                    .clip(adaptiveRoundedCornerShape(20.dp))
                     .then(
                         if (onClick != null) {
                             Modifier.clickable(onClick = onClick)

@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.withContext
 import moe.rukamori.archivetune.db.MusicDatabase
 import moe.rukamori.archivetune.innertube.YouTube
+import moe.rukamori.archivetune.utils.isLocalMediaId
 
 class MediaInfoRepository @Inject constructor(private val database: MusicDatabase) {
     fun observeLocal(videoId: String): Flow<LocalMediaInfo> =
@@ -23,7 +24,9 @@ class MediaInfoRepository @Inject constructor(private val database: MusicDatabas
                 title = song?.title,
                 artists = song?.artists?.takeIf { it.isNotEmpty() }?.joinToString { it.name },
                 artwork = song?.thumbnailUrl,
-                isLocal = song?.song?.isLocal == true,
+                isLocal = song?.song?.isLocal == true || videoId.isLocalMediaId(),
+                albumName = song?.song?.albumName,
+                durationSeconds = song?.song?.duration?.takeIf { it > 0 },
                 format = format?.let {
                     MediaInfoFormat(
                         itag = it.itag,

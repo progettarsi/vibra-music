@@ -18,6 +18,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.C
 import androidx.media3.common.Player
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import moe.rukamori.archivetune.models.MediaMetadata
@@ -96,7 +97,7 @@ data class PlaybackProgress(
 /**
  * Holds the sampled playback position. Media3 has no position callback, so the value is
  * polled while playing (250 ms is enough for the seconds display; the bar animates
- * between samples). While paused nothing runs; call [resample] after a seek.
+ * between samples). While paused, position discontinuities update it without polling.
  */
 @Stable
 class PlaybackPositionState internal constructor(
@@ -129,10 +130,21 @@ fun rememberPlaybackPosition(
     LaunchedEffect(state, isPlaying, mediaId) {
         snapshotFlow { shown() }.collectLatest { activeNow ->
             if (!activeNow) return@collectLatest
-            state.resample()
-            while (isPlaying) {
-                delay(250)
+            val listener = object : Player.Listener {
+                override fun onEvents(player: Player, events: Player.Events) {
+                    if (events.contains(Player.EVENT_POSITION_DISCONTINUITY)) state.resample()
+                }
+            }
+            player.addListener(listener)
+            try {
                 state.resample()
+                if (!isPlaying) awaitCancellation()
+                while (true) {
+                    delay(250)
+                    state.resample()
+                }
+            } finally {
+                player.removeListener(listener)
             }
         }
     }

@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
@@ -56,7 +55,9 @@ import androidx.media3.exoplayer.offline.Download
 import androidx.media3.exoplayer.offline.DownloadService
 import androidx.navigation.NavController
 import app.vibra.ui.components.*
+import app.vibra.ui.components.VibraLoadingIndicator
 import moe.rukamori.archivetune.LocalDatabase
+import moe.rukamori.archivetune.LocalSyncUtils
 import moe.rukamori.archivetune.LocalDownloadUtil
 import moe.rukamori.archivetune.LocalPlayerConnection
 import moe.rukamori.archivetune.R
@@ -82,6 +83,7 @@ import moe.rukamori.archivetune.utils.reportException
 fun YouTubeAlbumMenu(albumItem: AlbumItem, navController: NavController, onDismiss: () -> Unit) {
   val context = LocalContext.current
   val database = LocalDatabase.current
+  val libraryActions = LocalSyncUtils.current.libraryActions
   val downloadUtil = LocalDownloadUtil.current
   val playerConnection = LocalPlayerConnection.current ?: return
   val album by
@@ -93,7 +95,13 @@ fun YouTubeAlbumMenu(albumItem: AlbumItem, navController: NavController, onDismi
     database.album(albumItem.id).collect { album ->
       if (album == null) {
         YouTube.album(albumItem.id)
-          .onSuccess { albumPage -> database.transaction { insert(albumPage) } }
+          .onSuccess { albumPage ->
+            database.withTransaction {
+              val current = libraryAlbumEntity(albumItem.id)
+              if (current == null) insert(albumPage)
+              else if (current.songCount == 0) update(current, albumPage)
+            }
+          }
           .onFailure { reportException(it) }
       }
     }
@@ -347,7 +355,7 @@ fun YouTubeAlbumMenu(albumItem: AlbumItem, navController: NavController, onDismi
         Download.STATE_DOWNLOADING -> {
           NewAction(
             id = MenuActionId.Download,
-            icon = { CircularWavyProgressIndicator(modifier = Modifier.size(24.dp)) },
+            icon = { VibraLoadingIndicator(modifier = Modifier.size(24.dp)) },
             text = stringResource(R.string.downloading),
             onClick = {
               album?.songs?.forEach { song ->
@@ -433,7 +441,7 @@ fun YouTubeAlbumMenu(albumItem: AlbumItem, navController: NavController, onDismi
         toggle = {
           MediaMenuToggle(
             selected = album?.album?.bookmarkedAt != null,
-            onClick = { database.query { album?.album?.toggleLike()?.let(::update) } },
+            onClick = { libraryActions.toggleAlbum(albumItem) },
           ) {
             Icon(
               painter =

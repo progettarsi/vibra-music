@@ -93,6 +93,7 @@ class App :
     @Inject
     lateinit var powerSaveController: app.vibra.power.PowerSaveController
 
+    @Inject lateinit var libraryActions: app.vibra.library.LibraryActions
     @Inject lateinit var spotifySync: app.vibra.spotify.SpotifySyncRepository
 
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -120,11 +121,14 @@ class App :
             Timber.plant(Timber.DebugTree())
             return
         }
+        app.vibra.startup.StartupOptions.configure(this)
         BotGuardTokenGenerator.initialize(this)
         PreferenceStore.start(this)
         spotifySync.start()
+        libraryActions.start(this)
         LeakCanaryController.initialize(this)
         Timber.plant(Timber.DebugTree())
+        app.vibra.startup.StartupWork.mark("startup_${app.vibra.startup.StartupOptions.label}")
         try {
             Timber.plant(
                 moe.rukamori.archivetune.utils
@@ -199,7 +203,9 @@ class App :
     private fun initializeDeferredAsync() {
         applicationScope.launch(Dispatchers.IO) {
             try {
-                youtubeiStreamRepository.preWarm()
+                if (app.vibra.startup.StartupOptions.deferred) {
+                    app.vibra.startup.StartupWork.optional("resolver_prewarm") { youtubeiStreamRepository.preWarm() }
+                } else app.vibra.startup.StartupWork.trace("resolver_prewarm") { youtubeiStreamRepository.preWarm() }
             } catch (cancellation: CancellationException) {
                 throw cancellation
             } catch (throwable: Throwable) {

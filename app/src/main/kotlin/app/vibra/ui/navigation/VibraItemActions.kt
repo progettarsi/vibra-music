@@ -106,14 +106,22 @@ class VibraItemActions internal constructor(
         }
     }
 
-    fun showMenu(item: YTItem) {
+    /** [onDismissed] runs after the menu closes itself (an action was picked). */
+    fun showMenu(
+        item: YTItem,
+        onDismissed: () -> Unit = {},
+    ) {
         haptics.longPress()
+        val dismiss = {
+            menuState.dismiss()
+            onDismissed()
+        }
         menuState.show {
             when (item) {
-                is SongItem -> YouTubeSongMenu(song = item, navController = navController, onDismiss = menuState::dismiss)
-                is AlbumItem -> YouTubeAlbumMenu(albumItem = item, navController = navController, onDismiss = menuState::dismiss)
-                is ArtistItem -> YouTubeArtistMenu(artist = item, onDismiss = menuState::dismiss)
-                is PlaylistItem -> YouTubePlaylistMenu(playlist = item, coroutineScope = scope, onDismiss = menuState::dismiss)
+                is SongItem -> YouTubeSongMenu(song = item, navController = navController, onDismiss = dismiss)
+                is AlbumItem -> YouTubeAlbumMenu(albumItem = item, navController = navController, onDismiss = dismiss)
+                is ArtistItem -> YouTubeArtistMenu(artist = item, onDismiss = dismiss)
+                is PlaylistItem -> YouTubePlaylistMenu(playlist = item, coroutineScope = scope, onDismiss = dismiss)
                 is PodcastItem, is EpisodeItem -> menuState.dismiss()
             }
         }
@@ -186,25 +194,39 @@ class VibraItemActions internal constructor(
         }
     }
 
-    fun showMenu(item: LocalItem) {
+    /** [onDismissed] runs after the menu closes itself (an action was picked). */
+    fun showMenu(
+        item: LocalItem,
+        onDismissed: () -> Unit = {},
+    ) {
         haptics.longPress()
+        val dismiss = {
+            menuState.dismiss()
+            onDismissed()
+        }
         menuState.show {
             when (item) {
-                is Song -> SongMenu(originalSong = item, navController = navController, onDismiss = menuState::dismiss)
-                is Album -> AlbumMenu(originalAlbum = item, navController = navController, onDismiss = menuState::dismiss)
-                is Artist -> ArtistMenu(originalArtist = item, coroutineScope = scope, onDismiss = menuState::dismiss)
-                is Playlist -> PlaylistMenu(playlist = item, coroutineScope = scope, onDismiss = menuState::dismiss)
+                is Song -> SongMenu(originalSong = item, navController = navController, onDismiss = dismiss)
+                is Album -> AlbumMenu(originalAlbum = item, navController = navController, onDismiss = dismiss)
+                is Artist -> ArtistMenu(originalArtist = item, coroutineScope = scope, onDismiss = dismiss)
+                is Playlist -> PlaylistMenu(playlist = item, coroutineScope = scope, onDismiss = dismiss)
             }
         }
     }
 }
 
+/**
+ * [scope] owns asynchronous actions. Overlays that close after a menu action should pass
+ * their ViewModel's scope so accepted work survives the overlay leaving composition.
+ */
 @Composable
-fun rememberVibraItemActions(navController: NavController): VibraItemActions {
+fun rememberVibraItemActions(
+    navController: NavController,
+    scope: CoroutineScope = rememberCoroutineScope(),
+): VibraItemActions {
     val connection = LocalPlayerConnection.current
     val database = LocalDatabase.current
     val menuState = LocalMenuState.current
-    val scope = rememberCoroutineScope()
     val haptics = rememberVibraHaptics()
     return remember(navController, connection, database, menuState, scope, haptics) {
         VibraItemActions(navController, connection, database, menuState, scope, haptics)

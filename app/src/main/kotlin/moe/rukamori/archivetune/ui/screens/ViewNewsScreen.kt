@@ -12,6 +12,7 @@
 
 package moe.rukamori.archivetune.ui.screens
 
+import app.vibra.ui.components.VibraLoadingIndicator
 import app.vibra.ui.motion.vibraControlFeedback
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Spring
@@ -43,7 +44,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularWavyProgressIndicator
 import app.vibra.ui.motion.VibraElevatedButton as ElevatedButton
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -456,10 +456,9 @@ private fun ViewNewsLoadingState(modifier: Modifier = Modifier) {
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(24.dp),
             ) {
-                CircularWavyProgressIndicator(
+                VibraLoadingIndicator(
                     modifier = Modifier.size(72.dp),
                     color = MaterialTheme.colorScheme.primary,
-                    trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                 )
                 Text(
                     text = stringResource(R.string.news_loading),

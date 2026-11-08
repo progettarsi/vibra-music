@@ -8,6 +8,7 @@
 package moe.rukamori.archivetune.ui.screens.podcast
 
 import androidx.activity.compose.BackHandler
+import app.vibra.ui.components.VibraLoadingIndicator
 import app.vibra.ui.motion.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -26,7 +27,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -174,7 +174,7 @@ private fun PodcastScreenContent(
     Box(modifier = Modifier.fillMaxSize()) {
         when (state) {
             PodcastScreenState.Loading -> {
-                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                VibraLoadingIndicator(modifier = Modifier.align(Alignment.Center))
             }
 
             PodcastScreenState.Empty -> {
@@ -361,7 +361,7 @@ private fun PodcastSuccessContent(
                             .fillMaxWidth()
                             .padding(24.dp),
                 ) {
-                    CircularProgressIndicator(modifier = Modifier.size(32.dp))
+                    VibraLoadingIndicator(modifier = Modifier.size(32.dp))
                 }
             }
         }
@@ -433,7 +433,7 @@ private fun PodcastEpisodeRow(
         },
         trailingContent = {
             if (episode.isLibraryPending) {
-                CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                VibraLoadingIndicator(modifier = Modifier.size(24.dp))
             } else {
                 IconButton(onClick = onToggleLibrary) {
                     Icon(

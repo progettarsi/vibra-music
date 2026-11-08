@@ -7,6 +7,9 @@
 
 package moe.rukamori.archivetune.ui.screens.search
 
+// Vibra: independent radii follow the global rounding style.
+import app.vibra.ui.theme.adaptiveRoundedCornerShape
+
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import app.vibra.ui.motion.clickable
@@ -16,7 +19,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import app.vibra.ui.motion.VibraIconButton as IconButton
 import androidx.compose.runtime.*
@@ -158,7 +160,7 @@ fun LocalSearchScreen(
                                                 } else {
                                                     MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
                                                 },
-                                            shape = RoundedCornerShape(10.dp),
+                                            shape = adaptiveRoundedCornerShape(10.dp),
                                         ),
                             ) {
                                 Icon(

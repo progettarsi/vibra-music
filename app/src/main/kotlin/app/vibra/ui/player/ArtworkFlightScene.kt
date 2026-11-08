@@ -15,8 +15,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.structuralEqualityPolicy
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
@@ -118,7 +116,12 @@ private class FlightClip(
 }
 
 /** Stessa sagoma per fondo, immagine, controlli e verifiche debug. */
-internal class PlayerContainerShape(private val bounds: Rect, private val cornerPx: Float) : Shape {
+internal class PlayerContainerShape(
+    private val bounds: Rect,
+    private val corners: app.vibra.ui.theme.WindowCornerPixels,
+    private val from: Float = 0f,
+    private val progress: Float = 1f,
+) : Shape {
     override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline =
-        Outline.Rounded(RoundRect(bounds, CornerRadius(cornerPx)))
+        Outline.Rounded(corners.roundRect(bounds, from, progress))
 }

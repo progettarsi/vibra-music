@@ -441,6 +441,11 @@ class MusicService :
     }
 
     private var currentQueue: Queue = EmptyQueue
+
+    // Vibra: only the newest playQueue may touch the player; see playQueue.
+    private var queueLoadJob: Job? = null
+    private var queueLoadGeneration = 0
+    private var nextPageJob: Job? = null
     var queueTitle: String? = null
     private var blockedArtistIds: Set<String> = emptySet()
     private var hideMusicVideos = false
@@ -935,7 +940,7 @@ class MusicService :
                         },
                 ).apply {
                     addListener(this@MusicService)
-                    sleepTimer = SleepTimer(scope, this, this@MusicService)
+                    sleepTimer = SleepTimer(scope, this, onExpire = this@MusicService::pauseFromSleepTimer)
                     addListener(sleepTimer)
                 }
         sponsorBlockPlaybackController.attach(player, scope)
@@ -1418,6 +1423,7 @@ class MusicService :
                 .filterPlaybackContent(hideExplicit, hideVideo)
 
         withContext(Dispatchers.Main) {
+            if (hydrationGeneration != restoredQueueHydrationGeneration.get()) return@withContext
             currentQueue = continuationQueue
             queueTitle = initialStatus.title
 
@@ -3000,7 +3006,9 @@ class MusicService :
 
         clearAutomix()
         autoAddedMediaIds.clear()
-        scope.launch(SilentHandler) {
+        cancelQueueLoad()
+        val generation = queueLoadGeneration
+        queueLoadJob = scope.launch(SilentHandler) {
             val hideExplicit = dataStore.get(HideExplicitKey, false)
             val hideVideo = dataStore.get(HideVideoKey, false)
             val autoLoadMoreEnabled = dataStore.get(AutoLoadMoreKey, true)
@@ -3010,6 +3018,7 @@ class MusicService :
                     ?.takeUnless { item ->
                         item.hasBlockedArtist(loadBlockedArtistIds())
                     }
+            if (generation != queueLoadGeneration) return@launch
             if (preloadItem != null) {
                 player.setMediaItem(preloadItem)
                 player.prepare()
@@ -3021,6 +3030,8 @@ class MusicService :
                         .getInitialStatus()
                         .filterPlaybackContent(hideExplicit, hideVideo)
                 }
+            // A provider can answer after a newer queue has already started.
+            if (generation != queueLoadGeneration) return@launch
             if (!autoLoadMoreEnabled && queue.shouldExpandToFullQueueWhenAutoLoadMoreDisabled() && queue.hasNextPage()) {
                 val expandedItems = initialStatus.items.toMutableList()
                 var pagesLoaded = 0
@@ -3032,6 +3043,7 @@ class MusicService :
                                 .nextPage()
                                 .filterPlaybackContent(hideExplicit, hideVideo)
                         }
+                    if (generation != queueLoadGeneration) return@launch
                     if (nextItems.isNotEmpty()) {
                         expandedItems += nextItems
                     }
@@ -3083,6 +3095,14 @@ class MusicService :
         }
     }
 
+    private fun cancelQueueLoad() {
+        queueLoadGeneration++
+        queueLoadJob?.cancel()
+        queueLoadJob = null
+        nextPageJob?.cancel()
+        nextPageJob = null
+    }
+
     private fun applyCurrentFirstShuffleOrder() {
         val count = player.mediaItemCount
         if (count <= 1) return
@@ -3108,7 +3128,9 @@ class MusicService :
             return
         }
 
-        scope.launch(SilentHandler) {
+        cancelQueueLoad()
+        val generation = queueLoadGeneration
+        queueLoadJob = scope.launch(SilentHandler) {
             val radioQueue =
                 YouTubeQueue(
                     endpoint = WatchEndpoint(videoId = currentMediaId),
@@ -3124,6 +3146,7 @@ class MusicService :
                         )
                 }
 
+            if (generation != queueLoadGeneration) return@launch
             if (initialStatus.title != null) {
                 queueTitle = initialStatus.title
             }
@@ -3255,6 +3278,7 @@ class MusicService :
         suppressAutoPlayback = true
         cancelCrossfade(resetVolume = true, resetPauseAtEnd = true)
         clearAutomix()
+        cancelQueueLoad()
         currentQueue = EmptyQueue
         queueTitle = null
         waitingForNetworkConnection.value = false
@@ -3376,23 +3400,9 @@ class MusicService :
         val mediaMetadata = currentMediaMetadata.value ?: return
         ioScope.launch {
             try {
-                val result =
-                    toggleLikeMutex.withLock {
-                        val requestedSong =
-                            database.withTransaction {
-                                val currentSongEntity =
-                                    getSongById(mediaMetadata.id)
-                                        ?: run {
-                                            insert(mediaMetadata) {
-                                                it.copy(isLocal = mediaMetadata.id.isLocalMediaId())
-                                            }
-                                            getSongById(mediaMetadata.id)
-                                        }
-                                        ?: return@withTransaction null
-                                currentSongEntity.song.toggleLike()
-                            } ?: return@withLock null
-                        syncUtils.likeSong(requestedSong)
-                    } ?: return@launch
+                val result = toggleLikeMutex.withLock {
+                    syncUtils.libraryActions.changeSong(mediaMetadata.id, mediaMetadata) { it.toggleLike() }
+                }
                 val song =
                     result.getOrElse { error ->
                         reportException(error)
@@ -4102,16 +4112,24 @@ class MusicService :
             reason != Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT &&
             player.mediaItemCount - player.currentMediaItemIndex <= 5 &&
             currentQueue.hasNextPage() &&
-            player.repeatMode == REPEAT_MODE_OFF
+            player.repeatMode == REPEAT_MODE_OFF &&
+            nextPageJob?.isActive != true
         ) {
-            scope.launch(SilentHandler) {
+            val pagingQueue = currentQueue
+            val generation = queueLoadGeneration
+            val initialLoad = queueLoadJob
+            nextPageJob = scope.launch(SilentHandler) {
+                // A preload transition can arrive before getInitialStatus has finished.
+                initialLoad?.join()
+                if (generation != queueLoadGeneration || currentQueue !== pagingQueue || !pagingQueue.hasNextPage()) return@launch
                 val mediaItems =
-                    currentQueue
+                    pagingQueue
                         .nextPage()
                         .filterPlaybackContent(
                             hideExplicit = dataStore.get(HideExplicitKey, false),
                             hideVideo = dataStore.get(HideVideoKey, false),
                         )
+                if (generation != queueLoadGeneration || currentQueue !== pagingQueue) return@launch
                 if (player.playbackState != STATE_IDLE) {
                     player.addMediaItems(mediaItems.drop(1))
                 } else {
@@ -4126,6 +4144,7 @@ class MusicService :
             reason != Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT &&
             player.repeatMode == REPEAT_MODE_OFF &&
             player.mediaItemCount - player.currentMediaItemIndex <= 3 &&
+            queueLoadJob?.isActive != true &&
             !currentQueue.hasNextPage()
         ) {
             onInfiniteQueueEnabled()

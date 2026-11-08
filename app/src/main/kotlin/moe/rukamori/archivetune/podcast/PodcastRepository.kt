@@ -80,67 +80,21 @@ class PodcastRepository
         suspend fun setPodcastSaved(
             browseId: String,
             save: Boolean,
-        ): Result<Unit> =
-            withContext(Dispatchers.IO) {
-                try {
-                    val current = requireNotNull(database.getPodcast(browseId))
-                    val now = LocalDateTime.now()
-                    database.withTransaction {
-                        val latest = getPodcast(browseId) ?: current
-                        upsert(
-                            latest.copy(
-                                localSavedAt = if (save) now else null,
-                                lastUpdateTime = now,
-                            ),
-                        )
-                    }
-                    if (!save && current.remoteSavedAt == null) return@withContext Result.success(Unit)
-                    val playlistId = current.playlistId?.takeIf(String::isNotBlank) ?: return@withContext Result.success(Unit)
-                    syncUtils.requireLibrarySyncEnabled()
-                    YouTube.likePlaylist(playlistId, save).getOrThrow()
-                    database.withTransaction {
-                        val latest = getPodcast(browseId) ?: current
-                        upsert(
-                            latest.copy(
-                                remoteSavedAt = if (save) now else null,
-                                lastUpdateTime = now,
-                            ),
-                        )
-                    }
-                    Result.success(Unit)
-                } catch (cancellation: CancellationException) {
-                    throw cancellation
-                } catch (failure: Throwable) {
-                    Result.failure(failure)
-                }
-            }
+        ): Result<Unit> = syncUtils.libraryActions.setPodcastSaved(browseId, save)
 
         suspend fun setEpisodeInLibrary(
             metadata: MediaMetadata,
             addToLibrary: Boolean,
         ): Result<Unit> =
-            withContext(Dispatchers.IO) {
-                try {
-                    val requestedSong =
-                        database.withTransaction {
-                            val currentSong =
-                                getSongById(metadata.id)?.song
-                                    ?: metadata.toSongEntity().also { insert(metadata) }
-                            val now = LocalDateTime.now()
-                            currentSong.copy(
-                                liked = addToLibrary,
-                                likedDate = if (addToLibrary) now else null,
-                                inLibrary = if (addToLibrary) now else null,
-                                isPodcast = true,
-                            )
-                        }
-                    syncUtils.likeSong(requestedSong).map { Unit }
-                } catch (cancellation: CancellationException) {
-                    throw cancellation
-                } catch (failure: Throwable) {
-                    Result.failure(failure)
-                }
-            }
+            syncUtils.libraryActions.changeSong(metadata.id, metadata) { current ->
+                val now = LocalDateTime.now()
+                current.copy(
+                    liked = addToLibrary,
+                    likedDate = if (addToLibrary) now else null,
+                    inLibrary = if (addToLibrary) now else null,
+                    isPodcast = true,
+                )
+            }.map { Unit }
 
         private suspend fun persistPodcast(page: PodcastPage) {
             val item = page.podcast

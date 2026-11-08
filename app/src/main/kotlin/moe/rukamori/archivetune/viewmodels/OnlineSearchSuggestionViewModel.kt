@@ -66,4 +66,5 @@ class OnlineSearchSuggestionViewModel @Inject constructor(
     fun retry() = search.retry()
     fun cancel() = search.cancel()
     fun deleteHistory(history: SearchHistory) { database.query { delete(history) } }
+    fun clearHistory() { database.query { clearSearchHistory() } }
 }

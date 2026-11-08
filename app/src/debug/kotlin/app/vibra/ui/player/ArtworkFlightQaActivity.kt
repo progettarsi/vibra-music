@@ -18,7 +18,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.geometry.lerp
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
@@ -33,6 +32,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
+import app.vibra.ui.RoundingQaTheme
 import app.vibra.ui.components.VibraPlayButton
 import app.vibra.ui.dock.MiniPlayerGeometry
 import app.vibra.ui.motion.*
@@ -56,7 +56,7 @@ class ArtworkFlightQaActivity : ComponentActivity() {
     enableEdgeToEdge()
     geometry = Intent(intent)
     command = intent
-    setContent { MaterialTheme { Fixture(geometry, command, serial) } }
+    setContent { RoundingQaTheme { Fixture(geometry, command, serial) } }
   }
 
   override fun onNewIntent(intent: Intent) {
@@ -158,7 +158,7 @@ private fun Fixture(geometry: Intent, command: Intent, serial: Int) {
     if (v != null)
       Log.i("FlightQa", "READY p=${sheet.progress} id=${v.player?.let(System::identityHashCode)}")
   }
-  val radius = rememberScreenCornerRadius()
+  val radius = rememberScreenCorners().pixels(androidx.compose.ui.platform.LocalDensity.current)
   CompositionLocalProvider(LocalPlaybackSpin provides spin) {
     BoxWithConstraints(Modifier.fillMaxSize().background(Color.Green)) {
       val viewport = Rect(0f, 0f, constraints.maxWidth.toFloat(), constraints.maxHeight.toFloat())
@@ -189,9 +189,9 @@ private fun Fixture(geometry: Intent, command: Intent, serial: Int) {
       val shape = {
         PlayerContainerShape(
           container(),
-          with(density) {
-            androidx.compose.ui.unit.lerp(VibraDimens.DockHeight / 2, radius, sheet.progress).toPx()
-          },
+          radius,
+          with(density) { (VibraDimens.DockHeight / 2).toPx() },
+          sheet.progress,
         )
       }
       LaunchedEffect(slot, viewport) {

@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHost
@@ -38,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
+import app.vibra.ui.components.VibraLoadingIndicator
 import moe.rukamori.archivetune.LocalPlayerAwareWindowInsets
 import moe.rukamori.archivetune.LocalPlayerConnection
 import moe.rukamori.archivetune.R
@@ -168,7 +168,7 @@ private fun BoxScope.LibraryPodcastsContent(
 
     when (state) {
         PodcastLibraryScreenState.Loading -> {
-            CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+            VibraLoadingIndicator(modifier = Modifier.align(Alignment.Center))
         }
 
         PodcastLibraryScreenState.Empty -> {

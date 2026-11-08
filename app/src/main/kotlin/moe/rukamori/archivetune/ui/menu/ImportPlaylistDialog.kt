@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.SnackbarHostState
@@ -33,6 +32,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import app.vibra.ui.components.VibraDialogButton
+import app.vibra.ui.components.VibraLoadingIndicator
 import java.time.LocalDateTime
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.firstOrNull
@@ -98,7 +98,7 @@ fun ImportPlaylistDialog(
             },
             extraContent = {
                 if (isImporting) {
-                    CircularWavyProgressIndicator()
+                    VibraLoadingIndicator()
                 }
             },
             onDone = { finalName ->
@@ -186,7 +186,7 @@ fun ImportPlaylistDialog(
                     Text(text = stringResource(R.string.already_in_playlist))
                     if (isProcessingDuplicate) {
                         Spacer(modifier = Modifier.height(16.dp))
-                        CircularWavyProgressIndicator()
+                        VibraLoadingIndicator()
                     }
                 }
             },

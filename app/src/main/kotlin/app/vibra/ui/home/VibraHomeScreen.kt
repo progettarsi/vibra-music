@@ -10,6 +10,7 @@ package app.vibra.ui.home
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.compose.ui.platform.LocalContext
 import android.widget.Toast
+import app.vibra.ui.components.VibraLoadingIndicator
 import moe.rukamori.archivetune.LocalPlayerConnection
 
 import androidx.compose.foundation.layout.Arrangement
@@ -32,7 +33,6 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import app.vibra.ui.motion.VibraFilledTonalButton as FilledTonalButton
-import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -74,6 +74,9 @@ import app.vibra.ui.theme.VibraEmotionalShapes
 import app.vibra.ui.theme.VibraShapes
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.debounce
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTagsAsResourceId
 import moe.rukamori.archivetune.LocalPlayerAwareWindowInsets
 import moe.rukamori.archivetune.R
 import moe.rukamori.archivetune.db.entities.Playlist
@@ -123,6 +126,18 @@ fun VibraHomeScreen(
     val online by forYou.online.collectAsStateWithLifecycle()
     val downloaded by forYou.hasDownloads.collectAsStateWithLifecycle()
     val state by viewModel.screenState.collectAsStateWithLifecycle()
+    val showingCache by viewModel.showingCachedHome.collectAsStateWithLifecycle()
+    androidx.activity.compose.ReportDrawnWhen { state != HomeScreenState.Loading }
+    LaunchedEffect(state is HomeScreenState.Success) {
+        if (state is HomeScreenState.Success) {
+            // Read once: the fresh feed arriving must not restart the wait or change the label.
+            val source = if (showingCache) "cache" else "content"
+            androidx.compose.runtime.withFrameNanos { }
+            androidx.compose.runtime.withFrameNanos { }
+            app.vibra.startup.StartupWork.homeVisible(source)
+        }
+    }
+
     val actions = rememberVibraItemActions(navController)
     val listState = rememberLazyListState()
     val bottomPadding = LocalPlayerAwareWindowInsets.current.asPaddingValues().calculateBottomPadding()
@@ -177,7 +192,9 @@ fun VibraHomeScreen(
                         bottom = bottomPadding + 16.dp,
                     ),
                 verticalArrangement = Arrangement.spacedBy(VibraDimens.CardGap),
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier.fillMaxSize()
+                    .testTag(if (success != null) "home_content" else "home_loading")
+                    .semantics { testTagsAsResourceId = true },
             ) {
                 // Room for the logo, which is drawn outside the list (see above).
                 item(key = LogoKey) { Spacer(Modifier.fillMaxWidth().height(LogoRowHeight)) }
@@ -222,7 +239,7 @@ fun VibraHomeScreen(
                         )
                         if (ui.isLoadingMore) {
                             item(key = "loading_more") {
-                                Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) { LoadingIndicator() }
+                                Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) { VibraLoadingIndicator() }
                             }
                         }
                     }

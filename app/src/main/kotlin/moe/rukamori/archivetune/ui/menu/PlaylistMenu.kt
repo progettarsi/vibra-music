@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItemDefaults
@@ -44,12 +43,14 @@ import androidx.compose.ui.unit.dp
 import androidx.media3.exoplayer.offline.Download
 import androidx.media3.exoplayer.offline.DownloadService
 import app.vibra.ui.components.*
+import app.vibra.ui.components.VibraLoadingIndicator
 import app.vibra.ui.motion.VibraTextButton as TextButton
 import java.time.LocalDateTime
 import kotlin.math.roundToInt
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import moe.rukamori.archivetune.LocalDatabase
@@ -175,26 +176,11 @@ public fun PlaylistMenu(
           return@launch
         }
 
-        val browseId =
-          playlist.playlist.browseId ?: YouTube.createPlaylist(playlist.playlist.name).getOrThrow()
-        if (playlist.playlist.browseId == null) {
-          updateProgress(completedSongs = 0, totalSongs = songs.size)
-          YouTube.addSongsToPlaylist(
-              playlistId = browseId,
-              videoIds = songs.map(Song::id),
-              onProgress = ::updateProgress,
-            )
-            .getOrThrow()
-          database.query {
-            update(
-              playlist.playlist.copy(
-                browseId = browseId,
-                lastUpdateTime = LocalDateTime.now(),
-                remoteSongCount = songs.size,
-              )
-            )
-          }
-        } else {
+        val browseId = database.getPlaylistById(playlist.id)?.playlist?.browseId
+        val hasPendingEdits = syncUtils.libraryActions.observePlaylistSync(playlist.id).first() != null
+        if (browseId == null) {
+          syncUtils.libraryActions.publishPlaylist(playlist.id).getOrThrow()
+        } else if (!hasPendingEdits) {
           updateProgress(completedSongs = 0, totalSongs = 0)
           syncUtils.syncPlaylistNow(
             browseId = browseId,
@@ -207,7 +193,7 @@ public fun PlaylistMenu(
 
         withContext(Dispatchers.Main) {
           syncProgress = null
-          Toast.makeText(context, context.getString(R.string.playlist_synced), Toast.LENGTH_SHORT)
+          Toast.makeText(context, context.getString(if (browseId == null || hasPendingEdits) R.string.vibra_playlist_sync_pending else R.string.playlist_synced), Toast.LENGTH_SHORT)
             .show()
           onDismiss()
         }
@@ -258,12 +244,11 @@ public fun PlaylistMenu(
       initialName = playlist.playlist.name,
       onDismiss = { showEditDialog = false },
       onSave = { name ->
-        onDismiss()
-        database.query {
-          update(playlist.playlist.copy(name = name, lastUpdateTime = LocalDateTime.now()))
-        }
-        coroutineScope.launch(Dispatchers.IO) {
-          playlist.playlist.browseId?.let { YouTube.renamePlaylist(it, name) }
+        coroutineScope.launch {
+          syncUtils.libraryActions.renamePlaylist(playlist.id, name).fold(
+            onSuccess = { onDismiss() },
+            onFailure = { Toast.makeText(context, R.string.error_unknown, Toast.LENGTH_SHORT).show() },
+          )
         }
       },
     )
@@ -344,16 +329,11 @@ public fun PlaylistMenu(
         TextButton(
           onClick = {
             showDeletePlaylistDialog = false
-            onDismiss()
-            database.transaction {
-              if (playlist.playlist.bookmarkedAt != null) {
-                update(playlist.playlist.toggleLike())
-              }
-              delete(playlist.playlist)
-            }
-
-            coroutineScope.launch(Dispatchers.IO) {
-              playlist.playlist.browseId?.let { YouTube.deletePlaylist(it) }
+            coroutineScope.launch {
+              syncUtils.libraryActions.removePlaylists(listOf(playlist.id)).fold(
+                onSuccess = { onDismiss() },
+                onFailure = { Toast.makeText(context, R.string.error_unknown, Toast.LENGTH_SHORT).show() },
+              )
             }
           },
           shapes = ButtonDefaults.shapes(),
@@ -453,7 +433,7 @@ public fun PlaylistMenu(
         Download.STATE_DOWNLOADING -> {
           NewAction(
             id = MenuActionId.Download,
-            icon = { CircularWavyProgressIndicator(modifier = Modifier.size(24.dp)) },
+            icon = { VibraLoadingIndicator(modifier = Modifier.size(24.dp)) },
             text = stringResource(R.string.downloading),
             onClick = { showRemoveDownloadDialog = true },
           )
@@ -538,7 +518,7 @@ public fun PlaylistMenu(
             MediaMenuToggle(
               selected = dbPlaylist?.playlist?.bookmarkedAt != null,
               onClick = {
-                database.query { dbPlaylist?.playlist?.toggleLike()?.let { update(it) } }
+                dbPlaylist?.playlist?.let { syncUtils.libraryActions.togglePlaylist(it) }
               },
             ) {
               Icon(

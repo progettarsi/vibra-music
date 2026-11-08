@@ -7,6 +7,9 @@
 
 package moe.rukamori.archivetune.ui.screens.library
 
+// Vibra: independent radii follow the global rounding style.
+import app.vibra.ui.theme.adaptiveRoundedCornerShape
+
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -27,7 +30,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import app.vibra.ui.motion.VibraIconButton as IconButton
 import androidx.compose.material3.IconButtonDefaults
@@ -89,7 +91,7 @@ fun LibraryMediaListCard(
                     scaleX = scale
                     scaleY = scale
                     alpha = contentAlpha
-                }.clip(RoundedCornerShape(32.dp))
+                }.clip(adaptiveRoundedCornerShape(32.dp))
                 .background(if (selected == true) MaterialTheme.colorScheme.primaryContainer else cardBackgroundColor)
                 .combinedClickable(
                     interactionSource = interactionSource,
@@ -104,7 +106,7 @@ fun LibraryMediaListCard(
             isActive = false,
             isPlaying = false,
             // Vibra: concentric with the card (32 dp corner, 12 dp margin).
-            shape = RoundedCornerShape(20.dp),
+            shape = app.vibra.ui.theme.concentricRoundedCornerShape(32.dp, 12.dp),
             contentScale = ContentScale.Crop,
             showPlaceholder = true,
             modifier = Modifier.size(72.dp),

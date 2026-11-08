@@ -55,11 +55,11 @@ class LoadAiContentFilterPolicyUseCase
     constructor(
         private val repository: AiContentFilterRepository,
     ) {
-        suspend operator fun invoke(): AiContentFilterPolicy {
+        suspend operator fun invoke(refresh: Boolean = true): AiContentFilterPolicy {
             val settings = repository.getSettings()
             if (!settings.enabled) return AiContentFilterPolicy.Disabled
 
-            repository.refreshIfStale()
+            if (refresh) repository.refreshIfStale()
             val lists = repository.loadLists()
             val blockedKeys =
                 if (settings.includeModerateConfidence) {

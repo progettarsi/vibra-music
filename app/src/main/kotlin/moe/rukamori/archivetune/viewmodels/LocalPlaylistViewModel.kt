@@ -507,63 +507,18 @@ class LocalPlaylistViewModel
             browseId: String?,
         ): Boolean {
             return try {
-                val playlistSetVideoId =
-                    if (browseId != null) {
-                        withContext(Dispatchers.IO) {
-                            YouTube.addToPlaylist(browseId, song.id).getOrThrow()
-                        }
-                    } else {
-                        null
-                    }
-
                 val downloadSnapshot = downloadUtil.playlistDownloadSnapshot(playlistId)
-                val added =
-                    database.withTransaction {
-                        // Ensure playlist exists in local database (it should, but just in case)
-                        val p = getPlaylistById(playlistId)
-                        if (p == null) {
-                            // If not found, we can't add to it.
-                            // This might happen if it's a special playlist that hasn't been created yet.
-                            if (playlistId == moe.rukamori.archivetune.db.entities.PlaylistEntity.LIKED_PLAYLIST_ID) {
-                                insert(
-                                    moe.rukamori.archivetune.db.entities.PlaylistEntity(
-                                        id = playlistId,
-                                        name = context.getString(R.string.liked_songs),
-                                        isEditable = false,
-                                        bookmarkedAt = java.time.LocalDateTime.now(),
-                                    ),
-                                )
-                            } else {
-                                return@withTransaction false
-                            }
-                        }
-
-                        // First, ensure the song and its artists are in the database
-                        insert(song.toMediaMetadata())
-
-                        // Add to local playlist
-                        val maxPosition = maxPlaylistSongPosition(playlistId)
-                        val position = (maxPosition ?: -1) + 1
-                        insert(
-                            moe.rukamori.archivetune.db.entities.PlaylistSongMap(
-                                songId = song.id,
-                                playlistId = playlistId,
-                                position = position,
-                                setVideoId = playlistSetVideoId,
-                            ),
-                        )
-                        true
-                    }
-
-                if (!added) {
-                    return false
-                }
-
-                downloadUtil.downloadPlaylistAdditions(downloadSnapshot, listOf(song.id))
+                val added = syncUtils.libraryActions.addPlaylistSongs(
+                    playlistId, listOf(song.id), listOf(song.toMediaMetadata()),
+                ).getOrThrow()
+                if (added.isEmpty()) return false
+                downloadUtil.downloadPlaylistAdditions(downloadSnapshot, added)
                 // Update suggested song IDs to avoid duplicates
                 suggestedSongIds.value = suggestedSongIds.value + song.id
 
                 true
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (e: Exception) {
                 reportException(e)
                 false

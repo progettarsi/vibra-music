@@ -7,6 +7,9 @@
 
 package moe.rukamori.archivetune.ui.screens.library
 
+// Vibra: independent radii follow the global rounding style.
+import app.vibra.ui.theme.adaptiveRoundedCornerShape
+
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import app.vibra.ui.motion.clickable
@@ -34,7 +37,6 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import app.vibra.ui.motion.VibraButton as Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenuItem
@@ -384,7 +386,7 @@ fun LibraryAlbumsScreen(
                                 modifier =
                                     Modifier
                                         .fillMaxWidth()
-                                        .clip(RoundedCornerShape(36.dp))
+                                        .clip(adaptiveRoundedCornerShape(36.dp))
                                         .background(MaterialTheme.colorScheme.primaryContainer)
                                         .clickable {
                                             navController.navigateToAlbum(album.id)
@@ -399,7 +401,7 @@ fun LibraryAlbumsScreen(
                                             thumbnailUrl = album.album.thumbnailUrl,
                                             isActive = false,
                                             isPlaying = false,
-                                            shape = RoundedCornerShape(24.dp),
+                                            shape = app.vibra.ui.theme.concentricRoundedCornerShape(36.dp, 20.dp),
                                             contentScale = ContentScale.Crop,
                                             modifier =
                                                 Modifier
@@ -533,13 +535,13 @@ fun LibraryAlbumsScreen(
                                     Modifier
                                         .fillMaxWidth()
                                         .aspectRatio(1f)
-                                        .clip(RoundedCornerShape(22.dp)),
+                                        .clip(adaptiveRoundedCornerShape(22.dp)),
                             ) {
                                 ItemThumbnail(
                                     thumbnailUrl = album.album.thumbnailUrl,
                                     isActive = false,
                                     isPlaying = false,
-                                    shape = RoundedCornerShape(22.dp),
+                                    shape = adaptiveRoundedCornerShape(22.dp),
                                     contentScale = ContentScale.Crop,
                                     modifier = Modifier.fillMaxSize(),
                                 )
@@ -609,7 +611,7 @@ fun LibraryAlbumsScreen(
                             modifier =
                                 Modifier
                                     .fillMaxWidth()
-                                    .clip(RoundedCornerShape(28.dp))
+                                    .clip(adaptiveRoundedCornerShape(28.dp))
                                     .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
                                     .combinedClickable(
                                         onClick = { navController.navigateToAlbum(album.id) },
@@ -630,7 +632,7 @@ fun LibraryAlbumsScreen(
                                 thumbnailUrl = album.album.thumbnailUrl,
                                 isActive = false,
                                 isPlaying = false,
-                                shape = RoundedCornerShape(20.dp),
+                                shape = app.vibra.ui.theme.concentricRoundedCornerShape(28.dp, 12.dp),
                                 contentScale = ContentScale.Crop,
                                 modifier =
                                     Modifier

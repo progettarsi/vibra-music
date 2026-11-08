@@ -7,6 +7,9 @@
 
 package moe.rukamori.archivetune.ui.component
 
+// Vibra: independent radii follow the global rounding style.
+import app.vibra.ui.theme.adaptiveRoundedCornerShape
+
 import android.view.View
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Animatable
@@ -30,7 +33,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
@@ -104,7 +106,7 @@ fun BottomSheet(
                     IntOffset(x = 0, y = y)
                 }.bottomSheetDraggable(state, onDismiss)
                 .clip(
-                    RoundedCornerShape(
+                    adaptiveRoundedCornerShape(
                         topStart = if (!state.isExpanded) 16.dp else 0.dp,
                         topEnd = if (!state.isExpanded) 16.dp else 0.dp,
                     ),

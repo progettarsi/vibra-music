@@ -14,6 +14,7 @@
 
 package moe.rukamori.archivetune.ui.component
 
+import app.vibra.ui.motion.expansionElement
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.compose.foundation.horizontalScroll
@@ -147,7 +148,7 @@ public fun MediaDetailHero(
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 modifier =
-                    Modifier
+                    Modifier.expansionElement(title, "title")
                         .padding(top = 16.dp)
                         .semantics { heading() },
             )

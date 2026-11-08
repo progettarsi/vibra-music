@@ -21,7 +21,7 @@ class UpdatePlaylistCoverUseCase
             uri: Uri,
         ) {
             val playlist = requireNotNull(repository.getPlaylist(playlistId))
-            if (playlist.browseId == null) {
+            if (!repository.isPublishedOrPending(playlist.id)) {
                 repository.setLocalCover(playlist, uri)
             } else {
                 repository.setRemoteCover(playlist, uri)
@@ -36,7 +36,7 @@ class RemovePlaylistCoverUseCase
     ) {
         suspend operator fun invoke(playlistId: String) {
             val playlist = requireNotNull(repository.getPlaylist(playlistId))
-            if (playlist.browseId == null) {
+            if (!repository.isPublishedOrPending(playlist.id)) {
                 repository.removeLocalCover(playlist)
             } else {
                 repository.removeRemoteCover(playlist)

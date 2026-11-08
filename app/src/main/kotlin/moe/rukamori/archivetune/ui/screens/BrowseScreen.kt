@@ -8,6 +8,7 @@
 package moe.rukamori.archivetune.ui.screens
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import app.vibra.ui.components.VibraLoadingIndicator
 import app.vibra.ui.motion.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.asPaddingValues
@@ -18,7 +19,6 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.SnackbarHost
@@ -313,7 +313,7 @@ private fun BrowseSuccessContent(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier.padding(24.dp),
                 ) {
-                    CircularProgressIndicator()
+                    VibraLoadingIndicator()
                 }
             }
         }

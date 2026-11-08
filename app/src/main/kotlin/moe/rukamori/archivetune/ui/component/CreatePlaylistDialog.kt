@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
@@ -41,6 +42,7 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.vibra.ui.components.*
+import app.vibra.ui.components.VibraLoadingIndicator
 import coil3.compose.AsyncImage
 import app.vibra.ui.motion.vibraControlFeedback
 import moe.rukamori.archivetune.R
@@ -234,7 +236,7 @@ private fun CreatePlaylistDialogContent(
           modifier = Modifier.weight(1f),
         ) {
           if (data.isSubmitting)
-            androidx.compose.material3.CircularProgressIndicator(Modifier.size(20.dp))
+            VibraLoadingIndicator(Modifier.size(20.dp), color = LocalContentColor.current)
           else Text(stringResource(R.string.vibra_menu_create))
         }
       }

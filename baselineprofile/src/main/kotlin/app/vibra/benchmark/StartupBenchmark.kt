@@ -9,6 +9,7 @@ import androidx.benchmark.macro.CompilationMode
 import androidx.benchmark.macro.MacrobenchmarkScope
 import androidx.benchmark.macro.StartupMode
 import androidx.benchmark.macro.StartupTimingMetric
+import androidx.benchmark.macro.FrameTimingMetric
 import androidx.benchmark.macro.junit4.BaselineProfileRule
 import androidx.benchmark.macro.junit4.MacrobenchmarkRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -50,9 +51,20 @@ private fun MacrobenchmarkScope.homePlayerSearchJourney() {
 class BaselineProfileGenerator {
     @get:Rule val rule = BaselineProfileRule()
 
+    @Test fun startupHome() {
+        assumeTrue(BuildConfig.GENERATE_PROFILE)
+        rule.collect(packageName = TargetPackage, includeInStartupProfile = true, maxIterations = 5) {
+            pressHome()
+            startActivityAndWait()
+            check(device.wait(Until.hasObject(By.res("home_content")), 15_000)) {
+                "Home never became usable; finish onboarding and seed the benchmark fixture"
+            }
+        }
+    }
+
     @Test fun startupHomePlayerSearch() {
         assumeTrue(BuildConfig.GENERATE_PROFILE)
-        rule.collect(packageName = TargetPackage, includeInStartupProfile = false) {
+        rule.collect(packageName = TargetPackage, includeInStartupProfile = false, maxIterations = 5) {
             homePlayerSearchJourney()
         }
     }
@@ -62,18 +74,22 @@ class BaselineProfileGenerator {
 class StartupBenchmark {
     @get:Rule val rule = MacrobenchmarkRule()
 
-    @Test fun coldWithoutProfile() = measure(CompilationMode.None())
-    @Test fun coldWithProfile() = measure(CompilationMode.Partial(BaselineProfileMode.Require))
+    @Test fun coldWithoutProfile() = measure(CompilationMode.None(), StartupMode.COLD)
+    @Test fun coldWithProfile() = measure(CompilationMode.Partial(BaselineProfileMode.Require), StartupMode.COLD)
+    @Test fun warmWithProfile() = measure(CompilationMode.Partial(BaselineProfileMode.Require), StartupMode.WARM)
 
-    private fun measure(compilation: CompilationMode) {
+    private fun measure(compilation: CompilationMode, startup: StartupMode) {
         assumeFalse(BuildConfig.GENERATE_PROFILE)
         rule.measureRepeated(
             packageName = TargetPackage,
-            metrics = listOf(StartupTimingMetric()),
+            metrics = listOf(StartupTimingMetric(), FrameTimingMetric()),
             compilationMode = compilation,
-            startupMode = StartupMode.COLD,
+            startupMode = startup,
             iterations = 10,
             setupBlock = { pressHome() },
-        ) { startActivityAndWait() }
+        ) {
+            startActivityAndWait()
+            check(device.wait(Until.hasObject(By.res("home_content")), 15_000)) { "Home content timed out" }
+        }
     }
 }

@@ -14,7 +14,7 @@ concurrency:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -36,5 +36,26 @@ jobs:
       - name: Check formatting (spotless)
         run: ./gradlew spotlessCheck --stacktrace
 
-      - name: Build and run unit tests
-        run: ./gradlew testDebugUnitTest --stacktrace
+      # spotlessApply is excluded because the build otherwise rewrites what the check above read.
+      - name: Build the app and run its unit tests
+        run: >-
+          ./gradlew
+          :app:assembleGmsMobileUniversalDebug
+          :app:testGmsMobileUniversalDebugUnitTest
+          -x spotlessApply --stacktrace
+
+      # A green run must mean the tests ran: a renamed variant would otherwise pass with none.
+      - name: Check the unit tests really ran
+        run: |
+          RESULTS=app/build/test-results/testGmsMobileUniversalDebugUnitTest
+          SUITES=$(find "$RESULTS" -name 'TEST-*.xml' 2>/dev/null | wc -l)
+          TESTS=$(find "$RESULTS" -name 'TEST-*.xml' -exec grep -ho 'tests="[0-9]*"' {} + | tr -dc '0-9\n' | awk '{s+=$1} END {print s+0}')
+          echo "::notice::$SUITES test suites, $TESTS tests"
+          if [ "$SUITES" -lt 40 ]; then
+            echo "::error::Expected at least 40 test suites, found $SUITES"
+            exit 1
+          fi
+
+      # Known findings live in app/lint-baseline.xml: only new errors fail the run.
+      - name: Lint (new errors only)
+        run: ./gradlew :app:lintGmsMobileUniversalDebug -Pvibra.lintGate=true -x spotlessApply --stacktrace

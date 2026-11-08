@@ -33,6 +33,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import moe.rukamori.archivetune.LocalDatabase
+import moe.rukamori.archivetune.LocalSyncUtils
 import moe.rukamori.archivetune.LocalPlayerConnection
 import moe.rukamori.archivetune.R
 import moe.rukamori.archivetune.constants.ArtistSongSortType
@@ -45,6 +46,7 @@ import moe.rukamori.archivetune.ui.component.NewAction
 fun ArtistMenu(originalArtist: Artist, coroutineScope: CoroutineScope, onDismiss: () -> Unit) {
   val context = LocalContext.current
   val database = LocalDatabase.current
+  val libraryActions = LocalSyncUtils.current.libraryActions
   val playerConnection = LocalPlayerConnection.current ?: return
   val artistState =
     database.artist(originalArtist.id).collectAsStateWithLifecycle(initialValue = originalArtist)
@@ -179,7 +181,7 @@ fun ArtistMenu(originalArtist: Artist, coroutineScope: CoroutineScope, onDismiss
           )
         },
         modifier =
-          Modifier.clickable { database.transaction { update(artist.artist.toggleLike()) } },
+          Modifier.clickable { libraryActions.toggleArtist(artist.artist) },
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
       )
     }

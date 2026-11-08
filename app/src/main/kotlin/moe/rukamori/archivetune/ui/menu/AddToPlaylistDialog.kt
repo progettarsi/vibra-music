@@ -26,7 +26,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
@@ -62,6 +61,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.vibra.ui.components.*
+import app.vibra.ui.components.VibraLoadingIndicator
 import app.vibra.ui.motion.VibraTextButton as TextButton
 import coil3.compose.AsyncImage
 import java.time.LocalDateTime
@@ -77,7 +77,7 @@ import moe.rukamori.archivetune.R
 import moe.rukamori.archivetune.constants.InnerTubeCookieKey
 import moe.rukamori.archivetune.db.entities.Playlist
 import moe.rukamori.archivetune.innertube.YouTube
-import moe.rukamori.archivetune.innertube.utils.hasYouTubeLoginCookie
+import moe.rukamori.archivetune.LocalSyncUtils
 import moe.rukamori.archivetune.ui.component.CreatePlaylistDialog
 import moe.rukamori.archivetune.utils.rememberPreference
 
@@ -202,7 +202,7 @@ fun AddToPlaylistDialog(
           .flowOn(Dispatchers.Default)
       }
       .collectAsStateWithLifecycle(initialValue = null)
-  val (cookie) = rememberPreference(InnerTubeCookieKey, "")
+  val libraryActions = LocalSyncUtils.current.libraryActions
   var query by rememberSaveable { mutableStateOf("") }
   var showCreate by rememberSaveable { mutableStateOf(false) }
   var songIds by remember { mutableStateOf<List<String>?>(null) }
@@ -304,7 +304,7 @@ fun AddToPlaylistDialog(
           if (!error && (songIds == null || songMemberships == null))
             item(key = "loading") {
               Box(Modifier.fillMaxWidth().height(120.dp), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(Modifier.size(24.dp))
+                VibraLoadingIndicator(Modifier.size(24.dp))
               }
             }
           items(visible, key = { it.id }) { playlist ->
@@ -322,12 +322,11 @@ fun AddToPlaylistDialog(
                   requested = requested + (playlist.id to !checked)
                   app.vibra.library.PlaylistSync.toggle(
                     context = appContext,
-                    database = database,
+                    libraryActions = libraryActions,
                     downloadUtil = downloadUtil,
                     playlist = playlist,
                     songIds = ids,
                     remove = checked,
-                    remoteAllowed = hasYouTubeLoginCookie(cookie),
                     onApplied = { added ->
                       if (added > 0) onAddComplete?.invoke(added, listOf(playlist.playlist.name))
                     },

@@ -16,17 +16,18 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import app.vibra.ui.components.VibraLoadingIndicator
 import app.vibra.ui.motion.VibraButton as Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import app.vibra.ui.motion.VibraIconButton as IconButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import app.vibra.ui.motion.VibraOutlinedButton as OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -174,9 +175,9 @@ fun SongSourceReplacementDialog(
                                 modifier = Modifier.weight(1f),
                             ) {
                                 if (isSaving) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.height(18.dp),
-                                        strokeWidth = 2.dp,
+                                    VibraLoadingIndicator(
+                                        modifier = Modifier.size(18.dp),
+                                        color = LocalContentColor.current,
                                     )
                                     Spacer(Modifier.width(8.dp))
                                 }

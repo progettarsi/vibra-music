@@ -97,11 +97,10 @@ fun MediaMenuHeader(
         contentDescription = if (compact && onPlay != null) playLabel else null,
         shape =
           if (
-            compact &&
-              artworkShape != CircleShape &&
+            artworkShape != CircleShape &&
               artworkShape is androidx.compose.foundation.shape.CornerBasedShape
           )
-            RoundedCornerShape(concentric(MenuTokens.CardRadius, MenuTokens.CompactHeaderInset))
+            RoundedCornerShape(concentric(MenuTokens.CardRadius, if (compact) MenuTokens.CompactHeaderInset else MenuTokens.ExpandedHeaderInset))
           else artworkShape,
         modifier =
           Modifier.size(if (compact) compactArtwork else MenuTokens.ExpandedArtwork)
@@ -223,7 +222,7 @@ fun MediaMenuActions(
         verticalArrangement = Arrangement.spacedBy(8.dp),
       ) {
         Surface(
-          shape = if (action.selected) RoundedCornerShape(16.dp) else CircleShape,
+          shape = if (action.selected) app.vibra.ui.theme.adaptiveRoundedCornerShape(16.dp) else CircleShape,
           color =
             if (action.selected) MaterialTheme.colorScheme.primaryContainer
             else if (action.backgroundColor == Color.Unspecified)

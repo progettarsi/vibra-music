@@ -7,12 +7,14 @@
 
 package moe.rukamori.archivetune.ui.component
 
+// Vibra: independent radii follow the global rounding style.
+import app.vibra.ui.theme.adaptiveRoundedCornerShape
+
 import app.vibra.ui.motion.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -40,7 +42,7 @@ fun SpotifyLibraryPlaylistListItem(
     playlist: SpotifyPlaylist,
     navController: NavController,
     modifier: Modifier = Modifier,
-    shape: Shape = RoundedCornerShape(26.dp),
+    shape: Shape = adaptiveRoundedCornerShape(26.dp),
 ) {
     val libraryPlaylist = remember(playlist) { playlist.toLibraryPlaylist() }
     val openPlaylist = {
@@ -143,7 +145,7 @@ fun SpotifyTrackListItem(
                 isSelected = isSelected,
                 isActive = isActive,
                 isPlaying = isPlaying,
-                shape = RoundedCornerShape(ThumbnailCornerRadius),
+                shape = app.vibra.ui.theme.VibraShapes.RowThumbnail,
                 placeholderIconRes = if (showSongIconPlaceholder) R.drawable.music_note else null,
                 modifier = Modifier.size(ListThumbnailSize),
             )

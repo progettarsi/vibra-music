@@ -7,10 +7,12 @@
 
 package moe.rukamori.archivetune.ui.component.shimmer
 
+// Vibra: independent radii follow the global rounding style.
+import app.vibra.ui.theme.adaptiveRoundedCornerShape
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -22,7 +24,7 @@ fun ButtonPlaceholder(modifier: Modifier = Modifier) {
     Spacer(
         modifier
             .height(ButtonDefaults.MinHeight)
-            .clip(RoundedCornerShape(50))
+            .clip(adaptiveRoundedCornerShape(50))
             .background(MaterialTheme.colorScheme.onSurface),
     )
 }

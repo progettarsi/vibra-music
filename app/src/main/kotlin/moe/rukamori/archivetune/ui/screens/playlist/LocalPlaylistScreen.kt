@@ -69,6 +69,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
@@ -91,6 +92,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import moe.rukamori.archivetune.LocalDatabase
+import moe.rukamori.archivetune.LocalSyncUtils
 import moe.rukamori.archivetune.LocalDownloadUtil
 import moe.rukamori.archivetune.LocalPlayerAwareWindowInsets
 import moe.rukamori.archivetune.LocalPlayerConnection
@@ -125,7 +127,6 @@ import moe.rukamori.archivetune.ui.menu.PlaylistMenu
 import moe.rukamori.archivetune.ui.menu.SelectionSongMenu
 import moe.rukamori.archivetune.ui.menu.SongMenu
 import moe.rukamori.archivetune.ui.menu.SongSourceReplacementDialog
-import moe.rukamori.archivetune.ui.menu.removeSongFromRemotePlaylist
 import moe.rukamori.archivetune.ui.screens.playlist.PlaylistSuggestionsSection
 import moe.rukamori.archivetune.ui.utils.HeaderDownloadItem
 import moe.rukamori.archivetune.ui.utils.HeaderDownloadProgressIndicator
@@ -153,8 +154,22 @@ fun LocalPlaylistScreen(
     viewModel: LocalPlaylistViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val menuState = LocalMenuState.current
     val database = LocalDatabase.current
+    val snackbarHostState = remember { SnackbarHostState() }
+    val libraryActions = LocalSyncUtils.current.libraryActions
+    val syncState by remember(libraryActions, viewModel.playlistId) {
+        libraryActions.observePlaylistSync(viewModel.playlistId)
+    }.collectAsStateWithLifecycle(initialValue = null)
+    var confirmSyncRepeat by remember { mutableStateOf<app.vibra.library.PlaylistSyncStatus?>(null) }
+    fun retryPlaylistSync(confirmedEditId: Long? = null) {
+        viewModel.viewModelScope.launch {
+            libraryActions.retryPlaylist(viewModel.playlistId, confirmedEditId).onFailure {
+                snackbarHostState.showSnackbar(resources.getString(R.string.error_unknown))
+            }
+        }
+    }
     val haptic = LocalHapticFeedback.current
     val playerConnection = LocalPlayerConnection.current ?: return
     val isPlaying by playerConnection.isPlaying.collectAsStateWithLifecycle()
@@ -185,7 +200,6 @@ fun LocalPlaylistScreen(
     }
 
     val coroutineScope = rememberCoroutineScope()
-    val snackbarHostState = remember { SnackbarHostState() }
     var sourceChangeTarget by remember { mutableStateOf<PlaylistSong?>(null) }
     var sourceChangeSaving by remember { mutableStateOf(false) }
 
@@ -201,6 +215,7 @@ fun LocalPlaylistScreen(
                 coroutineScope.launch(Dispatchers.IO) {
                     try {
                         database.withTransaction {
+                            check(!libraryActions.isPublishedOrPending(target.map.playlistId))
                             if (!replacement.song.isLocal) {
                                 insert(replacement.toMediaMetadata())
                             }
@@ -304,7 +319,7 @@ fun LocalPlaylistScreen(
     var downloads by remember { mutableStateOf<Map<String, Download>>(emptyMap()) }
     var downloadState by remember { mutableStateOf<HeaderDownloadState>(HeaderDownloadState.None) }
     val editable: Boolean = playlist?.playlist?.isEditable == true
-    val canChangeSongSource = editable && playlist?.playlist?.browseId == null
+    val canChangeSongSource = editable && playlist?.playlist?.browseId == null && syncState == null
     val isReorderingEnabled =
         editable &&
             sortType == PlaylistSongSortType.CUSTOM &&
@@ -333,6 +348,26 @@ fun LocalPlaylistScreen(
             uri?.let(viewModel::updateCover)
         }
 
+    confirmSyncRepeat?.let { confirmation ->
+        val isCreation = confirmation.state == app.vibra.library.PlaylistSyncState.ConfirmCreation
+        app.vibra.ui.components.VibraAlertDialog(
+            onDismissRequest = { confirmSyncRepeat = null },
+            title = { Text(stringResource(if (isCreation) R.string.vibra_playlist_sync_confirm_title else R.string.vibra_playlist_sync_confirm_add_title)) },
+            text = { Text(stringResource(if (isCreation) R.string.vibra_playlist_sync_confirm_text else R.string.vibra_playlist_sync_confirm_add_text)) },
+            dismissButton = {
+                VibraDialogButton(onClick = { confirmSyncRepeat = null }) {
+                    Text(stringResource(android.R.string.cancel))
+                }
+            },
+            confirmButton = {
+                VibraDialogButton(primary = true, onClick = {
+                    confirmSyncRepeat = null
+                    retryPlaylistSync(confirmation.editId)
+                }) { Text(stringResource(R.string.retry)) }
+            },
+        )
+    }
+
     var showEditDialog by remember { mutableStateOf(false) }
 
     if (showEditDialog) {
@@ -341,16 +376,10 @@ fun LocalPlaylistScreen(
                 initialName = playlistData.playlist.name,
                 onDismiss = { showEditDialog = false },
                 onSave = { name ->
-                    database.query {
-                        update(
-                            playlistData.playlist.copy(
-                                name = name,
-                                lastUpdateTime = LocalDateTime.now(),
-                            ),
-                        )
-                    }
-                    viewModel.viewModelScope.launch(Dispatchers.IO) {
-                        playlistData.playlist.browseId?.let { YouTube.renamePlaylist(it, name) }
+                    viewModel.viewModelScope.launch {
+                        libraryActions.renamePlaylist(playlistData.id, name).onFailure {
+                            snackbarHostState.showSnackbar(resources.getString(R.string.error_unknown))
+                        }
                     }
                 },
             )
@@ -429,13 +458,13 @@ fun LocalPlaylistScreen(
                     primary = true,
                     onClick = {
                         showDeletePlaylistDialog = false
-                        database.query {
-                            playlist?.let { delete(it.playlist) }
+                        val id = playlist?.id
+                        if (id != null) viewModel.viewModelScope.launch {
+                            libraryActions.removePlaylists(listOf(id)).fold(
+                                onSuccess = { navController.popBackStack() },
+                                onFailure = { snackbarHostState.showSnackbar(resources.getString(R.string.error_unknown)) },
+                            )
                         }
-                        viewModel.viewModelScope.launch(Dispatchers.IO) {
-                            playlist?.playlist?.browseId?.let { YouTube.deletePlaylist(it) }
-                        }
-                        navController.popBackStack()
                     },
                     shapes = ButtonDefaults.shapes(),
                 ) {
@@ -451,7 +480,7 @@ fun LocalPlaylistScreen(
             val hasContent =
                 current != null &&
                     (current.songCount > 0 || current.playlist.remoteSongCount != 0)
-            if (hasContent && !isSearching) 2 else 0
+            if (!isSearching) (if (hasContent) 2 else 0) + (if (syncState != null) 1 else 0) else 0
         }
     }
     val lazyListState = rememberLazyListState()
@@ -465,13 +494,8 @@ fun LocalPlaylistScreen(
             val fromIndex = from.index - headerItems
             val toIndex = to.index - headerItems
             if (isReorderingEnabled && fromIndex in mutableSongs.indices && toIndex in mutableSongs.indices && fromIndex != toIndex) {
-                val currentDragInfo = dragInfo
-                dragInfo =
-                    if (currentDragInfo == null) {
-                        (from.index - headerItems) to (to.index - headerItems)
-                    } else {
-                        currentDragInfo.first to (to.index - headerItems)
-                    }
+                val movedId = dragInfo?.first ?: mutableSongs[fromIndex].map.id
+                dragInfo = movedId to toIndex
                 mutableSongs.move(from.index - headerItems, to.index - headerItems)
                 reorderHaptics.tick()
             }
@@ -479,38 +503,16 @@ fun LocalPlaylistScreen(
 
     LaunchedEffect(reorderableState.isAnyItemDragging) {
         if (!reorderableState.isAnyItemDragging) {
-            dragInfo?.let { (from, to) ->
-                val orderedBeforeMove = songs
-                val browseId =
-                    viewModel.playlist.value
-                        ?.playlist
-                        ?.browseId
-                val movedSetVideoId = orderedBeforeMove.getOrNull(from)?.map?.setVideoId
-                val successorIndex = if (from > to) to else to + 1
-                val successorSetVideoId = orderedBeforeMove.getOrNull(successorIndex)?.map?.setVideoId
-
-                coroutineScope.launch(Dispatchers.IO) {
-                    database.withTransaction {
-                        move(viewModel.playlistId, from, to)
-                    }
-
-                    if (browseId != null && movedSetVideoId != null) {
-                        runCatching {
-                            YouTube
-                                .moveSongPlaylist(
-                                    browseId,
-                                    movedSetVideoId,
-                                    successorSetVideoId,
-                                ).getOrThrow()
-                        }.onFailure {
-                            withContext(Dispatchers.Main) {
-                                snackbarHostState.showSnackbar(
-                                    message = context.getString(R.string.error_unknown),
-                                    withDismissAction = true,
-                                )
-                            }
+            dragInfo?.let { (movedId, to) ->
+                val before = mutableSongs.getOrNull(to - 1)?.map?.id
+                val after = mutableSongs.getOrNull(to + 1)?.map?.id
+                if (mutableSongs.getOrNull(to)?.map?.id == movedId) viewModel.viewModelScope.launch {
+                    libraryActions.movePlaylistSong(viewModel.playlistId, movedId, before, after, after == null)
+                        .onFailure {
+                            mutableSongs.clear()
+                            mutableSongs.addAll(songs)
+                            snackbarHostState.showSnackbar(resources.getString(R.string.error_unknown))
                         }
-                    }
                 }
                 dragInfo = null
             }
@@ -555,6 +557,31 @@ fun LocalPlaylistScreen(
                             .calculateBottomPadding(),
                 ),
         ) {
+            if (!isSearching) syncState?.let { status ->
+                item(key = "playlist-sync-status") {
+                    val state = status.state
+                    val pending = state == app.vibra.library.PlaylistSyncState.Pending
+                    val confirmCreation = state == app.vibra.library.PlaylistSyncState.ConfirmCreation
+                    val confirmAddition = state == app.vibra.library.PlaylistSyncState.ConfirmAddition
+                    androidx.compose.foundation.layout.Row(
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            stringResource(when {
+                                pending -> R.string.vibra_playlist_sync_pending
+                                confirmCreation -> R.string.vibra_playlist_sync_unconfirmed
+                                confirmAddition -> R.string.vibra_playlist_sync_add_unconfirmed
+                                else -> R.string.vibra_playlist_sync_attention
+                            }),
+                            modifier = Modifier.weight(1f),
+                        )
+                        if (!pending) androidx.compose.material3.TextButton(
+                            onClick = { if (confirmCreation || confirmAddition) confirmSyncRepeat = status else retryPlaylistSync() },
+                        ) { Text(stringResource(R.string.retry)) }
+                    }
+                }
+            }
             playlist?.let { playlist ->
                 if (playlist.songCount == 0 && playlist.playlist.remoteSongCount == 0) {
                     item {
@@ -630,9 +657,7 @@ fun LocalPlaylistScreen(
                                         }
                                     },
                                 onToggleAdd = {
-                                    database.transaction {
-                                        update(playlist.playlist.toggleLike())
-                                    }
+                                    libraryActions.togglePlaylist(playlist.playlist)
                                 },
                                 additionalPrimaryActions = { contentColor ->
                                     if (editable) {
@@ -798,23 +823,9 @@ fun LocalPlaylistScreen(
 
                         fun deleteFromPlaylist() {
                             val map = currentItem.map
-                            val browseId = playlist?.playlist?.browseId
-                            coroutineScope.launch(Dispatchers.IO) {
-                                if (browseId != null) {
-                                    val remoteResult = removeSongFromRemotePlaylist(browseId, map)
-                                    if (remoteResult.isFailure) {
-                                        withContext(Dispatchers.Main) {
-                                            snackbarHostState.showSnackbar(
-                                                message = context.getString(R.string.error_unknown),
-                                                withDismissAction = true,
-                                            )
-                                        }
-                                        return@launch
-                                    }
-                                }
-                                database.withTransaction {
-                                    move(map.playlistId, map.position, Int.MAX_VALUE)
-                                    delete(map.copy(position = Int.MAX_VALUE))
+                            viewModel.viewModelScope.launch {
+                                libraryActions.removePlaylistSongs(map.playlistId, entryIds = setOf(map.id)).onFailure {
+                                    snackbarHostState.showSnackbar(resources.getString(R.string.error_unknown))
                                 }
                             }
                         }

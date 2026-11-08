@@ -7,6 +7,9 @@
 
 package moe.rukamori.archivetune.ui.screens
 
+// Vibra: independent radii follow the global rounding style.
+import app.vibra.ui.theme.adaptiveRoundedCornerShape
+
 import app.vibra.ui.motion.vibraControlFeedback
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
@@ -54,7 +57,6 @@ import androidx.compose.foundation.pager.PageSize
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import app.vibra.ui.motion.VibraFilledIconButton as FilledIconButton
@@ -2249,7 +2251,7 @@ fun HomePageSectionTitle(
                         if (section.endpoint?.isArtistEndpoint == true) {
                             CircleShape
                         } else {
-                            RoundedCornerShape(ThumbnailCornerRadius)
+                            app.vibra.ui.theme.VibraShapes.RowThumbnail
                         }
                     AsyncImage(
                         model = thumbnailUrl,

@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Vibra (2026) - GPL-3.0 License. Derived from ArchiveTune c Rukamori. -->
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <application><profileable android:shell="true" /></application>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">
+    <application android:label="VIBRA Test" tools:replace="android:label">
+        <profileable android:shell="true" />
+        <activity android:name="app.vibra.startup.StartupBenchmarkSetupActivity"
+            android:exported="true" android:permission="android.permission.DUMP" />
+        <activity android:name="app.vibra.ui.ExpansionMotionQaActivity" android:exported="true" />
+    </application>
 </manifest>

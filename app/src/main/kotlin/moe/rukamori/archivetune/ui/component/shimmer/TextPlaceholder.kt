@@ -7,13 +7,15 @@
 
 package moe.rukamori.archivetune.ui.component.shimmer
 
+// Vibra: independent radii follow the global rounding style.
+import app.vibra.ui.theme.adaptiveRoundedCornerShape
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CornerBasedShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -27,7 +29,7 @@ import kotlin.random.Random
 fun TextPlaceholder(
     modifier: Modifier = Modifier,
     height: Dp = 16.dp,
-    shape: CornerBasedShape = RoundedCornerShape(0.dp),
+    shape: CornerBasedShape = adaptiveRoundedCornerShape(0.dp),
 ) {
     Box(
         modifier =

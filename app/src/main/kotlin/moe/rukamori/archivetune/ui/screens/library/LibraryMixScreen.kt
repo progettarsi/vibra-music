@@ -7,11 +7,15 @@
 
 package moe.rukamori.archivetune.ui.screens.library
 
+// Vibra: independent radii follow the global rounding style.
+import app.vibra.ui.theme.adaptiveRoundedCornerShape
+
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import app.vibra.ui.components.VibraLoadingIndicator
 import app.vibra.ui.motion.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -36,12 +40,10 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import app.vibra.ui.motion.VibraButton as Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import app.vibra.ui.motion.VibraFilledTonalButton as FilledTonalButton
 import androidx.compose.material3.Icon
 import app.vibra.ui.motion.VibraIconButton as IconButton
@@ -348,7 +350,7 @@ fun LibraryMixScreen(
                                             modifier =
                                                 Modifier
                                                     .size(110.dp)
-                                                    .clip(RoundedCornerShape(28.dp)),
+                                                    .clip(adaptiveRoundedCornerShape(28.dp)),
                                         ) {
                                             AsyncImage(
                                                 model = song.song.thumbnailUrl,
@@ -487,7 +489,7 @@ fun LibraryMixScreen(
                                                 .graphicsLayer {
                                                     scaleX = scale
                                                     scaleY = scale
-                                                }.clip(RoundedCornerShape(32.dp))
+                                                }.clip(adaptiveRoundedCornerShape(32.dp))
                                                 .background(cardBgColor)
                                                 .clickable(
                                                     interactionSource = interactionSource,
@@ -507,7 +509,7 @@ fun LibraryMixScreen(
                                             modifier =
                                                 Modifier
                                                     .size(106.dp)
-                                                    .clip(RoundedCornerShape(24.dp)),
+                                                    .clip(app.vibra.ui.theme.concentricRoundedCornerShape(32.dp, 12.dp)),
                                         ) {
                                             AsyncImage(
                                                 model = playlist.thumbnails.getOrNull(0),
@@ -585,7 +587,7 @@ fun LibraryMixScreen(
                                             Modifier
                                                 .width(130.dp)
                                                 .height(168.dp)
-                                                .clip(RoundedCornerShape(32.dp))
+                                                .clip(adaptiveRoundedCornerShape(32.dp))
                                                 .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
                                                 .clickable {
                                                     onTabSelected(LibraryFilter.PLAYLISTS)
@@ -768,7 +770,7 @@ private fun SpotifyPlaylistCompactCard(
                 .graphicsLayer {
                     scaleX = scale
                     scaleY = scale
-                }.clip(RoundedCornerShape(32.dp))
+                }.clip(adaptiveRoundedCornerShape(32.dp))
                 .background(cardBgColor)
                 .clickable(
                     interactionSource = interactionSource,
@@ -780,7 +782,7 @@ private fun SpotifyPlaylistCompactCard(
             modifier =
                 Modifier
                     .size(106.dp)
-                    .clip(RoundedCornerShape(24.dp)),
+                    .clip(app.vibra.ui.theme.concentricRoundedCornerShape(32.dp, 12.dp)),
         ) {
             AsyncImage(
                 model = thumbnailUrl,
@@ -943,7 +945,7 @@ private fun TopMixesEmptySection(
                 Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 24.dp),
-            shape = RoundedCornerShape(32.dp),
+            shape = adaptiveRoundedCornerShape(32.dp),
             colors =
                 CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surfaceContainer,
@@ -1022,9 +1024,8 @@ private fun TopMixesHeader(
                 enabled = !isRefreshing,
             ) {
                 if (isRefreshing) {
-                    CircularProgressIndicator(
+                    VibraLoadingIndicator(
                         modifier = Modifier.size(20.dp),
-                        strokeWidth = 2.dp,
                     )
                 } else {
                     Icon(
@@ -1065,7 +1066,7 @@ private fun LibraryTopMixCard(
                     indication = null,
                     onClick = onPlay,
                 ),
-        shape = RoundedCornerShape(32.dp),
+        shape = adaptiveRoundedCornerShape(32.dp),
         colors =
             CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
@@ -1187,7 +1188,7 @@ private fun MostPlayedAlbumSpotlightCard(
             modifier
                 .fillMaxWidth()
                 .padding(horizontal = 24.dp)
-                .clip(RoundedCornerShape(32.dp))
+                .clip(adaptiveRoundedCornerShape(32.dp))
                 .background(backgroundBrush)
                 .clickable(onClick = onOpenAlbum)
                 .padding(16.dp),
@@ -1201,7 +1202,7 @@ private fun MostPlayedAlbumSpotlightCard(
                     modifier =
                         Modifier
                             .size(64.dp)
-                            .clip(RoundedCornerShape(20.dp))
+                            .clip(app.vibra.ui.theme.concentricRoundedCornerShape(32.dp, 16.dp))
                             .background(primaryColor.copy(alpha = 0.16f)),
                     contentAlignment = Alignment.Center,
                 ) {
@@ -1370,7 +1371,7 @@ fun ShortcutCard(
                 .graphicsLayer {
                     scaleX = scale
                     scaleY = scale
-                }.clip(RoundedCornerShape(26.dp))
+                }.clip(adaptiveRoundedCornerShape(26.dp))
                 .background(finalBgColor)
                 .clickable(
                     interactionSource = interactionSource,

@@ -7,6 +7,9 @@
 
 package moe.rukamori.archivetune.ui.screens.library
 
+// Vibra: independent radii follow the global rounding style.
+import app.vibra.ui.theme.adaptiveRoundedCornerShape
+
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -41,7 +44,6 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import app.vibra.ui.motion.VibraIconButton as IconButton
@@ -88,6 +90,7 @@ import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import moe.rukamori.archivetune.LocalDatabase
+import moe.rukamori.archivetune.LocalSyncUtils
 import moe.rukamori.archivetune.LocalPlayerAwareWindowInsets
 import moe.rukamori.archivetune.LocalPlayerConnection
 import moe.rukamori.archivetune.R
@@ -131,6 +134,9 @@ fun LibraryPlaylistsScreen(
     val menuState = LocalMenuState.current
     val coroutineScope = rememberCoroutineScope()
     val database = LocalDatabase.current
+    val libraryActions = LocalSyncUtils.current.libraryActions
+    val librarySync by remember(libraryActions) { libraryActions.observeLibrarySync() }
+        .collectAsStateWithLifecycle(initialValue = null)
     val playerConnection = LocalPlayerConnection.current
     val haptic = LocalHapticFeedback.current
 
@@ -223,18 +229,16 @@ fun LibraryPlaylistsScreen(
                         val doomed = playlists.filter { it.id in toDelete }
                         confirmDelete = false
                         selection = null
-                        // The same steps as a single delete from the playlist's menu.
-                        database.transaction {
-                            doomed.forEach { playlist ->
-                                if (playlist.playlist.bookmarkedAt != null) update(playlist.playlist.toggleLike())
-                                delete(playlist.playlist)
-                            }
+                        val ids = doomed.map { it.id }.toSet()
+                        coroutineScope.launch {
+                            libraryActions.removePlaylists(ids.toList()).fold(
+                                onSuccess = {
+                                    val remaining = pinned.filter { it !in ids }
+                                    if (remaining != pinned) onPinnedRawChange(encodePinnedPlaylists(remaining))
+                                },
+                                onFailure = { android.widget.Toast.makeText(context, R.string.error_unknown, android.widget.Toast.LENGTH_SHORT).show() },
+                            )
                         }
-                        coroutineScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                            doomed.forEach { playlist -> playlist.playlist.browseId?.let { moe.rukamori.archivetune.innertube.YouTube.deletePlaylist(it) } }
-                        }
-                        val remaining = pinned.filter { it !in toDelete }
-                        if (remaining != pinned) onPinnedRawChange(encodePinnedPlaylists(remaining))
                     },
                     primary = true,
                     destructive = true,
@@ -273,6 +277,31 @@ fun LibraryPlaylistsScreen(
                     .fillMaxSize()
                     .padding(top = LibraryHeaderContentPadding),
         ) {
+            librarySync?.let { state ->
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = stringResource(when (state) {
+                            app.vibra.library.LibrarySyncState.Pending -> R.string.vibra_playlist_sync_pending
+                            app.vibra.library.LibrarySyncState.NeedsAttention -> R.string.vibra_playlist_sync_attention
+                            app.vibra.library.LibrarySyncState.RemovalNeedsAttention -> R.string.vibra_playlist_sync_removed_attention
+                        }),
+                        modifier = Modifier.weight(1f),
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    if (state == app.vibra.library.LibrarySyncState.RemovalNeedsAttention) {
+                        androidx.compose.material3.TextButton(onClick = {
+                            coroutineScope.launch {
+                                libraryActions.retryRemovedPlaylists().onFailure {
+                                    android.widget.Toast.makeText(context, R.string.error_unknown, android.widget.Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        }) { Text(stringResource(R.string.retry)) }
+                    }
+                }
+            }
             // Control row (Sort dropdown, grid/list layout toggle, + add button); while selecting,
             // the selection's own bar takes its place.
             val selected = selection
@@ -967,7 +996,7 @@ fun PlaylistGridCard(
                     scaleX = scale
                     scaleY = scale
                     alpha = hiddenAlpha
-                }.clip(RoundedCornerShape(32.dp))
+                }.clip(adaptiveRoundedCornerShape(32.dp))
                 .background(if (selected == true) MaterialTheme.colorScheme.primaryContainer else cardBgColor)
                 .combinedClickable(
                     interactionSource = interactionSource,
@@ -982,13 +1011,13 @@ fun PlaylistGridCard(
                     .fillMaxWidth()
                     .aspectRatio(1f)
                     // Vibra: concentric with the card (32 dp corner, 12 dp margin).
-                    .clip(RoundedCornerShape(20.dp)),
+                    .clip(app.vibra.ui.theme.concentricRoundedCornerShape(32.dp, 12.dp)),
         ) {
             ItemThumbnail(
                 thumbnailUrl = playlist.thumbnails.getOrNull(0),
                 isActive = false,
                 isPlaying = false,
-                shape = RoundedCornerShape(20.dp),
+                shape = app.vibra.ui.theme.concentricRoundedCornerShape(32.dp, 12.dp),
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
             )

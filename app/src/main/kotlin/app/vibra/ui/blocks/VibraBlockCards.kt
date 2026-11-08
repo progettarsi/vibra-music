@@ -5,6 +5,7 @@
 
 package app.vibra.ui.blocks
 
+import app.vibra.ui.motion.expansionElement
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.blur
@@ -62,7 +63,26 @@ import app.vibra.ui.components.VibraRow
 import app.vibra.ui.components.entryTapBounce
 import app.vibra.ui.haptics.rememberVibraHaptics
 import app.vibra.ui.theme.VibraShapes
+import app.vibra.ui.theme.concentricRoundedCornerShape
+import app.vibra.ui.theme.insetRoundedShape
+import androidx.compose.ui.unit.Dp
 import app.vibra.ui.theme.rememberMoodShape
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import app.vibra.ui.components.VibraPlayButton
+import app.vibra.ui.motion.Liquid
+import app.vibra.ui.motion.LocalPlaybackSpin
+import app.vibra.ui.motion.VibraFilledTonalButton as FilledTonalButton
 import moe.rukamori.archivetune.R
 
 /*
@@ -82,6 +102,10 @@ data class SongEntry(
     val duration: String?,
     val onClick: () -> Unit,
     val onLongClick: (() -> Unit)? = null,
+    /** The track now playing: the row tints to the secondary container. */
+    val isActive: Boolean = false,
+    /** An artist in a mixed list: round artwork instead of the square cover. */
+    val circular: Boolean = false,
 )
 
 /** A cookie beside the For You blob: a dedicated mix, started with one tap. */
@@ -223,9 +247,10 @@ private fun ForYouMosaic(
         modifier =
             modifier
                 .height(height)
-                .clip(VibraShapes.Card)
-                .background(MaterialTheme.colorScheme.surfaceContainer)
-                .clickable(role = Role.Button) {
+                .interactiveSurface(
+                    shape = VibraShapes.Card,
+                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                ) {
                     haptics.press()
                     onClick()
                 },
@@ -299,14 +324,15 @@ private fun ForYouMosaic(
     }
 }
 
-private enum class MoodPalette(
+/** The two gradients mood cookies are painted with (home and search). */
+internal enum class MoodPalette(
     val colors: List<Color>,
 ) {
     Warm(listOf(Color(0xFFE2541B), Color(0xFFB3261E), Color(0xFF7D2A6E))),
     Cool(listOf(Color(0xFF7B2CBF), Color(0xFF3F2A8C), Color(0xFF14213D))),
 }
 
-private fun moodGradient(palette: MoodPalette) = Brush.linearGradient(palette.colors)
+internal fun moodGradient(palette: MoodPalette) = Brush.linearGradient(palette.colors)
 
 @Composable
 private fun MoodCookie(
@@ -365,25 +391,33 @@ fun SongsBlock(
     modifier: Modifier = Modifier,
     title: String? = null,
     onTitleClick: (() -> Unit)? = null,
-) {
-    val rows =
+    rows: Int =
         when (size) {
             BlockSize.Large -> 6
             BlockSize.Medium -> 4
             BlockSize.Small -> 2
-        }
+        },
+    footer: (@Composable ColumnScope.() -> Unit)? = null,
+) {
     VibraCard(modifier = modifier) {
         title?.let { BlockTitle(text = it, onClick = onTitleClick) }
         Column(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = if (title == null) 12.dp else 6.dp),
+            modifier = Modifier.padding(10.dp),
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
             songs.take(rows).forEach { song ->
                 VibraRow(
+                    containerInset = 10.dp,
                     title = song.title,
                     background = RowBackground.None,
+                    isActive = song.isActive,
                     thumbnail = {
-                        VibraArtwork(url = song.thumbnailUrl, shape = VibraShapes.RowThumbnail, sizePx = 160, modifier = Modifier.fillMaxSize())
+                        VibraArtwork(
+                            url = song.thumbnailUrl,
+                            shape = if (song.circular) CircleShape else VibraShapes.RowThumbnail,
+                            sizePx = 160,
+                            modifier = Modifier.fillMaxSize(),
+                        )
                     },
                     subtitle = { RowSubtitleText(song.subtitle) },
                     trailing = { if (size != BlockSize.Small) song.duration?.let { RowDurationText(it) } },
@@ -393,6 +427,7 @@ fun SongsBlock(
                 )
             }
         }
+        footer?.invoke(this)
     }
 }
 
@@ -411,6 +446,7 @@ fun MosaicBlock(
     size: BlockSize,
     modifier: Modifier = Modifier,
     onTitleClick: (() -> Unit)? = null,
+    onPlayLead: (() -> Unit)? = null,
 ) {
     if (entries.isEmpty()) return
     VibraCard(modifier = modifier) {
@@ -422,7 +458,7 @@ fun MosaicBlock(
 
             size == BlockSize.Medium ->
                 Row(modifier = inner, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    LabeledCover(entries[0], Modifier.weight(1.9f), big = true)
+                    LabeledCover(entries[0], Modifier.weight(1.9f), big = true, onPlay = onPlayLead)
                     Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         entries.drop(1).take(2).forEach { LabeledCover(it, Modifier.fillMaxWidth()) }
                     }
@@ -430,7 +466,7 @@ fun MosaicBlock(
 
             else ->
                 Row(modifier = inner, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    LabeledCover(entries[0], Modifier.weight(1f), big = true)
+                    LabeledCover(entries[0], Modifier.weight(1f), big = true, onPlay = onPlayLead)
                     CoverGrid(entries = entries.drop(1).take(4), modifier = Modifier.weight(1f))
                 }
         }
@@ -444,21 +480,39 @@ private fun LabeledCover(
     entry: ShelfEntry,
     modifier: Modifier = Modifier,
     big: Boolean = false,
+    onPlay: (() -> Unit)? = null,
+    containerInset: Dp = 10.dp,
 ) {
     Column(
         modifier =
             modifier
                 .entryTapBounce(entry)
-                .clip(VibraShapes.InnerArtwork)
+                .clip(concentricRoundedCornerShape(32.dp, containerInset))
                 .combinedClickable(onClick = entry.onClick, onLongClick = entry.onLongClick),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        VibraArtwork(
-            url = entry.thumbnailUrl,
-            shape = if (entry.circular) CircleShape else VibraShapes.InnerArtwork,
-            contentDescription = entry.title,
-            modifier = Modifier.fillMaxWidth().aspectRatio(1f),
-        )
+        Box(modifier = Modifier.fillMaxWidth().aspectRatio(1f)) {
+            VibraArtwork(
+                url = entry.thumbnailUrl,
+                shape = if (entry.circular) CircleShape else concentricRoundedCornerShape(32.dp, containerInset),
+                contentDescription = entry.title,
+                modifier = Modifier.matchParentSize(),
+            )
+            if (onPlay != null) {
+                // Not the transport: it stays still while the music plays.
+                CompositionLocalProvider(LocalPlaybackSpin provides null) {
+                    VibraPlayButton(
+                        isPlaying = false,
+                        isBuffering = false,
+                        onClick = onPlay,
+                        size = CoverPlaySize,
+                        containerColor = Color.White,
+                        contentColor = Color.Black,
+                        modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp),
+                    )
+                }
+            }
+        }
         Text(
             text = entry.title,
             style = if (big) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.titleSmall,
@@ -466,7 +520,7 @@ private fun LabeledCover(
             textAlign = TextAlign.Center,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(top = 6.dp, start = 4.dp, end = 4.dp),
+            modifier = Modifier.expansionElement(entry.title, "title").padding(top = 6.dp, start = 4.dp, end = 4.dp),
         )
         entry.subtitle?.takeIf { it.isNotBlank() }?.let {
             Text(
@@ -500,13 +554,13 @@ private fun CoverGrid(
             val side = if (constraints.hasBoundedHeight) minOf(maxWidth, maxHeight) else maxWidth
             VibraArtwork(
                 url = entry.thumbnailUrl,
-                shape = if (entry.circular) CircleShape else VibraShapes.InnerArtwork,
+                shape = if (entry.circular) CircleShape else concentricRoundedCornerShape(32.dp, 10.dp),
                 contentDescription = entry.title,
                 modifier =
                     Modifier
                         .size(side)
                         .entryTapBounce(entry)
-                        .clip(if (entry.circular) CircleShape else VibraShapes.InnerArtwork)
+                        .clip(if (entry.circular) CircleShape else concentricRoundedCornerShape(32.dp, 10.dp))
                         .combinedClickable(onClick = entry.onClick, onLongClick = entry.onLongClick),
             )
             return@BoxWithConstraints
@@ -519,18 +573,128 @@ private fun CoverGrid(
                     pair.forEach { entry ->
                         VibraArtwork(
                             url = entry.thumbnailUrl,
-                            shape = if (entry.circular) CircleShape else VibraShapes.RowThumbnail,
+                            shape = if (entry.circular) CircleShape else concentricRoundedCornerShape(32.dp, 10.dp),
                             contentDescription = entry.title,
                             modifier =
                                 Modifier
                                     .size(cell)
                                     .entryTapBounce(entry)
-                                    .clip(if (entry.circular) CircleShape else VibraShapes.RowThumbnail)
+                                    .clip(if (entry.circular) CircleShape else concentricRoundedCornerShape(32.dp, 10.dp))
                                     .combinedClickable(onClick = entry.onClick, onLongClick = entry.onLongClick),
                         )
                     }
                     if (pair.size == 1) Spacer(Modifier.size(cell))
                 }
+            }
+        }
+    }
+}
+
+// ── collection ─────────────────────────────────────────────────────────────────────
+
+/** Covers with their names, two per row; a long collection opens in place. */
+@Composable
+fun CollectionBlock(
+    entries: List<ShelfEntry>,
+    modifier: Modifier = Modifier,
+) {
+    if (entries.isEmpty()) return
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    val shown = if (expanded) entries else entries.take(CollectionPreview)
+    VibraCard(modifier = modifier.animateContentSize(Liquid.spatial())) {
+        Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            shown.chunked(2).forEach { pair ->
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    pair.forEach { CollectionTile(it, Modifier.weight(1f)) }
+                    if (pair.size == 1) Spacer(Modifier.weight(1f))
+                }
+            }
+        }
+        if (entries.size > CollectionPreview) {
+            BlockExpandToggle(expanded = expanded, count = entries.size, onToggle = { expanded = !expanded })
+        }
+    }
+}
+
+@Composable
+private fun CollectionTile(
+    entry: ShelfEntry,
+    modifier: Modifier = Modifier,
+) {
+    val tileShape = concentricRoundedCornerShape(32.dp, 10.dp)
+    VibraCard(
+        modifier = modifier.entryTapBounce(entry),
+        onClick = entry.onClick,
+        onLongClick = entry.onLongClick,
+        shape = tileShape,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+    ) {
+        Column(modifier = Modifier.padding(10.dp)) {
+            VibraArtwork(
+                url = entry.thumbnailUrl,
+                shape = if (entry.circular) CircleShape else insetRoundedShape(tileShape, 10.dp),
+                fallbackIcon = R.drawable.queue_music,
+                contentDescription = entry.title,
+                modifier = Modifier.fillMaxWidth().aspectRatio(1f),
+            )
+            Text(
+                text = entry.title,
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(top = 8.dp, start = 2.dp, end = 2.dp),
+            )
+            // Always one line, even when empty: tiles side by side keep the same height.
+            Text(
+                text = entry.subtitle.orEmpty(),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(horizontal = 2.dp),
+            )
+        }
+    }
+}
+
+/** The bottom of a block whose content opens in place: "Show all (n)" / "Show less". */
+@Composable
+fun BlockExpandToggle(
+    expanded: Boolean,
+    count: Int,
+    onToggle: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val turn by animateFloatAsState(if (expanded) 180f else 0f, Liquid.spatial(), label = "expandToggleTurn")
+    FilledTonalButton(
+        onClick = onToggle,
+        modifier = modifier.fillMaxWidth().padding(start = 10.dp, end = 10.dp, bottom = 12.dp),
+    ) {
+        Text(text = if (expanded) stringResource(R.string.vibra_show_less) else stringResource(R.string.vibra_show_all, count))
+        Spacer(Modifier.width(8.dp))
+        Icon(
+            painter = painterResource(R.drawable.expand_more),
+            contentDescription = null,
+            modifier = Modifier.size(20.dp).graphicsLayer { rotationZ = turn },
+        )
+    }
+}
+
+/** A row of covers that scrolls sideways (artists, which read best side by side). */
+@Composable
+fun CoverRowBlock(
+    entries: List<ShelfEntry>,
+    modifier: Modifier = Modifier,
+) {
+    if (entries.isEmpty()) return
+    VibraCard(modifier = modifier) {
+        LazyRow(
+            contentPadding = PaddingValues(14.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            items(entries, key = { it.key }) { entry ->
+                LabeledCover(entry, Modifier.width(CoverRowItemWidth), containerInset = 14.dp)
             }
         }
     }
@@ -561,10 +725,10 @@ fun SpotlightBlock(
                     .fillMaxWidth()
                     .aspectRatio(SpotlightAspect)
                     .entryTapBounce(lead)
-                    .clip(VibraShapes.InnerArtwork)
+                    .clip(concentricRoundedCornerShape(32.dp, 10.dp))
                     .combinedClickable(onClick = lead.onClick, onLongClick = lead.onLongClick),
         ) {
-            VibraArtwork(url = lead.thumbnailUrl, shape = VibraShapes.InnerArtwork, contentDescription = lead.title, modifier = Modifier.fillMaxSize())
+            VibraArtwork(url = lead.thumbnailUrl, shape = concentricRoundedCornerShape(32.dp, 10.dp), contentDescription = lead.title, modifier = Modifier.fillMaxSize())
             // The title sits on the cover: a dark fade at the bottom keeps it readable.
             Box(
                 Modifier
@@ -574,6 +738,7 @@ fun SpotlightBlock(
             Column(modifier = Modifier.align(Alignment.BottomStart).padding(16.dp)) {
                 Text(
                     text = lead.title,
+                    modifier = Modifier.expansionElement(lead.title, "title"),
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
                     color = Color.White,
@@ -598,7 +763,7 @@ fun SpotlightBlock(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 rest.forEach { entry ->
-                    val shape = if (entry.circular) CircleShape else VibraShapes.RowThumbnail
+                    val shape = if (entry.circular) CircleShape else concentricRoundedCornerShape(32.dp, 10.dp)
                     VibraArtwork(
                         url = entry.thumbnailUrl,
                         shape = shape,
@@ -676,7 +841,7 @@ fun CoverBlock(
                 textAlign = TextAlign.Center,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.expansionElement(entry.title, "title").fillMaxWidth(),
             )
         }
     }
@@ -718,7 +883,7 @@ fun PlaylistBlock(
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(top = 8.dp),
+                    modifier = Modifier.expansionElement(title, "title").padding(top = 8.dp),
                 )
             }
         } else {
@@ -732,6 +897,7 @@ fun PlaylistBlock(
                 Column(modifier = Modifier.weight(1f).padding(start = 10.dp)) {
                     Text(
                         text = title,
+                    modifier = Modifier.expansionElement(title, "title"),
                         style = MaterialTheme.typography.headlineSmall,
                         color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 1,
@@ -793,7 +959,7 @@ fun PlaylistsBlock(
                 modifier =
                     Modifier
                         .weight(1f)
-                        .clip(VibraShapes.InnerArtwork)
+                        .clip(concentricRoundedCornerShape(32.dp, 10.dp))
                         .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                         .combinedClickable(onClick = first.onClick, onLongClick = first.onLongClick)
                         .padding(12.dp),
@@ -802,7 +968,7 @@ fun PlaylistsBlock(
                 // Covers stay whole squares: an expressive shape would cut parts of them off.
                 VibraArtwork(
                     url = first.thumbnailUrl,
-                    shape = VibraShapes.InnerArtwork,
+                    shape = insetRoundedShape(concentricRoundedCornerShape(32.dp, 10.dp), 12.dp),
                     fallbackIcon = R.drawable.queue_music,
                     modifier = Modifier.fillMaxWidth().aspectRatio(1f),
                 )
@@ -823,7 +989,7 @@ fun PlaylistsBlock(
                             line.forEach { entry ->
                                 VibraArtwork(
                                     url = entry.thumbnailUrl,
-                                    shape = VibraShapes.RowThumbnail,
+                                    shape = concentricRoundedCornerShape(32.dp, 10.dp),
                                     fallbackIcon = R.drawable.queue_music,
                                     contentDescription = entry.title,
                                     modifier =
@@ -831,7 +997,7 @@ fun PlaylistsBlock(
                                             .weight(1f)
                                             .aspectRatio(1f)
                                             .entryTapBounce(entry)
-                                            .clip(VibraShapes.RowThumbnail)
+                                            .clip(concentricRoundedCornerShape(32.dp, 10.dp))
                                             .combinedClickable(onClick = entry.onClick, onLongClick = entry.onLongClick),
                                 )
                             }
@@ -938,3 +1104,7 @@ private const val SpotlightAspect = 1.25f
 
 /** Covers in the spotlight's strip. */
 private const val SpotlightStrip = 4
+
+private val CoverPlaySize = 46.dp
+private val CoverRowItemWidth = 84.dp
+private const val CollectionPreview = 4

@@ -7,12 +7,14 @@
 
 package moe.rukamori.archivetune.ui.component
 
+// Vibra: independent radii follow the global rounding style.
+import app.vibra.ui.theme.adaptiveRoundedCornerShape
+
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import app.vibra.ui.motion.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -52,7 +54,7 @@ fun Material3SettingsGroup(
                 Modifier
                     .fillMaxWidth()
                     .animateContentSize(),
-            shape = RoundedCornerShape(24.dp),
+            shape = adaptiveRoundedCornerShape(24.dp),
             colors =
                 CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
@@ -64,6 +66,8 @@ fun Material3SettingsGroup(
                     Material3SettingsItemRow(
                         item = item,
                         showDivider = index < items.size - 1,
+                        index = index,
+                        count = items.size,
                     )
                 }
             }
@@ -78,18 +82,25 @@ fun Material3SettingsGroup(
 private fun Material3SettingsItemRow(
     item: Material3SettingsItem,
     showDivider: Boolean,
+    index: Int,
+    count: Int,
 ) {
     Column {
         Row(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(adaptiveRoundedCornerShape(
+                        topStart = if (index == 0) 24.dp else 6.dp,
+                        topEnd = if (index == 0) 24.dp else 6.dp,
+                        bottomStart = if (index == count - 1) 24.dp else 6.dp,
+                        bottomEnd = if (index == count - 1) 24.dp else 6.dp,
+                    ))
                     .then(if (item.onClick != null) Modifier.focusable() else Modifier)
                     .clickable(
                         enabled = item.onClick != null,
                         onClick = { item.onClick?.invoke() },
-                    ).padding(horizontal = 20.dp, vertical = 16.dp),
+                    ).padding(start = 16.dp, end = 20.dp, top = 16.dp, bottom = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             // Icon with background
@@ -98,7 +109,7 @@ private fun Material3SettingsItemRow(
                     modifier =
                         Modifier
                             .size(40.dp)
-                            .clip(RoundedCornerShape(12.dp))
+                            .clip(app.vibra.ui.theme.concentricRoundedCornerShape(24.dp, 16.dp))
                             .background(
                                 MaterialTheme.colorScheme.primary.copy(
                                     alpha = if (item.isHighlighted) 0.15f else 0.1f,

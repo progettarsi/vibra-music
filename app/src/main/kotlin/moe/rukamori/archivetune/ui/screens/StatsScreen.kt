@@ -7,11 +7,15 @@
 
 package moe.rukamori.archivetune.ui.screens
 
+// Vibra: independent radii follow the global rounding style.
+import app.vibra.ui.theme.adaptiveRoundedCornerShape
+
 import android.graphics.Color as AndroidColor
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import app.vibra.ui.components.VibraLoadingIndicator
 import app.vibra.ui.motion.clickable
 import app.vibra.ui.motion.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -37,7 +41,6 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import app.vibra.ui.components.VibraAlertDialog as AlertDialog
 import app.vibra.ui.motion.VibraButton as Button
 import androidx.compose.material3.CardDefaults
@@ -49,7 +52,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LargeFlexibleTopAppBar
 import androidx.compose.material3.ListItemDefaults
-import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedListItem
@@ -630,7 +632,7 @@ private fun StatsStatusScreen(
             contentAlignment = Alignment.Center,
         ) {
             if (loading) {
-                LoadingIndicator(modifier = Modifier.size(48.dp))
+                VibraLoadingIndicator(modifier = Modifier.size(48.dp))
             } else {
                 Column(
                     modifier = Modifier.widthIn(max = 420.dp),
@@ -926,7 +928,7 @@ private fun StatsYearPickerDialog(
                         text = year.toString(),
                         modifier =
                             Modifier
-                                .clip(RoundedCornerShape(18.dp))
+                                .clip(adaptiveRoundedCornerShape(18.dp))
                                 .background(
                                     if (isSelected) {
                                         MaterialTheme.colorScheme.primary
@@ -1419,7 +1421,7 @@ private fun ListeningByDayChart(
                                     Modifier
                                         .width(24.dp)
                                         .height((80 * animatedFraction).dp.coerceAtLeast(2.dp))
-                                        .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp))
+                                        .clip(adaptiveRoundedCornerShape(topStart = 4.dp, topEnd = 4.dp))
                                         .background(barColor),
                             )
                         }
@@ -1512,7 +1514,7 @@ private fun ListeningByHourChart(
                                 Modifier
                                     .fillMaxWidth()
                                     .height((48 * animatedFraction).dp.coerceAtLeast(2.dp))
-                                    .clip(RoundedCornerShape(topStart = 2.dp, topEnd = 2.dp))
+                                    .clip(adaptiveRoundedCornerShape(topStart = 2.dp, topEnd = 2.dp))
                                     .background(barColor),
                         )
                     }

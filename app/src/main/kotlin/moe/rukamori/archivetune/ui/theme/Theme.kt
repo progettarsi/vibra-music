@@ -21,6 +21,10 @@ import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialExpressiveTheme
 import androidx.compose.material3.MotionScheme
+import app.vibra.ui.theme.*
+import androidx.compose.ui.platform.LocalDensity
+import moe.rukamori.archivetune.utils.rememberEnumPreference
+import androidx.compose.runtime.getValue
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
@@ -173,26 +177,14 @@ fun ArchiveTuneTheme(
             )
         }
 
-    val expressiveShapes =
-        remember {
-            Shapes(
-                extraSmall =
-                    androidx.compose.foundation.shape
-                        .RoundedCornerShape(8.dp),
-                small =
-                    androidx.compose.foundation.shape
-                        .RoundedCornerShape(12.dp),
-                medium =
-                    androidx.compose.foundation.shape
-                        .RoundedCornerShape(16.dp),
-                large =
-                    androidx.compose.foundation.shape
-                        .RoundedCornerShape(24.dp),
-                extraLarge =
-                    androidx.compose.foundation.shape
-                        .RoundedCornerShape(32.dp),
-            )
-        }
+    // Vibra: one resolved style for Material and custom components; physical window corners stay separate.
+    val roundingMode by rememberEnumPreference(RoundingModeKey, RoundingMode.AUTOMATIC)
+    val deviceCorners = rememberDeviceCorners()
+    val density = LocalDensity.current.density
+    val radii = remember(roundingMode, deviceCorners.displayRadiiPx, density) {
+        resolveVibraRadii(roundingMode, deviceCorners.displayRadiiPx, density)
+    }
+    val expressiveShapes = remember(radii) { radii.materialShapes() }
 
     CompositionLocalProvider(
         LocalArchiveTuneFontPreference provides fontPreference,

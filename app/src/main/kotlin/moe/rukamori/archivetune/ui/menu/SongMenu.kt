@@ -22,7 +22,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
@@ -61,6 +60,7 @@ import androidx.media3.exoplayer.offline.DownloadRequest
 import androidx.media3.exoplayer.offline.DownloadService
 import androidx.navigation.NavController
 import app.vibra.ui.components.*
+import app.vibra.ui.components.VibraLoadingIndicator
 import coil3.compose.AsyncImage
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -474,7 +474,7 @@ fun SongMenu(
         Download.STATE_DOWNLOADING -> {
           NewAction(
             id = MenuActionId.Download,
-            icon = { CircularWavyProgressIndicator(modifier = Modifier.size(24.dp)) },
+            icon = { VibraLoadingIndicator(modifier = Modifier.size(24.dp)) },
             text = stringResource(R.string.downloading),
             onClick = {
               DownloadService.sendRemoveDownload(
@@ -545,18 +545,7 @@ fun SongMenu(
             onClick = {
               coroutineScope.launch(Dispatchers.IO) {
                 try {
-                  val requestedSong =
-                    database.withTransaction {
-                      val currentSong =
-                        getSongById(song.id)
-                          ?: run {
-                            insert(song.toMediaMetadata())
-                            getSongById(song.id)
-                          }
-                          ?: return@withTransaction null
-                      currentSong.song.toggleLike()
-                    } ?: return@launch
-                  syncUtils.likeSong(requestedSong).onFailure { error ->
+                  syncUtils.libraryActions.changeSong(song.id, song.toMediaMetadata()) { it.toggleLike() }.onFailure { error ->
                     Timber.w(error, "Failed to update liked song ${song.id}")
                     withContext(Dispatchers.Main) {
                       Toast.makeText(context, R.string.error_unknown, Toast.LENGTH_SHORT).show()
@@ -763,28 +752,9 @@ fun SongMenu(
               Modifier.clickable {
                 val map = playlistSong.map
                 coroutineScope.launch(Dispatchers.IO) {
-                  val browseId = playlistBrowseId
-                  if (browseId != null) {
-                    val remoteResult = removeSongFromRemotePlaylist(browseId, map)
-                    if (remoteResult.isFailure) {
-                      withContext(Dispatchers.Main) {
-                        Toast.makeText(
-                            context,
-                            context.getString(R.string.error_unknown),
-                            Toast.LENGTH_SHORT,
-                          )
-                          .show()
-                        onDismiss()
-                      }
-                      return@launch
-                    }
-                  }
-                  database.withTransaction {
-                    val maxPosition = maxPlaylistSongPosition(map.playlistId) ?: map.position
-                    if (map.position < maxPosition) {
-                      move(map.playlistId, map.position, maxPosition)
-                    }
-                    delete(map)
+                  val result = syncUtils.libraryActions.removePlaylistSongs(map.playlistId, entryIds = setOf(map.id))
+                  withContext(Dispatchers.Main) {
+                    if (result.isFailure) Toast.makeText(context, R.string.error_unknown, Toast.LENGTH_SHORT).show()
                   }
                   withContext(Dispatchers.Main) { onDismiss() }
                 }

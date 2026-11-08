@@ -9,6 +9,9 @@
 
 package moe.rukamori.archivetune.ui.component
 
+// Vibra: independent radii follow the global rounding style.
+import app.vibra.ui.theme.adaptiveRoundedCornerShape
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -21,12 +24,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -39,6 +40,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import app.vibra.ui.components.VibraDialogButton
+import app.vibra.ui.components.VibraLoadingIndicator
 import moe.rukamori.archivetune.R
 import moe.rukamori.archivetune.viewmodels.PlaylistTagUiModel
 import moe.rukamori.archivetune.viewmodels.PlaylistTagsScreenState
@@ -90,7 +92,7 @@ fun PlaylistTagOrderDialog(
             )
             when (state) {
                 PlaylistTagsScreenState.Loading -> {
-                    LoadingIndicator(modifier = Modifier.padding(32.dp))
+                    VibraLoadingIndicator(modifier = Modifier.padding(32.dp))
                 }
 
                 PlaylistTagsScreenState.Empty -> {
@@ -128,7 +130,7 @@ fun PlaylistTagOrderDialog(
                                     modifier =
                                         Modifier
                                             .fillMaxWidth()
-                                            .clip(RoundedCornerShape(8.dp))
+                                            .clip(adaptiveRoundedCornerShape(8.dp))
                                             .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                                             .padding(horizontal = 12.dp, vertical = 10.dp),
                                     verticalAlignment = Alignment.CenterVertically,

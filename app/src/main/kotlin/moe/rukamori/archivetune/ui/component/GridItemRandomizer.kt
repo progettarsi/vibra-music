@@ -7,17 +7,18 @@
 
 package moe.rukamori.archivetune.ui.component
 
+// Vibra: independent radii follow the global rounding style.
+
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import app.vibra.ui.components.VibraLoadingIndicator
 import app.vibra.ui.motion.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -51,7 +52,7 @@ fun RandomizeGridItem(
         modifier =
             modifier
                 .aspectRatio(1f)
-                .clip(RoundedCornerShape(ThumbnailCornerRadius))
+                .clip(app.vibra.ui.theme.VibraShapes.RowThumbnail)
                 .background(MaterialTheme.colorScheme.secondaryContainer)
                 .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
@@ -106,7 +107,7 @@ fun RandomizeGridItem(
         )
 
         Box(modifier = Modifier.alpha(loadingAlpha)) {
-            CircularWavyProgressIndicator(
+            VibraLoadingIndicator(
                 modifier = Modifier.size(48.dp),
                 color = MaterialTheme.colorScheme.onSecondaryContainer,
             )

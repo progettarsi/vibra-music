@@ -7,10 +7,12 @@
 
 package moe.rukamori.archivetune.ui.player
 
+// Vibra: independent radii follow the global rounding style.
+import app.vibra.ui.theme.adaptiveRoundedCornerShape
+
 import android.text.format.DateFormat
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -169,7 +171,7 @@ fun SleepTimerPanel(
               role = Role.RadioButton
               this.selected = selected
             },
-          shape = if (selected) RoundedCornerShape(12.dp) else CircleShape,
+          shape = if (selected) adaptiveRoundedCornerShape(12.dp) else CircleShape,
           color = if (selected) colors.primaryContainer else colors.surfaceContainerHighest,
           contentColor = if (selected) colors.onPrimaryContainer else colors.onSurface,
         ) {

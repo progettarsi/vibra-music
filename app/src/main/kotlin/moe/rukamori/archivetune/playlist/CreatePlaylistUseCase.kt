@@ -47,24 +47,7 @@ class CreatePlaylistUseCase
             val normalizedName = name.trim()
             require(normalizedName.isNotEmpty())
 
-            val browseId =
-                if (syncRequested) {
-                    repository
-                        .createRemotePlaylist(normalizedName)
-                        .onFailure { error ->
-                            if (error is CancellationException) throw error
-                            Timber.w(error, "Remote playlist creation failed; creating a local playlist")
-                        }.getOrNull()
-                } else {
-                    null
-                }
-
-            val playlistId =
-                repository.createLocalPlaylist(
-                    name = normalizedName,
-                    browseId = browseId,
-                    coverStyle = coverStyle,
-                )
+            val playlistId = repository.createPlaylist(normalizedName, syncRequested, coverStyle)
             // The playlist exists either way; an image that cannot be read only leaves the default cover.
             if (coverUri != null) {
                 try {

@@ -5,6 +5,10 @@
 
 package app.vibra.ui.onboarding
 
+import app.vibra.ui.components.VibraLoadingIndicator
+// Vibra: independent radii follow the global rounding style.
+import app.vibra.ui.theme.adaptiveRoundedCornerShape
+
 import app.vibra.ui.motion.ambientMotionAllowed
 import android.Manifest
 import android.content.pm.PackageManager
@@ -44,7 +48,6 @@ import app.vibra.ui.motion.clickable
 import app.vibra.ui.motion.interactiveSurface
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -68,7 +71,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -724,7 +726,7 @@ private fun ConnectionRow(
             Modifier
                 .fillMaxWidth()
                 .liquidPress(interaction, pressedScale = 0.97f)
-                .clip(RoundedCornerShape(28.dp))
+                .clip(adaptiveRoundedCornerShape(28.dp))
                 .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                 .clickable(
                     interactionSource = interaction,
@@ -755,7 +757,7 @@ private fun ConnectionRow(
             label = "connection",
         ) { shown ->
             when (shown) {
-                ConnectionStatus.Loading -> LoadingIndicator(modifier = Modifier.size(36.dp))
+                ConnectionStatus.Loading -> VibraLoadingIndicator(modifier = Modifier.size(36.dp))
                 ConnectionStatus.Connected ->
                     Box(
                         modifier =
@@ -797,7 +799,7 @@ private fun AnimatedVisibilityScope.ArtistsScene(
     when {
         state.loadingAccount ->
             Column(Modifier.fillMaxWidth().padding(top = 48.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                LoadingIndicator(modifier = Modifier.size(64.dp))
+                VibraLoadingIndicator(modifier = Modifier.size(64.dp))
                 Text(stringResource(R.string.vibra_onb_account_loading), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 12.dp))
             }
 

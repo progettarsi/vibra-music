@@ -7,6 +7,9 @@
 
 package moe.rukamori.archivetune.ui.component
 
+// Vibra: independent radii follow the global rounding style.
+import app.vibra.ui.theme.adaptiveRoundedCornerShape
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -18,7 +21,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.CloudOff
@@ -93,7 +95,7 @@ fun NetworkStatusBanner(
         label = "networkStatusBanner",
     ) {
         Surface(
-            shape = RoundedCornerShape(14.dp),
+            shape = adaptiveRoundedCornerShape(14.dp),
             color = visuals.containerColor,
             contentColor = visuals.contentColor,
             shadowElevation = 8.dp,

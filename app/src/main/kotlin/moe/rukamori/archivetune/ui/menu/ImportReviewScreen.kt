@@ -9,6 +9,7 @@
 
 package moe.rukamori.archivetune.ui.menu
 
+import app.vibra.ui.components.VibraLoadingIndicator
 import app.vibra.ui.motion.vibraControlFeedback
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
@@ -29,10 +30,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import app.vibra.ui.motion.VibraButton as Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Icon
 import app.vibra.ui.motion.VibraIconButton as IconButton
 import androidx.compose.material3.MaterialTheme
@@ -469,9 +470,9 @@ internal fun SearchButtonContent(
     text: String,
 ) {
     if (loading) {
-        CircularProgressIndicator(
+        VibraLoadingIndicator(
             modifier = Modifier.size(16.dp),
-            strokeWidth = 2.dp,
+            color = LocalContentColor.current,
         )
         Spacer(Modifier.width(8.dp))
     }

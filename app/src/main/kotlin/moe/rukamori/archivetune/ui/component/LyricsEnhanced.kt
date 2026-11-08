@@ -13,12 +13,17 @@
 
 package moe.rukamori.archivetune.ui.component
 
+// Vibra: independent radii follow the global rounding style.
+import app.vibra.ui.theme.adaptiveRoundedCornerShape
+
 import android.app.Activity
 import android.os.SystemClock
 import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
@@ -41,8 +46,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import app.vibra.ui.components.VibraBasicAlertDialog as BasicAlertDialog
 import app.vibra.ui.motion.VibraButton as Button
 import androidx.compose.material3.ButtonDefaults
@@ -68,6 +73,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -77,6 +83,8 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.invisibleToUser
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -90,8 +98,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.media3.common.Player
 import app.vibra.ui.components.VibraBottomSheet
+import app.vibra.ui.lyrics.LyricsEntrance
 import app.vibra.ui.lyrics.VibraLyricsList
-import app.vibra.ui.lyrics.VibraLyricsLoader
+import app.vibra.ui.lyrics.VibraLyricsSkeleton
+import app.vibra.ui.lyrics.rememberLyricsEntrance
 import app.vibra.ui.motion.Liquid
 import app.vibra.ui.motion.LiquidSpeed
 import com.mocharealm.accompanist.lyrics.core.model.ISyncedLine
@@ -101,7 +111,9 @@ import com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeLine
 import com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeSyllable
 import com.mocharealm.accompanist.lyrics.core.model.synced.SyncedLine
 import kotlin.math.roundToInt
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
+import moe.rukamori.archivetune.LocalAnimationsDisabled
 import moe.rukamori.archivetune.LocalPlayerConnection
 import moe.rukamori.archivetune.R
 import moe.rukamori.archivetune.constants.PlayerBackgroundStyle
@@ -130,6 +142,7 @@ fun LyricsEnhanced(
     textColorOverride: Color? = null,
     lyricsLineBlurOverride: Boolean? = null,
     lyricsRenderViewModel: LyricsRenderViewModel = hiltViewModel(),
+    paneActive: Boolean = true,
 ) {
     val playerConnection = LocalPlayerConnection.current ?: return
     val player = playerConnection.player
@@ -409,6 +422,10 @@ fun LyricsEnhanced(
             !isSynced -> LyricsView.Plain(plainLyrics, lyricsSessionKey)
             else -> LyricsView.Synced(syncedLyrics, lyricsSessionKey, lyricsLayoutDirection)
         }
+    val loading = lyricsView == LyricsView.Loading
+    val hasLyrics = lyricsView is LyricsView.Plain || lyricsView is LyricsView.Synced
+    val entrance = rememberLyricsEntrance(mediaMetadata?.id, paneActive, loading, hasLyrics)
+    val animationsDisabled = LocalAnimationsDisabled.current
     val viewEnter = Liquid.effects<Float>(LiquidSpeed.Slow)
     val viewExit = Liquid.effects<Float>(LiquidSpeed.Fast)
 
@@ -421,14 +438,23 @@ fun LyricsEnhanced(
     ) {
         AnimatedContent(
             targetState = lyricsView,
-            transitionSpec = { fadeIn(viewEnter) togetherWith fadeOut(viewExit) using null },
+            transitionSpec = {
+                // Vibra: the skeleton and the first visible verses own this handoff.
+                val transition =
+                    if (initialState == LyricsView.Loading || animationsDisabled) {
+                        EnterTransition.None togetherWith ExitTransition.None
+                    } else {
+                        fadeIn(viewEnter) togetherWith fadeOut(viewExit)
+                    }
+                transition using null
+            },
             contentKey = { view -> view.key },
             contentAlignment = Alignment.Center,
             label = "lyricsView",
             modifier = Modifier.fillMaxSize(),
         ) { view ->
             when (view) {
-                LyricsView.Loading -> VibraLyricsLoader(color = textColor, modifier = Modifier.fillMaxSize())
+                LyricsView.Loading -> Unit
 
                 LyricsView.Missing -> LyricsMissing(textColor = textColor)
 
@@ -453,6 +479,7 @@ fun LyricsEnhanced(
                             }
                         },
                         modifier = Modifier.fillMaxSize(),
+                        entrance = entrance.takeIf { view.key == lyricsView.key },
                     )
                 }
 
@@ -491,11 +518,15 @@ fun LyricsEnhanced(
                                 accompanimentStyle = accompanimentTextStyle,
                                 showTranslation = showTranslations,
                                 modifier = Modifier.fillMaxSize(),
+                                entrance = entrance.takeIf { view.key == lyricsView.key },
                             )
                         }
                     }
                 }
             }
+        }
+        if (entrance.shown && (loading || hasLyrics)) {
+            VibraLyricsSkeleton(entrance, textColor, normalTextStyle.fontSize, loading)
         }
     }
 
@@ -513,7 +544,7 @@ fun LyricsEnhanced(
         val (lyricsText, songTitle, artists) = shareDialogData!!
         BasicAlertDialog(onDismissRequest = { showShareDialog = false }) {
             Card(
-                shape = RoundedCornerShape(28.dp),
+                shape = adaptiveRoundedCornerShape(28.dp),
                 elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 modifier =
@@ -682,7 +713,16 @@ private fun PlainLyricsView(
     onLineClicked: (String) -> Unit,
     onLinePressed: (String) -> Unit,
     modifier: Modifier = Modifier,
+    entrance: LyricsEntrance? = null,
 ) {
+    val reveal = entrance?.takeIf { it.shouldReveal }
+    val waitingForRows = reveal != null && reveal.rowRanks == null
+    LaunchedEffect(reveal, listState) {
+        if (reveal != null && reveal.rowRanks == null) {
+            val layout = snapshotFlow { listState.layoutInfo }.first { it.visibleItemsInfo.isNotEmpty() }
+            reveal.onPlaced(layout)
+        }
+    }
     val contentPadding =
         remember {
             PaddingValues(
@@ -695,15 +735,16 @@ private fun PlainLyricsView(
 
     LazyColumn(
         state = listState,
-        modifier = modifier,
+        modifier = modifier.semantics { if (waitingForRows) invisibleToUser() },
+        userScrollEnabled = !waitingForRows,
         contentPadding = contentPadding,
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        items(
+        itemsIndexed(
             items = lines.items,
-            key = { line -> line.itemId },
-            contentType = { "plain_lyric_line" },
-        ) { line ->
+            key = { _, line -> line.itemId },
+            contentType = { _, _ -> "plain_lyric_line" },
+        ) { index, line ->
             PlainLyricLineItem(
                 line = line,
                 selected = line.selectionId in selectedLineKeys,
@@ -711,6 +752,8 @@ private fun PlainLyricsView(
                 textStyle = textStyle,
                 onLineClicked = onLineClicked,
                 onLinePressed = onLinePressed,
+                modifier = reveal?.rowModifier(index) ?: Modifier,
+                enabled = !waitingForRows,
             )
         }
     }
@@ -724,6 +767,8 @@ private fun PlainLyricLineItem(
     textStyle: TextStyle,
     onLineClicked: (String) -> Unit,
     onLinePressed: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
 ) {
     val contentColor =
         if (selected) {
@@ -737,10 +782,11 @@ private fun PlainLyricLineItem(
         style = textStyle,
         color = contentColor,
         modifier =
-            Modifier
+            modifier
                 .fillMaxWidth()
                 .heightIn(min = 48.dp)
                 .combinedClickable(
+                    enabled = enabled,
                     onClick = { onLineClicked(line.selectionId) },
                     onLongClick = { onLinePressed(line.selectionId) },
                 ).padding(horizontal = 12.dp, vertical = 8.dp),

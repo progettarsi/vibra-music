@@ -9,7 +9,11 @@
 
 package moe.rukamori.archivetune.ui.screens.playlist
 
+// Vibra: independent radii follow the global rounding style.
+import app.vibra.ui.theme.adaptiveRoundedCornerShape
+
 import androidx.compose.foundation.background
+import app.vibra.ui.components.VibraLoadingIndicator
 import app.vibra.ui.motion.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -25,7 +29,6 @@ import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -195,7 +198,7 @@ private fun SpotifyLikedSongsContent(
                             contentAlignment = Alignment.Center,
                             modifier = Modifier.fillMaxWidth().height(160.dp),
                         ) {
-                            CircularWavyProgressIndicator()
+                            VibraLoadingIndicator()
                         }
                     }
                 }
@@ -302,7 +305,7 @@ private fun SpotifyLikedSongListItem(
                 thumbnailUrl = song.thumbnailUrl,
                 isActive = false,
                 isPlaying = false,
-                shape = androidx.compose.foundation.shape.RoundedCornerShape(ThumbnailCornerRadius),
+                shape = app.vibra.ui.theme.VibraShapes.RowThumbnail,
                 placeholderIconRes = R.drawable.music_note,
                 modifier = Modifier.size(ListThumbnailSize),
             )

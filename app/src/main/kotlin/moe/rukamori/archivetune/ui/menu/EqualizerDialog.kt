@@ -37,7 +37,6 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItemDefaults
-import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedListItem
 import androidx.compose.material3.SnackbarHost
@@ -65,6 +64,7 @@ import app.vibra.ui.components.*
 import app.vibra.ui.components.VibraAlertDialog as AlertDialog
 import app.vibra.ui.components.VibraDialogButton
 import app.vibra.ui.components.VibraFieldShape
+import app.vibra.ui.components.VibraLoadingIndicator
 import app.vibra.ui.components.vibraTextFieldColors
 import app.vibra.ui.motion.VibraIconButton as IconButton
 import app.vibra.ui.motion.VibraOutlinedButton as OutlinedButton
@@ -228,7 +228,7 @@ private fun EqualizerScreen(
       EqualizerScreenState.Loading ->
         MenuCard {
           Box(Modifier.fillMaxWidth().height(180.dp), contentAlignment = Alignment.Center) {
-            LoadingIndicator()
+            VibraLoadingIndicator()
           }
         }
       else ->

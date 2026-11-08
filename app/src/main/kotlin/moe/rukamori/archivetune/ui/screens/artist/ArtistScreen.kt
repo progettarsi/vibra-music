@@ -9,6 +9,9 @@
 
 package moe.rukamori.archivetune.ui.screens.artist
 
+// Vibra: independent radii follow the global rounding style.
+import app.vibra.ui.theme.adaptiveRoundedCornerShape
+
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -41,7 +44,6 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -98,6 +100,7 @@ import com.valentinilk.shimmer.shimmer
 import java.util.Locale
 import kotlinx.coroutines.flow.collect
 import moe.rukamori.archivetune.LocalDatabase
+import moe.rukamori.archivetune.LocalSyncUtils
 import moe.rukamori.archivetune.LocalPlayerAwareWindowInsets
 import moe.rukamori.archivetune.LocalPlayerConnection
 import moe.rukamori.archivetune.R
@@ -143,6 +146,7 @@ fun ArtistScreen(
 ) {
     val context = LocalContext.current
     val database = LocalDatabase.current
+    val libraryActions = LocalSyncUtils.current.libraryActions
     val menuState = LocalMenuState.current
     val haptic = LocalHapticFeedback.current
     val coroutineScope = rememberCoroutineScope()
@@ -563,23 +567,15 @@ fun ArtistScreen(
                                     }
                                 },
                                 onToggleSubscription = {
-                                    database.transaction {
-                                        val artist = libraryArtist?.artist
-                                        if (artist != null) {
-                                            update(artist.toggleLike())
-                                        } else {
-                                            artistPage?.artist?.let { remoteArtist ->
-                                                insert(
-                                                    ArtistEntity(
-                                                        id = remoteArtist.id,
-                                                        name = remoteArtist.title,
-                                                        channelId = remoteArtist.channelId,
-                                                        thumbnailUrl = remoteArtist.thumbnail,
-                                                    ).toggleLike(),
-                                                )
-                                            }
-                                        }
+                                    val artist = libraryArtist?.artist ?: artistPage?.artist?.let { remoteArtist ->
+                                        ArtistEntity(
+                                            id = remoteArtist.id,
+                                            name = remoteArtist.title,
+                                            channelId = remoteArtist.channelId,
+                                            thumbnailUrl = remoteArtist.thumbnail,
+                                        )
                                     }
+                                    artist?.let(libraryActions::toggleArtist)
                                 },
                                 onMore = showArtistOverflowMenu,
                                 modifier = Modifier.padding(top = 12.dp),
@@ -904,14 +900,14 @@ private fun ArtistNewReleaseSection(
                         modifier =
                             Modifier
                                 .size(ArtistReleaseArtworkSize)
-                                .clip(RoundedCornerShape(10.dp)),
+                                .clip(adaptiveRoundedCornerShape(10.dp)),
                     )
                 } else {
                     Box(
                         modifier =
                             Modifier
                                 .size(ArtistReleaseArtworkSize)
-                                .clip(RoundedCornerShape(10.dp))
+                                .clip(adaptiveRoundedCornerShape(10.dp))
                                 .background(MaterialTheme.colorScheme.surfaceContainerHigh),
                         contentAlignment = Alignment.Center,
                     ) {

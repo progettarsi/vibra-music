@@ -9,7 +9,11 @@
 
 package moe.rukamori.archivetune.ui.component
 
+// Vibra: independent radii follow the global rounding style.
+import app.vibra.ui.theme.adaptiveRoundedCornerShape
+
 import android.widget.Toast
+import app.vibra.ui.motion.expansionElement
 import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
@@ -45,7 +49,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -294,7 +297,7 @@ fun GridItem(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             textAlign = TextAlign.Start,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.expansionElement(title, "title").fillMaxWidth(),
         )
     },
     subtitle = {
@@ -384,7 +387,7 @@ fun SongListItem(
                     isSelected = isSelected,
                     isActive = isActive,
                     isPlaying = isPlaying,
-                    shape = RoundedCornerShape(ThumbnailCornerRadius),
+                    shape = app.vibra.ui.theme.VibraShapes.RowThumbnail,
                     placeholderIconRes = if (showSongIconPlaceholder) R.drawable.music_note else null,
                     maxSizePx = 200,
                     modifier = Modifier.size(ListThumbnailSize),
@@ -441,7 +444,7 @@ fun SongGridItem(
             fontWeight = FontWeight.Bold,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.basicMarquee().fillMaxWidth(),
+            modifier = Modifier.expansionElement(song.song.title, "title").basicMarquee().fillMaxWidth(),
         )
     },
     subtitle = {
@@ -463,7 +466,7 @@ fun SongGridItem(
             thumbnailUrl = song.song.thumbnailUrl,
             isActive = isActive,
             isPlaying = isPlaying,
-            shape = RoundedCornerShape(GridThumbnailCornerRadius),
+            shape = adaptiveRoundedCornerShape(GridThumbnailCornerRadius),
             modifier = Modifier.size(GridThumbnailHeight),
         )
         if (!isActive) {
@@ -611,7 +614,7 @@ fun AlbumListItem(
             thumbnailUrl = album.album.thumbnailUrl,
             isActive = isActive,
             isPlaying = isPlaying,
-            shape = RoundedCornerShape(ThumbnailCornerRadius),
+            shape = app.vibra.ui.theme.VibraShapes.RowThumbnail,
             maxSizePx = 200,
             modifier = Modifier.size(ListThumbnailSize),
         )
@@ -676,7 +679,7 @@ fun AlbumGridItem(
             fontWeight = FontWeight.Bold,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.basicMarquee().fillMaxWidth(),
+            modifier = Modifier.expansionElement(album.album.title, "title").basicMarquee().fillMaxWidth(),
         )
     },
     subtitle = {
@@ -697,7 +700,7 @@ fun AlbumGridItem(
             thumbnailUrl = album.album.thumbnailUrl,
             isActive = isActive,
             isPlaying = isPlaying,
-            shape = RoundedCornerShape(GridThumbnailCornerRadius),
+            shape = adaptiveRoundedCornerShape(GridThumbnailCornerRadius),
             maxSizePx = 544,
         )
 
@@ -785,7 +788,7 @@ fun PlaylistGridItem(
             fontWeight = FontWeight.Bold,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.basicMarquee().fillMaxWidth(),
+            modifier = Modifier.expansionElement(playlist.playlist.name, "title").basicMarquee().fillMaxWidth(),
         )
     },
     subtitle = {
@@ -841,7 +844,7 @@ fun PlaylistGridItem(
                     )
                 }
             },
-            shape = RoundedCornerShape(GridThumbnailCornerRadius),
+            shape = adaptiveRoundedCornerShape(GridThumbnailCornerRadius),
         )
     },
     fillMaxWidth = fillMaxWidth,
@@ -890,7 +893,7 @@ fun LibraryPinnedCollectionTile(
     accentColor: Color = MaterialTheme.colorScheme.primary,
 ) {
     Card(
-        shape = RoundedCornerShape(24.dp),
+        shape = adaptiveRoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
         modifier = modifier,
     ) {
@@ -930,6 +933,7 @@ fun LibraryPinnedCollectionTile(
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
                         text = title,
+            modifier = Modifier.expansionElement(title, "title"),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         maxLines = 1,
@@ -959,13 +963,13 @@ private const val LibraryCardGlowSpotAlpha = 0.96f
 fun LibraryPlaylistFeatureCard(
     playlist: Playlist,
     modifier: Modifier = Modifier,
-    shape: Shape = RoundedCornerShape(26.dp),
+    shape: Shape = adaptiveRoundedCornerShape(26.dp),
     autoPlaylist: Boolean = false,
     trailingContent: @Composable RowScope.() -> Unit = {},
 ) {
     val subtitleText = playlistCountText(playlist = playlist, autoPlaylist = autoPlaylist)
     val thumbnailSize = LibraryCardThumbnailSize
-    val thumbnailShape = RoundedCornerShape(18.dp)
+    val thumbnailShape = app.vibra.ui.theme.insetRoundedShape(shape, 12.dp)
     val context = LocalContext.current
     val primaryThumbnailUrl = playlist.thumbnails.getOrNull(0)
     var extractedGlowColor by remember(primaryThumbnailUrl) { mutableStateOf(Color.Transparent) }
@@ -1036,6 +1040,7 @@ fun LibraryPlaylistFeatureCard(
             ) {
                 Text(
                     text = playlist.playlist.name,
+            modifier = Modifier.expansionElement(playlist.playlist.name, "title"),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     maxLines = 2,
@@ -1064,7 +1069,7 @@ fun LibraryPlaylistFeatureCard(
 fun LibraryAlbumSpotlightCard(
     album: Album,
     modifier: Modifier = Modifier,
-    shape: Shape = RoundedCornerShape(26.dp),
+    shape: Shape = adaptiveRoundedCornerShape(26.dp),
     isActive: Boolean = false,
     isPlaying: Boolean = false,
     onPlay: (() -> Unit)? = null,
@@ -1126,7 +1131,7 @@ fun LibraryAlbumSpotlightCard(
                         .size(LibraryCardThumbnailSize)
                         .shadow(
                             elevation = LibraryCardGlowElevation,
-                            shape = RoundedCornerShape(18.dp),
+                            shape = app.vibra.ui.theme.insetRoundedShape(shape, 12.dp),
                             clip = false,
                             ambientColor = glowColor.copy(alpha = LibraryCardGlowAmbientAlpha),
                             spotColor = glowColor.copy(alpha = LibraryCardGlowSpotAlpha),
@@ -1136,7 +1141,7 @@ fun LibraryAlbumSpotlightCard(
                     thumbnailUrl = album.album.thumbnailUrl,
                     isActive = isActive,
                     isPlaying = isPlaying,
-                    shape = RoundedCornerShape(18.dp),
+                    shape = app.vibra.ui.theme.insetRoundedShape(shape, 12.dp),
                     modifier = Modifier.fillMaxSize(),
                 )
                 if (onPlay != null) {
@@ -1153,6 +1158,7 @@ fun LibraryAlbumSpotlightCard(
             ) {
                 Text(
                     text = album.album.title,
+            modifier = Modifier.expansionElement(album.album.title, "title"),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     maxLines = 2,
@@ -1186,7 +1192,7 @@ fun LibraryAlbumSpotlightCard(
 fun LibraryArtistSpotlightCard(
     artist: Artist,
     modifier: Modifier = Modifier,
-    shape: Shape = RoundedCornerShape(26.dp),
+    shape: Shape = adaptiveRoundedCornerShape(26.dp),
     trailingContent: @Composable RowScope.() -> Unit = {},
 ) {
     val context = LocalContext.current
@@ -1252,6 +1258,7 @@ fun LibraryArtistSpotlightCard(
             ) {
                 Text(
                     text = artist.artist.name,
+            modifier = Modifier.expansionElement(artist.artist.name, "title"),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     maxLines = 2,
@@ -1301,7 +1308,7 @@ fun MediaMetadataListItem(
                 isActive = isActive,
                 isPlaying = isPlaying,
                 shouldLoadImage = shouldLoadImage,
-                shape = RoundedCornerShape(ThumbnailCornerRadius),
+                shape = app.vibra.ui.theme.VibraShapes.RowThumbnail,
                 modifier = Modifier.size(ListThumbnailSize),
             )
         },
@@ -1390,7 +1397,7 @@ fun YouTubeListItem(
                     isSelected = isSelected,
                     isActive = isActive,
                     isPlaying = isPlaying,
-                    shape = if (item is ArtistItem) CircleShape else RoundedCornerShape(ThumbnailCornerRadius),
+                    shape = if (item is ArtistItem) CircleShape else app.vibra.ui.theme.VibraShapes.RowThumbnail,
                     modifier = Modifier.size(ListThumbnailSize),
                 )
             },
@@ -1465,7 +1472,7 @@ fun YouTubeGridItem(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 textAlign = if (item is ArtistItem) TextAlign.Center else TextAlign.Start,
-                modifier = Modifier.basicMarquee().fillMaxWidth(),
+                modifier = Modifier.expansionElement(item.title, "title").basicMarquee().fillMaxWidth(),
             )
         },
         subtitle = {
@@ -1492,7 +1499,7 @@ fun YouTubeGridItem(
         thumbnailContent = {
             val database = LocalDatabase.current
             val playerConnection = LocalPlayerConnection.current ?: return@GridItem
-            val shape = if (item is ArtistItem) CircleShape else RoundedCornerShape(GridThumbnailCornerRadius)
+            val shape = if (item is ArtistItem) CircleShape else adaptiveRoundedCornerShape(GridThumbnailCornerRadius)
 
             ItemThumbnail(
                 thumbnailUrl = item.thumbnail,
@@ -1557,7 +1564,7 @@ fun LocalSongsGrid(
             thumbnailUrl = thumbnailUrl,
             isActive = isActive,
             isPlaying = isPlaying,
-            shape = RoundedCornerShape(GridThumbnailCornerRadius),
+            shape = adaptiveRoundedCornerShape(GridThumbnailCornerRadius),
             modifier = if (fillMaxWidth) Modifier.fillMaxWidth() else Modifier,
             showCenterPlay = true,
             playButtonVisible = false,
@@ -1616,7 +1623,7 @@ fun LocalAlbumsGrid(
             thumbnailUrl = thumbnailUrl,
             isActive = isActive,
             isPlaying = isPlaying,
-            shape = RoundedCornerShape(GridThumbnailCornerRadius),
+            shape = adaptiveRoundedCornerShape(GridThumbnailCornerRadius),
             modifier = if (fillMaxWidth) Modifier.fillMaxWidth() else Modifier,
             showCenterPlay = false,
             playButtonVisible = true,

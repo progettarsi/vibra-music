@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItemDefaults
@@ -53,6 +52,7 @@ import androidx.media3.exoplayer.offline.DownloadRequest
 import androidx.media3.exoplayer.offline.DownloadService
 import androidx.navigation.NavController
 import app.vibra.ui.components.*
+import app.vibra.ui.components.VibraLoadingIndicator
 import java.time.LocalDateTime
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -314,7 +314,7 @@ fun YouTubeSongMenu(song: SongItem, navController: NavController, onDismiss: () 
         Download.STATE_DOWNLOADING -> {
           NewAction(
             id = MenuActionId.Download,
-            icon = { CircularWavyProgressIndicator(modifier = Modifier.size(24.dp)) },
+            icon = { VibraLoadingIndicator(modifier = Modifier.size(24.dp)) },
             text = stringResource(R.string.downloading),
             onClick = {
               DownloadService.sendRemoveDownload(
@@ -386,18 +386,7 @@ fun YouTubeSongMenu(song: SongItem, navController: NavController, onDismiss: () 
             onClick = {
               coroutineScope.launch(Dispatchers.IO) {
                 try {
-                  val requestedSong =
-                    database.withTransaction {
-                      val currentSong =
-                        getSongById(song.id)
-                          ?: run {
-                            insert(song.toMediaMetadata())
-                            getSongById(song.id)
-                          }
-                          ?: return@withTransaction null
-                      currentSong.song.toggleLike()
-                    } ?: return@launch
-                  syncUtils.likeSong(requestedSong).onFailure { error ->
+                  syncUtils.libraryActions.changeSong(song.id, song.toMediaMetadata()) { it.toggleLike() }.onFailure { error ->
                     Timber.w(error, "Failed to update liked song ${song.id}")
                     withContext(Dispatchers.Main) {
                       Toast.makeText(context, R.string.error_unknown, Toast.LENGTH_SHORT).show()
@@ -495,22 +484,15 @@ fun YouTubeSongMenu(song: SongItem, navController: NavController, onDismiss: () 
         Modifier.clickable {
           coroutineScope.launch(Dispatchers.IO) {
             try {
-              val requestedSong =
-                database.withTransaction {
-                  val currentSong =
-                    getSongById(song.id)?.song
-                      ?: song.toMediaMetadata().toSongEntity().also {
-                        insert(song.toMediaMetadata())
-                      }
-                  val shouldAdd = currentSong.inLibrary == null
-                  val now = LocalDateTime.now()
-                  currentSong.copy(
-                    liked = shouldAdd,
-                    likedDate = if (shouldAdd) now else null,
-                    inLibrary = if (shouldAdd) now else null,
-                  )
-                }
-              syncUtils.likeSong(requestedSong).onFailure { error ->
+              syncUtils.libraryActions.changeSong(song.id, song.toMediaMetadata()) { currentSong ->
+                val shouldAdd = currentSong.inLibrary == null
+                val now = LocalDateTime.now()
+                currentSong.copy(
+                  liked = shouldAdd,
+                  likedDate = if (shouldAdd) now else null,
+                  inLibrary = if (shouldAdd) now else null,
+                )
+              }.onFailure { error ->
                 Timber.w(error, "Failed to update song library state ${song.id}")
                 withContext(Dispatchers.Main) {
                   Toast.makeText(context, R.string.error_unknown, Toast.LENGTH_SHORT).show()

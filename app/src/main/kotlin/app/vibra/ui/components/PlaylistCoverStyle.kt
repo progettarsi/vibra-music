@@ -6,6 +6,9 @@
 
 package app.vibra.ui.components
 
+// Vibra: independent radii follow the global rounding style.
+import app.vibra.ui.theme.adaptiveRoundedCornerShape
+
 import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -159,7 +162,7 @@ fun PlaylistCoverStylePicker(
               Modifier.size(24.dp)
                 .clip(
                   if (style == PlaylistCoverStyle.Rounded)
-                    androidx.compose.foundation.shape.RoundedCornerShape(6.dp)
+                    adaptiveRoundedCornerShape(6.dp)
                   else style.shape()
                 )
                 .background(MaterialTheme.colorScheme.primary)

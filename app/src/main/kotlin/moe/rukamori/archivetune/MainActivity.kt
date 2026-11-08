@@ -380,6 +380,11 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
+            LaunchedEffect(Unit) {
+                androidx.compose.runtime.withFrameNanos { }
+                androidx.compose.runtime.withFrameNanos { }
+                app.vibra.startup.StartupWork.firstFrame()
+            }
             val gatekeeperViewModel: GatekeeperViewModel = hiltViewModel()
             LaunchedEffect(Unit) {
                 gatekeeperViewModel.blockedMessages.collect { message ->

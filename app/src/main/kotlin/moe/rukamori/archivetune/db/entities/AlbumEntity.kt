@@ -11,11 +11,6 @@ import androidx.compose.runtime.Immutable
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.launch
-import moe.rukamori.archivetune.innertube.YouTube
 import java.time.LocalDateTime
 
 @Immutable
@@ -42,15 +37,4 @@ data class AlbumEntity(
         copy(
             bookmarkedAt = if (bookmarkedAt != null) null else LocalDateTime.now(),
         )
-
-    fun toggleLike() =
-        localToggleLike().also {
-            if (isLocal) return@also
-            CoroutineScope(Dispatchers.IO).launch {
-                if (playlistId != null) {
-                    YouTube.likePlaylist(playlistId, bookmarkedAt == null)
-                }
-                this.cancel()
-            }
-        }
 }

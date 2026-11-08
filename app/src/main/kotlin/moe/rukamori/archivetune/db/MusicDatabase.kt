@@ -9,8 +9,10 @@ package moe.rukamori.archivetune.db
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.database.DatabaseErrorHandler
 import android.database.sqlite.SQLiteDatabase
 import android.util.Log
+import app.vibra.backup.RestoreTransaction
 import androidx.core.content.contentValuesOf
 import androidx.room.AutoMigration
 import androidx.room.Database
@@ -54,6 +56,7 @@ import moe.rukamori.archivetune.db.entities.SortedSongAlbumMap
 import moe.rukamori.archivetune.db.entities.SortedSongArtistMap
 import moe.rukamori.archivetune.db.entities.TagEntity
 import moe.rukamori.archivetune.extensions.toSQLiteQuery
+import java.io.File
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneOffset
@@ -62,7 +65,41 @@ import java.util.concurrent.Executor
 import kotlin.coroutines.resume
 
 private const val TAG = "MusicDatabase"
-private const val CURRENT_VERSION = 38
+private const val CURRENT_VERSION = 40
+private const val PRE_LIBRARY_MUTATION_VERSION = 38
+
+internal val LIBRARY_MUTATION_MIGRATION: Migration = object : Migration(PRE_LIBRARY_MUTATION_VERSION, 39) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS library_mutation (
+                account TEXT NOT NULL, target TEXT NOT NULL, targetId TEXT NOT NULL,
+                localId TEXT NOT NULL, desired INTEGER NOT NULL, revision TEXT NOT NULL,
+                createdAt INTEGER NOT NULL, completedAt INTEGER, rejected INTEGER NOT NULL,
+                PRIMARY KEY (account, target, targetId)
+            )
+            """.trimIndent(),
+        )
+    }
+}
+
+internal val PLAYLIST_OUTBOX_MIGRATION: Migration = object : Migration(39, 40) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE library_mutation ADD COLUMN nextAttemptAt INTEGER")
+        db.execSQL(
+            """
+            CREATE TABLE playlist_edit (
+                id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, account TEXT NOT NULL,
+                playlistId TEXT NOT NULL, kind TEXT NOT NULL, value TEXT, remoteId TEXT,
+                videoId TEXT, entryId INTEGER, setId TEXT, beforeId INTEGER, beforeSetId TEXT,
+                afterId INTEGER, afterSetId TEXT, toEnd INTEGER NOT NULL,
+                attempt TEXT, nextAttemptAt INTEGER, completedAt INTEGER, blocked INTEGER NOT NULL
+            )
+            """.trimIndent(),
+        )
+        db.execSQL("CREATE INDEX index_playlist_edit_account_playlistId ON playlist_edit (account, playlistId)")
+    }
+}
 
 class MusicDatabase(
     private val delegate: InternalDatabase,
@@ -112,6 +149,8 @@ class MusicDatabase(
 @Database(
     entities = [
         app.vibra.spotify.SpotifyImportMap::class,
+        app.vibra.library.LibraryMutation::class,
+        app.vibra.library.PlaylistEdit::class,
         SongEntity::class,
         ArtistEntity::class,
         AlbumEntity::class,
@@ -174,7 +213,7 @@ abstract class InternalDatabase : RoomDatabase() {
 
         fun newInstance(context: Context): MusicDatabase {
             val universalMigrations =
-                (2 until CURRENT_VERSION)
+                (2 until PRE_LIBRARY_MUTATION_VERSION)
                     .map { from -> UniversalMigration(context, from, CURRENT_VERSION) }
                     .toTypedArray()
 
@@ -183,6 +222,8 @@ abstract class InternalDatabase : RoomDatabase() {
                     .databaseBuilder(context, InternalDatabase::class.java, DB_NAME)
                     .addMigrations(
                         MIGRATION_1_2,
+                        LIBRARY_MUTATION_MIGRATION,
+                        PLAYLIST_OUTBOX_MIGRATION,
                         *universalMigrations,
                     ).addCallback(DatabaseCallback())
                     .fallbackToDestructiveMigration()
@@ -196,18 +237,22 @@ abstract class InternalDatabase : RoomDatabase() {
                             .newFixedThreadPool(4),
                     ).build()
 
-            fun shouldResetDb(t: Throwable): Boolean {
-                val msg = (t.message ?: "").lowercase()
-                return msg.contains("room cannot verify the data integrity") ||
-                    msg.contains("forgot to update the version number") ||
-                    msg.contains("migration didn't properly handle") ||
-                    msg.contains("room openhelper verification failed")
-            }
+            // Vibra: a restored database proves itself here; if it cannot open, the previous one returns.
+            val restore = RestoreTransaction.forApp(context, DB_NAME)
+            val restoredDatabasePending = restore.recover()
 
             var db = build()
             try {
                 db.openHelper.writableDatabase
             } catch (t: Throwable) {
+                if (restoredDatabasePending) {
+                    Log.e(TAG, "Restored database failed to open, returning to the previous one")
+                    runCatching { db.close() }
+                    restore.revert()
+                    db = build()
+                    db.openHelper.writableDatabase
+                    return MusicDatabase(delegate = db)
+                }
                 if (!shouldResetDb(t)) throw t
                 Log.e(TAG, "Database open failed, attempting schema repair", t)
                 runCatching { db.close() }
@@ -227,7 +272,74 @@ abstract class InternalDatabase : RoomDatabase() {
                 }
             }
 
+            if (restoredDatabasePending) {
+                db.openHelper.writableDatabase.execSQL("DELETE FROM library_mutation")
+                restore.finish()
+            }
             return MusicDatabase(delegate = db)
+        }
+
+        /**
+         * Vibra: proves a database from a backup can really be used, working on that copy only.
+         * Throws when the file is damaged, comes from a newer app version, or lacks the library
+         * tables. Migrates the copy with no destructive fallback, so a backup that would
+         * only open by being wiped is refused here rather than erasing the library later.
+         */
+        fun verifyRestoreCandidate(
+            context: Context,
+            file: File,
+        ) {
+            SQLiteDatabase
+                .openDatabase(file.path, null, SQLiteDatabase.OPEN_READWRITE, DatabaseErrorHandler { })
+                .use { candidate ->
+                    check(candidate.version in 1..CURRENT_VERSION) { "Unsupported backup version ${candidate.version}" }
+                    candidate.rawQuery("PRAGMA integrity_check", null).use { result ->
+                        check(result.moveToFirst() && result.getString(0).equals("ok", ignoreCase = true)) {
+                            "Backup database is damaged"
+                        }
+                    }
+                    candidate
+                        .rawQuery(
+                            "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name IN ('song', 'playlist')",
+                            null,
+                        ).use { result ->
+                            check(result.moveToFirst() && result.getInt(0) == 2) { "Backup database has no library" }
+                        }
+                }
+
+            val universalMigrations =
+                (2 until PRE_LIBRARY_MUTATION_VERSION)
+                    .map { from -> UniversalMigration(context, from, CURRENT_VERSION) }
+                    .toTypedArray()
+
+            fun open() {
+                val candidate =
+                    Room
+                        .databaseBuilder(context, InternalDatabase::class.java, file.absolutePath)
+                        .addMigrations(MIGRATION_1_2, LIBRARY_MUTATION_MIGRATION, PLAYLIST_OUTBOX_MIGRATION, *universalMigrations)
+                        .build()
+                try {
+                    candidate.openHelper.writableDatabase
+                } finally {
+                    candidate.close()
+                }
+            }
+
+            try {
+                open()
+            } catch (t: Throwable) {
+                if (!shouldResetDb(t)) throw t
+                SchemaTools.repairDatabaseFile(context = context, name = file.absolutePath)
+                open()
+            }
+        }
+
+        private fun shouldResetDb(t: Throwable): Boolean {
+            val msg = (t.message ?: "").lowercase()
+            return msg.contains("room cannot verify the data integrity") ||
+                msg.contains("forgot to update the version number") ||
+                msg.contains("migration didn't properly handle") ||
+                msg.contains("room openhelper verification failed")
         }
     }
 }

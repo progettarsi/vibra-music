@@ -7,6 +7,9 @@
 
 package moe.rukamori.archivetune.ui.screens.search
 
+// Vibra: independent radii follow the global rounding style.
+import app.vibra.ui.theme.adaptiveRoundedCornerShape
+
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import app.vibra.ui.motion.combinedClickable
@@ -31,7 +34,6 @@ import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -86,6 +88,7 @@ import moe.rukamori.archivetune.playback.queues.ListQueue
 import moe.rukamori.archivetune.playback.queues.YouTubeQueue
 import moe.rukamori.archivetune.ui.component.ChipsRow
 import moe.rukamori.archivetune.ui.component.EmptyPlaceholder
+import moe.rukamori.archivetune.ui.component.MediaDetailStatePanel
 import moe.rukamori.archivetune.ui.component.LocalMenuState
 import moe.rukamori.archivetune.ui.component.YouTubeListItem
 import moe.rukamori.archivetune.ui.component.shimmer.ListItemPlaceHolder
@@ -368,7 +371,7 @@ fun OnlineSearchResult(
                                     Modifier
                                         .width(3.dp)
                                         .height(18.dp)
-                                        .clip(RoundedCornerShape(2.dp))
+                                        .clip(adaptiveRoundedCornerShape(2.dp))
                                         .background(MaterialTheme.colorScheme.primary),
                             )
                             Spacer(Modifier.width(10.dp))
@@ -397,7 +400,7 @@ fun OnlineSearchResult(
                     }
                 }
 
-                if (allModeSections.isEmpty() && isAllModeLoaded) {
+                if (allModeSections.isEmpty() && isAllModeLoaded && viewModel.allModeFailure() == null) {
                     item(key = "empty_all", contentType = "empty") {
                         EmptyPlaceholder(
                             icon = R.drawable.search,
@@ -433,7 +436,21 @@ fun OnlineSearchResult(
                 }
             }
 
-            if (searchFilter == null && allModeSections.isEmpty() && !isAllModeLoaded || searchFilter != null && itemsPage == null) {
+            val failure =
+                searchFilter?.let { if (itemsPage == null) viewModel.failureOf(it) else null }
+                    ?: viewModel.allModeFailure().takeIf { searchFilter == null && allModeSections.isEmpty() }
+            if (failure != null) {
+                item(key = "load_failed", contentType = "error") {
+                    MediaDetailStatePanel(
+                        title = stringResource(R.string.browse_load_failed),
+                        description = stringResource(failure),
+                        iconRes = R.drawable.error,
+                        actionLabel = stringResource(R.string.retry),
+                        onAction = viewModel::retry,
+                        modifier = Modifier.fillParentMaxSize(),
+                    )
+                }
+            } else if (searchFilter == null && allModeSections.isEmpty() && !isAllModeLoaded || searchFilter != null && itemsPage == null) {
                 item(key = "initial_loading", contentType = "loading") {
                     ShimmerHost {
                         repeat(8) {

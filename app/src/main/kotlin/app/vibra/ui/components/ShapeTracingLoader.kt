@@ -17,7 +17,9 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathMeasure
@@ -34,9 +36,8 @@ import app.vibra.ui.motion.Liquid
  * Indeterminate progress that runs *along the outline* of [shape] — Vibra's take on the
  * classic circular spinner, used by the cookie play button while buffering.
  *
- * Apply it inside the element that is clipped to the same shape (and rotated with it): the
- * stroke is centred on the outline, so the clip leaves exactly its inner half visible and
- * the indicator hugs the edge at the shape's current position and rotation.
+ * By default this hugs the edge of an element clipped to [shape]. Set [insetStroke] and
+ * apply it before the clip to draw the full stroke and its round caps inside the outer bounds.
  *
  * Motion mirrors M3's circular indicator: the arc travels round the outline while its
  * length breathes between short and long. Like M3's indicator it keeps one even thickness
@@ -47,52 +48,25 @@ fun Modifier.shapeTracingLoader(
     shape: Shape,
     color: Color,
     strokeWidth: Dp = 3.dp,
+    insetStroke: Boolean = false,
 ): Modifier =
     if (state == null) {
         this
     } else {
-        drawShapeTracingLoader(state, shape, color, strokeWidth)
-    }
-
-private fun Modifier.drawShapeTracingLoader(
-    state: ShapeTracingLoaderState,
-    shape: Shape,
-    color: Color,
-    strokeWidth: Dp,
-): Modifier =
-    drawWithContent {
-        drawContent()
-        val alpha = state.visibility()
-        if (alpha <= 0.01f) return@drawWithContent
-        val outlinePath = Path().apply { addOutline(shape.createOutline(size, layoutDirection, this@drawWithContent)) }
-        val measure = PathMeasure().apply { setPath(outlinePath, forceClosed = true) }
-        val length = measure.length
-        if (length <= 0f) return@drawWithContent
-
-        val sweep = length * (MinSweep + (MaxSweep - MinSweep) * state.breath())
-        val start = state.phase() * length
-        val segment = Path()
-        val from = start % length
-        val to = from + sweep
-        if (to <= length) {
-            measure.getSegment(from, to, segment, startWithMoveTo = true)
-        } else {
-            measure.getSegment(from, length, segment, startWithMoveTo = true)
-            measure.getSegment(0f, to - length, segment, startWithMoveTo = false)
-        }
-        drawPath(
-            path = segment,
+        drawOutlineProgress(
+            shape = shape,
             color = color,
-            alpha = alpha,
-            // Doubled: half of the stroke is clipped away by the shape.
-            style = Stroke(width = strokeWidth.toPx() * 2f, cap = StrokeCap.Round, join = StrokeJoin.Round),
+            strokeWidth = strokeWidth,
+            insetStroke = insetStroke,
+            phase = state.phase,
+            sweep = { MinSweep + (MaxSweep - MinSweep) * state.breath() },
+            visibility = state.visibility,
         )
     }
 
 /**
- * Determinate sibling of [shapeTracingLoader]: the outline of [shape] is traced from its
- * start up to [progress] (0‥1, read in draw), e.g. how far a pull-to-refresh has gone.
- * Same placement rule: apply it inside the element clipped to [shape].
+ * Determinate sibling of [shapeTracingLoader], for pull-to-refresh. Apply it before clipping
+ * the content to [shape] so the inset stroke retains its round caps.
  */
 fun Modifier.shapeProgress(
     progress: () -> Float,
@@ -100,20 +74,64 @@ fun Modifier.shapeProgress(
     color: Color,
     strokeWidth: Dp = 3.dp,
 ): Modifier =
-    drawWithContent {
-        drawContent()
-        val fraction = progress().coerceIn(0f, 1f)
-        if (fraction <= 0.005f) return@drawWithContent
-        val outlinePath = Path().apply { addOutline(shape.createOutline(size, layoutDirection, this@drawWithContent)) }
-        val measure = PathMeasure().apply { setPath(outlinePath, forceClosed = true) }
-        val segment = Path()
-        measure.getSegment(0f, measure.length * fraction, segment, startWithMoveTo = true)
-        drawPath(
-            path = segment,
-            color = color,
-            alpha = (fraction * 3f).coerceAtMost(1f),
-            style = Stroke(width = strokeWidth.toPx() * 2f, cap = StrokeCap.Round, join = StrokeJoin.Round),
+    drawOutlineProgress(
+        shape = shape,
+        color = color,
+        strokeWidth = strokeWidth,
+        insetStroke = true,
+        phase = { 0f },
+        sweep = progress,
+        visibility = { (progress() * 3f).coerceIn(0f, 1f) },
+    )
+
+private fun Modifier.drawOutlineProgress(
+    shape: Shape,
+    color: Color,
+    strokeWidth: Dp,
+    insetStroke: Boolean,
+    phase: () -> Float,
+    sweep: () -> Float,
+    visibility: () -> Float,
+): Modifier =
+    drawWithCache {
+        val width = strokeWidth.toPx()
+        val inset = if (insetStroke) width / 2f else 0f
+        val outlineSize = Size(
+            (size.width - 2f * inset).coerceAtLeast(0f),
+            (size.height - 2f * inset).coerceAtLeast(0f),
         )
+        val outlinePath = Path().apply {
+            addOutline(shape.createOutline(outlineSize, layoutDirection, this@drawWithCache))
+            if (insetStroke) translate(Offset(inset, inset))
+        }
+        val measure = PathMeasure().apply { setPath(outlinePath, forceClosed = true) }
+        val length = measure.length
+        val segment = Path()
+        val stroke = Stroke(
+            // The original edge treatment draws double width because the clip hides half of it.
+            width = if (insetStroke) width else 2f * width,
+            cap = StrokeCap.Round,
+            join = StrokeJoin.Round,
+        )
+        onDrawWithContent {
+            drawContent()
+            val alpha = visibility()
+            val fraction = sweep().coerceIn(0f, 1f)
+            if (length <= 0f || alpha <= 0.01f || fraction <= 0.005f) return@onDrawWithContent
+            if (fraction == 1f) {
+                drawPath(outlinePath, color, alpha = alpha, style = stroke)
+                return@onDrawWithContent
+            }
+
+            val from = (phase() * length) % length
+            val to = from + length * fraction
+            segment.rewind()
+            measure.getSegment(from, minOf(to, length), segment, startWithMoveTo = true)
+            if (to > length) {
+                measure.getSegment(0f, to - length, segment, startWithMoveTo = false)
+            }
+            drawPath(segment, color, alpha = alpha, style = stroke)
+        }
     }
 
 /**

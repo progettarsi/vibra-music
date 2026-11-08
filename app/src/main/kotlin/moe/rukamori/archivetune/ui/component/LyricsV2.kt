@@ -9,6 +9,9 @@
 
 package moe.rukamori.archivetune.ui.component
 
+// Vibra: independent radii follow the global rounding style.
+import app.vibra.ui.theme.adaptiveRoundedCornerShape
+
 import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
@@ -38,7 +41,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import app.vibra.ui.components.VibraBasicAlertDialog as BasicAlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -664,7 +666,7 @@ fun LyricsV2(
                                         } else {
                                             Color.Transparent
                                         },
-                                    shape = RoundedCornerShape(8.dp),
+                                    shape = adaptiveRoundedCornerShape(8.dp),
                                 ).padding(
                                     start = if (isAllBackground) 24.dp else 12.dp,
                                     end = 12.dp,
@@ -892,7 +894,7 @@ fun LyricsV2(
                                             } else {
                                                 Color.White.copy(alpha = 0.5f)
                                             },
-                                        shape = RoundedCornerShape(24.dp),
+                                        shape = adaptiveRoundedCornerShape(24.dp),
                                     ).clickable(enabled = selectedIndices.isNotEmpty()) {
                                         if (selectedIndices.isNotEmpty()) {
                                             val sortedIndices = selectedIndices.sorted()
@@ -940,7 +942,7 @@ fun LyricsV2(
         val (lyricsText, songTitle, artists) = shareDialogData!!
         BasicAlertDialog(onDismissRequest = { showShareDialog = false }) {
             Card(
-                shape = RoundedCornerShape(28.dp),
+                shape = adaptiveRoundedCornerShape(28.dp),
                 elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
                 colors =
                     CardDefaults.cardColors(

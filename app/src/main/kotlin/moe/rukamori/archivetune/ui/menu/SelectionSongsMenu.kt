@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItemDefaults
@@ -45,6 +44,7 @@ import androidx.media3.common.Timeline
 import androidx.media3.exoplayer.offline.Download
 import androidx.media3.exoplayer.offline.DownloadService
 import app.vibra.ui.components.*
+import app.vibra.ui.components.VibraLoadingIndicator
 import app.vibra.ui.motion.VibraTextButton as TextButton
 import java.time.LocalDateTime
 import kotlinx.coroutines.Dispatchers
@@ -287,20 +287,13 @@ fun SelectionSongMenu(
             coroutineScope.launch(Dispatchers.IO) {
               val shouldAdd = !allInLibrary
               val now = LocalDateTime.now()
-              val requestedSongs =
-                songSelection
-                  .asSequence()
-                  .map { it.song }
-                  .distinctBy { it.id }
-                  .map { song ->
-                    song.copy(
-                      liked = shouldAdd,
-                      likedDate = if (shouldAdd) now else null,
-                      inLibrary = if (shouldAdd) now else null,
-                    )
-                  }
-                  .toList()
-              val failedSongIds = syncUtils.likeSongs(requestedSongs)
+              val failedSongIds = syncUtils.libraryActions.changeSongs(songSelection.map { it.id }) { song ->
+                song.copy(
+                  liked = shouldAdd,
+                  likedDate = if (shouldAdd) song.likedDate ?: now else null,
+                  inLibrary = if (shouldAdd) song.inLibrary ?: now else null,
+                )
+              }
 
               withContext(Dispatchers.Main) {
                 onDismiss()
@@ -333,19 +326,10 @@ fun SelectionSongMenu(
         modifier =
           Modifier.clickable {
             val shouldUnlikeAll = songSelection.all { it.song.liked }
-            val updatedSongs =
-              songSelection
-                .asSequence()
-                .map { it.song }
-                .distinctBy { it.id }
-                .filter { song -> shouldUnlikeAll || !song.liked }
-                .map { song -> song.localToggleLike() }
-                .toList()
-
-            if (updatedSongs.isEmpty()) return@clickable
-
             coroutineScope.launch(Dispatchers.IO) {
-              val failedSongIds = syncUtils.likeSongs(updatedSongs)
+              val failedSongIds = syncUtils.libraryActions.changeSongs(songSelection.map { it.id }) { song ->
+                if (song.liked == shouldUnlikeAll) song.localToggleLike() else song
+              }
 
               withContext(Dispatchers.Main) {
                 onDismiss()
@@ -385,7 +369,7 @@ fun SelectionSongMenu(
       Download.STATE_DOWNLOADING -> {
         MediaMenuRow(
           headlineContent = { Text(text = stringResource(R.string.downloading)) },
-          leadingContent = { CircularWavyProgressIndicator(modifier = Modifier.size(24.dp)) },
+          leadingContent = { VibraLoadingIndicator(modifier = Modifier.size(24.dp)) },
           modifier = Modifier.clickable { showRemoveDownloadDialog = true },
           colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         )
@@ -438,43 +422,9 @@ fun SelectionSongMenu(
                 return@launch
               }
 
-              val browseIdByPlaylistId = HashMap<String, String?>()
-              for (playlistId in positions.asSequence().map { it.playlistId }.distinct()) {
-                browseIdByPlaylistId[playlistId] =
-                  database.getPlaylistById(playlistId)?.playlist?.browseId
+              val failed = positions.groupBy { it.playlistId }.filter { (playlistId, entries) ->
+                syncUtils.libraryActions.removePlaylistSongs(playlistId, entryIds = entries.map { it.id }.toSet()).isFailure
               }
-
-              val failed = LinkedHashSet<PlaylistSongMap>()
-              val succeeded = ArrayList<PlaylistSongMap>(positions.size)
-
-              for (cur in positions) {
-                val browseId = browseIdByPlaylistId[cur.playlistId]
-                if (browseId != null) {
-                  val remoteResult = removeSongFromRemotePlaylist(browseId, cur)
-                  if (remoteResult.isFailure) {
-                    failed += cur
-                  } else {
-                    succeeded += cur
-                  }
-                } else {
-                  succeeded += cur
-                }
-              }
-
-              if (succeeded.isNotEmpty()) {
-                database.withTransaction {
-                  val offsetByPlaylistId = HashMap<String, Int>()
-                  succeeded
-                    .sortedWith(compareBy<PlaylistSongMap> { it.playlistId }.thenBy { it.position })
-                    .forEach { cur ->
-                      val offset = offsetByPlaylistId.getOrPut(cur.playlistId) { 0 }
-                      move(cur.playlistId, cur.position - offset, Int.MAX_VALUE)
-                      delete(cur.copy(position = Int.MAX_VALUE))
-                      offsetByPlaylistId[cur.playlistId] = offset + 1
-                    }
-                }
-              }
-
               withContext(Dispatchers.Main) {
                 onDismiss()
                 clearAction()
@@ -798,18 +748,11 @@ fun SelectionMediaMetadataMenu(
         },
         modifier =
           Modifier.clickable {
-            val updatedSongs =
-              songSelection
-                .asSequence()
-                .distinctBy { it.id }
-                .filter { song -> allLiked || !song.liked }
-                .map { song -> song.toSongEntity().localToggleLike() }
-                .toList()
-
-            if (updatedSongs.isEmpty()) return@clickable
-
+            val shouldUnlikeAll = allLiked
             coroutineScope.launch(Dispatchers.IO) {
-              val failedSongIds = syncUtils.likeSongs(updatedSongs)
+              val failedSongIds = syncUtils.libraryActions.changeSongs(songSelection.map { it.id }) { song ->
+                if (song.liked == shouldUnlikeAll) song.localToggleLike() else song
+              }
 
               withContext(Dispatchers.Main) {
                 onDismiss()
@@ -849,7 +792,7 @@ fun SelectionMediaMetadataMenu(
       Download.STATE_DOWNLOADING -> {
         MediaMenuRow(
           headlineContent = { Text(text = stringResource(R.string.downloading)) },
-          leadingContent = { CircularWavyProgressIndicator(modifier = Modifier.size(24.dp)) },
+          leadingContent = { VibraLoadingIndicator(modifier = Modifier.size(24.dp)) },
           modifier = Modifier.clickable { showRemoveDownloadDialog = true },
           colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         )

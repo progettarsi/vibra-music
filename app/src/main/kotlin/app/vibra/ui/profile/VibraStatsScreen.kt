@@ -208,7 +208,7 @@ fun VibraStatsScreen(navController: NavController) {
                     VibraCard(modifier = Modifier.fillMaxWidth()) {
                         SectionTitle(stringResource(R.string.vibra_top_artists))
                         LazyRow(
-                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 12.dp),
+                            contentPadding = PaddingValues(14.dp),
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                         ) {
                             itemsIndexed(artists.drop(1), key = { _, it -> it.id }) { index, artist ->
@@ -247,6 +247,7 @@ fun VibraStatsScreen(navController: NavController) {
                         Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                             songs.forEachIndexed { index, song ->
                                 VibraRow(
+                    containerInset = 10.dp,
                                     title = song.song.title,
                                     background = RowBackground.None,
                                     thumbnail = {
@@ -290,12 +291,12 @@ fun VibraStatsScreen(navController: NavController) {
                     VibraCard(modifier = Modifier.fillMaxWidth()) {
                         SectionTitle(stringResource(R.string.vibra_top_albums))
                         LazyRow(
-                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 12.dp),
+                            contentPadding = PaddingValues(14.dp),
                             horizontalArrangement = Arrangement.spacedBy(10.dp),
                         ) {
                             items(albums, key = { it.id }) { album ->
                                 Column(modifier = Modifier.width(132.dp).clickable(role = Role.Button) { actions.open(album) }) {
-                                    VibraArtwork(url = album.thumbnailUrl, shape = VibraShapes.InnerArtwork, sizePx = 320, modifier = Modifier.size(132.dp))
+                                    VibraArtwork(url = album.thumbnailUrl, shape = app.vibra.ui.theme.concentricRoundedCornerShape(32.dp, 14.dp), sizePx = 320, modifier = Modifier.size(132.dp))
                                     Text(
                                         text = album.title,
                                         style = MaterialTheme.typography.titleSmall,

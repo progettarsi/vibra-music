@@ -9,6 +9,7 @@
 
 package moe.rukamori.archivetune.ui.screens.settings
 
+import app.vibra.ui.components.VibraLoadingIndicator
 import app.vibra.ui.motion.vibraControlFeedback
 import android.Manifest
 import android.content.pm.PackageManager
@@ -52,7 +53,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItemDefaults
-import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -625,7 +625,7 @@ fun UpdateScreen(
         AlertDialog(
             onDismissRequest = {},
             icon = {
-                LoadingIndicator(
+                VibraLoadingIndicator(
                     modifier = Modifier.size(24.dp),
                 )
             },
@@ -705,7 +705,7 @@ fun UpdateScreen(
                             )
                         }
                     } else {
-                        CircularWavyProgressIndicator(
+                        VibraLoadingIndicator(
                             modifier = indeterminateIndicatorModifier,
                         )
                     }
@@ -1269,7 +1269,7 @@ private fun CommitHistorySection(
                                 horizontalAlignment = Alignment.CenterHorizontally,
                                 verticalArrangement = Arrangement.spacedBy(12.dp),
                             ) {
-                                LoadingIndicator(modifier = Modifier.size(32.dp))
+                                VibraLoadingIndicator(modifier = Modifier.size(32.dp))
                                 Text(
                                     text = stringResource(R.string.updates_loading_commits),
                                     style = MaterialTheme.typography.bodyMedium,

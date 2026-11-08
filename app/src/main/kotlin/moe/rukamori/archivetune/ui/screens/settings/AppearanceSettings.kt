@@ -7,6 +7,8 @@
 
 package moe.rukamori.archivetune.ui.screens.settings
 
+import app.vibra.ui.theme.RoundingMode
+import app.vibra.ui.theme.RoundingModeKey
 import moe.rukamori.archivetune.ui.component.IconButton
 import moe.rukamori.archivetune.ui.utils.backToMain
 import android.content.Intent
@@ -37,6 +39,7 @@ import moe.rukamori.archivetune.utils.*
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppearanceSettings(navController: NavController) {
+    val (roundingMode, onRoundingModeChange) = rememberEnumPreference(RoundingModeKey, RoundingMode.AUTOMATIC)
     val context = LocalContext.current
     val (darkMode, onDarkModeChange) = rememberEnumPreference(DarkModeKey, DarkModeDefault)
     val (pureBlack, onPureBlackChange) = rememberPreference(PureBlackKey, false)
@@ -99,6 +102,19 @@ fun AppearanceSettings(navController: NavController) {
             .windowInsetsPadding(LocalPlayerAwareWindowInsets.current.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom))
             .verticalScroll(rememberScrollState()).padding(bottom = SettingsDimensions.ScreenBottomPadding)) {
             PreferenceGroup(title = stringResource(R.string.theme)) {
+                item {
+                    EnumListPreference(
+                        title = { Text(stringResource(R.string.vibra_rounding_title)) },
+                        description = stringResource(R.string.vibra_rounding_description),
+                        icon = { Icon(painterResource(R.drawable.palette), null) },
+                        selectedValue = roundingMode,
+                        onValueSelected = onRoundingModeChange,
+                        valueText = { when (it) {
+                            RoundingMode.AUTOMATIC -> stringResource(R.string.vibra_rounding_automatic)
+                            RoundingMode.CLASSIC -> stringResource(R.string.vibra_rounding_classic)
+                        } },
+                    )
+                }
                 item {
                     EnumListPreference(title = { Text(stringResource(R.string.dark_theme)) },
                         icon = { Icon(painterResource(R.drawable.dark_mode), null) },

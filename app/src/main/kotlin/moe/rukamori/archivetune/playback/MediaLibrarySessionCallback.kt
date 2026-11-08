@@ -11,6 +11,7 @@ import android.content.ContentResolver
 import android.content.Context
 import android.net.Uri
 import android.os.Bundle
+import android.os.Process
 import android.provider.MediaStore
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
@@ -85,6 +86,7 @@ class MediaLibrarySessionCallback
         @ApplicationContext val context: Context,
         val database: MusicDatabase,
         val downloadUtil: DownloadUtil,
+        private val libraryActions: app.vibra.library.LibraryActions,
         private val androidAutoSettings: AndroidAutoSettingsUseCases,
     ) : MediaLibrarySession.Callback {
         private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -135,13 +137,16 @@ class MediaLibrarySessionCallback
             val defaults = builder.build()
             val availableSessionCommands = defaults.availableSessionCommands
                 .buildUpon()
-                .add(MediaSessionConstants.CommandToggleLike)
                 .add(MediaSessionConstants.CommandToggleStartRadio)
-                .add(MediaSessionConstants.CommandToggleLibrary)
                 .add(MediaSessionConstants.CommandToggleShuffle)
                 .add(MediaSessionConstants.CommandToggleRepeatMode)
-                .build()
-            builder.setAvailableSessionCommands(availableSessionCommands)
+            // Vibra: any app can connect to the media service; only these may change the library.
+            if (mayChangeLibrary(session, controller)) {
+                availableSessionCommands
+                    .add(MediaSessionConstants.CommandToggleLike)
+                    .add(MediaSessionConstants.CommandToggleLibrary)
+            }
+            builder.setAvailableSessionCommands(availableSessionCommands.build())
             if (isCarController(session, controller)) {
                 val carButtons = carMediaButtonPreferences(androidAutoSettings.currentConfiguration())
                 builder
@@ -150,6 +155,20 @@ class MediaLibrarySessionCallback
             }
             return builder.build()
         }
+
+        private fun mayChangeLibrary(
+            session: MediaSession,
+            controller: MediaSession.ControllerInfo,
+        ): Boolean =
+            controllerMayChangeLibrary(
+                isOwnApp = controller.uid == Process.myUid(),
+                isTrustedBySystem = controller.isTrusted,
+                isCarController = isCarController(session, controller),
+                packageMatchesUid =
+                    context.packageManager
+                        .getPackagesForUid(controller.uid)
+                        ?.contains(controller.packageName) == true,
+            )
 
         fun isCarController(session: MediaSession, controller: MediaSession.ControllerInfo): Boolean =
             session.isAutoCompanionController(controller) || session.isAutomotiveController(controller)
@@ -219,8 +238,7 @@ class MediaLibrarySessionCallback
         ): ListenableFuture<SessionResult> {
             val handled = when (customCommand.customAction) {
                 MediaSessionConstants.ACTION_TOGGLE_LIKE -> {
-                    toggleLike()
-                    true
+                    mayChangeLibrary(session, controller).also { if (it) toggleLike() }
                 }
 
                 MediaSessionConstants.ACTION_TOGGLE_START_RADIO -> {
@@ -229,8 +247,7 @@ class MediaLibrarySessionCallback
                 }
 
                 MediaSessionConstants.ACTION_TOGGLE_LIBRARY -> {
-                    toggleLibrary()
-                    true
+                    mayChangeLibrary(session, controller).also { if (it) toggleLibrary() }
                 }
 
                 MediaSessionConstants.ACTION_TOGGLE_SHUFFLE -> {
@@ -1967,26 +1984,12 @@ class MediaLibrarySessionCallback
                 val playlist = database.getPlaylistById(playlistId) ?: return@withContext false
                 if (!playlist.playlist.isEditable) return@withContext false
                 if (database.checkInPlaylist(playlistId, songId) > 0) return@withContext false
-                val browseId = playlist.playlist.browseId
-                val setVideoId =
-                    if (browseId != null) {
-                        if (songId.isLocalMediaId()) return@withContext false
-                        YouTube.addToPlaylist(browseId, songId).getOrNull() ?: return@withContext false
-                    } else {
-                        null
-                    }
                 val downloadSnapshot = downloadUtil.playlistDownloadSnapshot(playlistId)
-                val added = database.withTransaction {
-                    if (getSongByIdBlocking(songId) == null) {
-                        currentItem.metadata?.let { insert(it) } ?: return@withTransaction false
-                    }
-                    val latestPlaylist = getPlaylistByIdBlocking(playlistId) ?: return@withTransaction false
-                    if (checkInPlaylist(playlistId, songId) > 0) return@withTransaction false
-                    addSongEntriesToPlaylist(latestPlaylist, listOf(songId to setVideoId))
-                    true
-                }
-                if (added) downloadUtil.downloadPlaylistAdditions(downloadSnapshot, listOf(songId))
-                added
+                val added = libraryActions.addPlaylistSongs(
+                    playlistId, listOf(songId), listOfNotNull(currentItem.metadata),
+                ).getOrNull().orEmpty()
+                if (added.isNotEmpty()) downloadUtil.downloadPlaylistAdditions(downloadSnapshot, added)
+                added.isNotEmpty()
             }
         }
 
@@ -2469,3 +2472,11 @@ class MediaLibrarySessionCallback
                 )
         }
     }
+
+/** Vibra: who may like songs or change the library through the media session. */
+internal fun controllerMayChangeLibrary(
+    isOwnApp: Boolean,
+    isTrustedBySystem: Boolean,
+    isCarController: Boolean,
+    packageMatchesUid: Boolean,
+): Boolean = isOwnApp || isTrustedBySystem || (isCarController && packageMatchesUid)

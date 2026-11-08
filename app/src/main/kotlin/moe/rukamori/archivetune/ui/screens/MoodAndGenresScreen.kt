@@ -7,6 +7,9 @@
 
 package moe.rukamori.archivetune.ui.screens
 
+// Vibra: independent radii follow the global rounding style.
+import app.vibra.ui.theme.adaptiveRoundedCornerShape
+
 import android.content.Context
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -21,7 +24,6 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
@@ -126,7 +128,7 @@ fun MoodAndGenresScreen(
                     stripeColor = item.stripeColor,
                     endpoint = item.endpoint,
                     onClick = {
-                        navController.navigate("youtube_browse/${item.endpoint.browseId}?params=${item.endpoint.params}")
+                        navController.navigate(youtubeBrowseRoute(item))
                     },
                     modifier =
                         Modifier
@@ -394,8 +396,8 @@ private const val MoodAndGenresArtworkTtlMs = 7L * 24 * 60 * 60 * 1000
 
 private val moodAndGenresArtworkCache = ConcurrentHashMap<String, MoodAndGenresArtworkCacheEntry>()
 
-private val MoodAndGenresButtonShape = RoundedCornerShape(24.dp)
-private val MoodAndGenresCoverShape = RoundedCornerShape(16.dp)
+private val MoodAndGenresButtonShape: androidx.compose.foundation.shape.CornerBasedShape @Composable get() = adaptiveRoundedCornerShape(24.dp)
+private val MoodAndGenresCoverShape: androidx.compose.ui.graphics.Shape @Composable get() = adaptiveRoundedCornerShape(16.dp)
 private val MoodAndGenresCoverSize = 80.dp
 private val MoodAndGenresArtworkRequestSize = 80.dp
 

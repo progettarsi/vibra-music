@@ -7,11 +7,9 @@
 
 package moe.rukamori.archivetune.mediainfo
 
-import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.compose.runtime.Immutable
 import com.google.common.collect.ImmutableList
-import moe.rukamori.archivetune.R
 
 @Immutable
 sealed interface MediaInfoState<out T> {
@@ -38,6 +36,8 @@ data class LocalMediaInfo(
     val artwork: String?,
     val isLocal: Boolean,
     val format: MediaInfoFormat?,
+    val albumName: String? = null,
+    val durationSeconds: Int? = null,
 )
 
 @Immutable
@@ -74,20 +74,15 @@ data class MediaInfoData(
     val statistics: MediaInfoState<MediaInfoStatistics>,
 )
 
-enum class MediaInfoTab(@param:StringRes val labelRes: Int) {
-    Information(R.string.information),
-    Details(R.string.details),
-    Numbers(R.string.numbers),
-}
-
-@Immutable
-data class MediaInfoQuickFact(@param:DrawableRes val iconRes: Int, val text: String)
-
 @Immutable
 data class MediaInfoDetail(@param:StringRes val labelRes: Int, val value: String?)
 
 @Immutable
-data class MediaInfoMetric(@param:StringRes val labelRes: Int, val value: String?)
+data class MediaInfoMetric(
+    @param:StringRes val labelRes: Int,
+    val value: String?,
+    val displayValue: String? = value,
+)
 
 @Immutable
 data class MediaInfoUiModel(
@@ -95,17 +90,15 @@ data class MediaInfoUiModel(
     val title: String,
     val subtitle: String?,
     val artwork: String?,
+    val isLocal: Boolean,
     val metadata: MediaInfoState<MediaInfoMetadata>,
     val descriptionState: MediaInfoState<String>,
     val technicalDetails: MediaInfoState<ImmutableList<MediaInfoDetail>>,
     val statistics: MediaInfoState<MediaInfoStatistics>,
     val overview: ImmutableList<MediaInfoDetail>,
-    val quickFacts: ImmutableList<MediaInfoQuickFact>,
     val metrics: ImmutableList<MediaInfoMetric>,
 )
 
 sealed interface MediaInfoEvent {
     data class Copy(val value: String) : MediaInfoEvent
-    data class Share(val url: String) : MediaInfoEvent
-    data object Close : MediaInfoEvent
 }

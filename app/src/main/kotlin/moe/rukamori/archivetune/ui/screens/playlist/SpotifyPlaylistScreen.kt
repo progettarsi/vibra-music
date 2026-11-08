@@ -11,6 +11,7 @@ package moe.rukamori.archivetune.ui.screens.playlist
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import app.vibra.ui.components.VibraLoadingIndicator
 import app.vibra.ui.motion.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -29,7 +30,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
@@ -372,7 +372,7 @@ fun SpotifyPlaylistScreen(
                                         },
                                     ) {
                                         if (state.isResolvingDownloads) {
-                                            CircularWavyProgressIndicator(
+                                            VibraLoadingIndicator(
                                                 modifier = Modifier.size(22.dp),
                                             )
                                         } else {
@@ -433,7 +433,7 @@ fun SpotifyPlaylistScreen(
                                 .height(160.dp),
                         contentAlignment = Alignment.Center,
                     ) {
-                        CircularWavyProgressIndicator()
+                        VibraLoadingIndicator()
                     }
                 }
             }
@@ -482,7 +482,7 @@ fun SpotifyPlaylistScreen(
                     isPlaying = isPlaying && !trackIsResolving,
                     trailingContent = {
                         if (trackIsResolving) {
-                            CircularWavyProgressIndicator(modifier = Modifier.size(24.dp))
+                            VibraLoadingIndicator(modifier = Modifier.size(24.dp))
                         }
                     },
                     modifier =

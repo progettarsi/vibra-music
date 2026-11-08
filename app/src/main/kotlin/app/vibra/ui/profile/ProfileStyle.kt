@@ -30,7 +30,7 @@ import moe.rukamori.archivetune.utils.rememberPreference
  *    (CustomThemeColorKey), so the whole app — not just the profile — adopts it.
  */
 
-/** Avatar / wallpaper shapes offered in edit mode (M3 Expressive set + the star). */
+/** Avatar / wallpaper shapes shared by profile edit mode and onboarding. */
 enum class ProfileShape(
     @StringRes val label: Int,
 ) {
@@ -43,6 +43,7 @@ enum class ProfileShape(
     Heart(R.string.vibra_shape_heart),
     Star(R.string.vibra_shape_star),
     Burst(R.string.vibra_shape_burst),
+    Circle(R.string.vibra_shape_circle),
     ;
 
     val polygon: RoundedPolygon
@@ -57,6 +58,7 @@ enum class ProfileShape(
                 Heart -> MaterialShapes.Heart
                 Star -> VibraEmotionalShapes.Star
                 Burst -> MaterialShapes.SoftBoom
+                Circle -> MaterialShapes.Circle
             }
 }
 

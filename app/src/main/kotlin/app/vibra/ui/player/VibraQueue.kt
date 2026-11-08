@@ -5,6 +5,9 @@
 
 package app.vibra.ui.player
 
+// Vibra: independent radii follow the global rounding style.
+import app.vibra.ui.theme.adaptiveRoundedCornerShape
+
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -25,7 +28,6 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarDuration
@@ -179,7 +181,7 @@ fun VibraQueuePanel(
             modifier
                 .statusBarsPadding()
                 .padding(top = 10.dp)
-                .clip(RoundedCornerShape(topStart = QueueSheetCorner, topEnd = QueueSheetCorner))
+                .clip(adaptiveRoundedCornerShape(topStart = QueueSheetCorner, topEnd = QueueSheetCorner))
                 .background(sheetColor),
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -405,6 +407,7 @@ private fun QueueRow(
         label = "queueRowLift",
     )
 
+    val rowShape = VibraShapes.Row
     SwipeToDismissBox(
         state = dismissState,
         enableDismissFromStartToEnd = false,
@@ -461,7 +464,7 @@ private fun QueueRow(
                         scaleX = scale
                         scaleY = scale
                         shadowElevation = 12.dp.toPx() * lift
-                        shape = VibraShapes.Row
+                        shape = rowShape
                     },
         )
     }

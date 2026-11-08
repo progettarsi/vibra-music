@@ -348,7 +348,7 @@ private fun ShortcutTile(
         modifier =
             modifier
                 .liquidPress(interaction, pressedScale = 0.95f)
-                .clip(VibraShapes.InnerArtwork)
+                .clip(app.vibra.ui.theme.concentricRoundedCornerShape(32.dp, 10.dp))
                 .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                 .clickable(interactionSource = interaction, indication = ripple(), role = Role.Button, onClick = onClick)
                 .padding(10.dp),

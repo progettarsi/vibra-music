@@ -7,15 +7,7 @@
 
 package app.vibra.ui.profile
 
-import app.vibra.ui.motion.ambientMotionAllowed
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import app.vibra.ui.motion.clickable
@@ -63,12 +55,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Matrix
-import androidx.compose.ui.graphics.asComposePath
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.rotate
-import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -79,7 +65,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.graphics.shapes.toPath
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
@@ -88,6 +73,7 @@ import app.vibra.ui.blocks.BlockSize
 import app.vibra.ui.blocks.VibraBlock
 import app.vibra.ui.blocks.blockColumnsFor
 import app.vibra.ui.blocks.blockGrid
+import app.vibra.ui.components.ShapeWallpaper
 import app.vibra.ui.components.VibraArtwork
 import app.vibra.ui.components.VibraBottomSheet
 import app.vibra.ui.components.VibraCard
@@ -184,7 +170,11 @@ fun VibraProfileScreen(
         }
 
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        ShapeWallpaper(shape = style.shape, modifier = Modifier.fillMaxWidth().height(380.dp))
+        ShapeWallpaper(
+            polygon = style.shape.polygon,
+            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
+            modifier = Modifier.fillMaxWidth().height(380.dp),
+        )
 
         // Pull to refresh the account and library: the screen lowers and the avatar's own
         // outline shows the pull, then runs the shape loader while it refreshes.
@@ -314,10 +304,10 @@ private fun ProfileAvatar(
     Box(
         modifier =
             modifier
-                .clip(outline)
-                .background(MaterialTheme.colorScheme.primaryContainer)
                 .shapeProgress(progress = pull, shape = outline, color = ring, strokeWidth = 4.dp)
-                .shapeTracingLoader(state = loader, shape = outline, color = ring, strokeWidth = 4.dp),
+                .shapeTracingLoader(state = loader, shape = outline, color = ring, strokeWidth = 4.dp, insetStroke = true)
+                .clip(outline)
+                .background(MaterialTheme.colorScheme.primaryContainer),
         contentAlignment = Alignment.Center,
     ) {
         if (avatarUrl != null) {
@@ -329,45 +319,6 @@ private fun ProfileAvatar(
                 tint = MaterialTheme.colorScheme.onPrimaryContainer,
                 modifier = Modifier.fillMaxSize(0.46f),
             )
-        }
-    }
-}
-
-/**
- * Wallpaper: large, faint outlines of the profile shape that drift and turn very slowly
- * (one revolution every few minutes), so the profile feels alive without distracting.
- */
-@Composable
-private fun ShapeWallpaper(
-    shape: ProfileShape,
-    modifier: Modifier = Modifier,
-) {
-    val color = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
-    val path = remember(shape) { shape.polygon.toPath().asComposePath() }
-    val turn =
-        if (!ambientMotionAllowed) {
-            null
-        } else {
-            rememberInfiniteTransition(label = "wallpaper").animateFloat(
-                initialValue = 0f,
-                targetValue = 360f,
-                animationSpec = infiniteRepeatable(tween(180_000, easing = LinearEasing), RepeatMode.Restart),
-                label = "wallpaperTurn",
-            )
-        }
-    // (x, y, size) as fractions of the width — follows the Figma blob placement.
-    val placements = remember { listOf(Triple(-0.12f, -0.1f, 0.42f), Triple(0.78f, 0.62f, 0.26f), Triple(0.8f, -0.04f, 0.3f), Triple(-0.06f, 0.62f, 0.34f)) }
-    Canvas(modifier = modifier) {
-        val angle = turn?.value ?: 0f
-        placements.forEachIndexed { index, (fx, fy, fs) ->
-            val side = size.width * fs
-            val matrix = Matrix().apply { scale(side, side) }
-            val scaled = androidx.compose.ui.graphics.Path().apply { addPath(path) }.also { it.transform(matrix) }
-            translate(left = size.width * fx, top = size.width * fy) {
-                rotate(degrees = if (index % 2 == 0) angle else -angle, pivot = Offset(side / 2f, side / 2f)) {
-                    drawPath(scaled, color = color, style = Stroke(width = 3.dp.toPx()))
-                }
-            }
         }
     }
 }
