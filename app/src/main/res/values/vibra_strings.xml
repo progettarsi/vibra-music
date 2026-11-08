@@ -222,7 +222,7 @@
     <string name="vibra_rounding_title">Rounding</string>
     <string name="vibra_rounding_automatic">Automatic</string>
     <string name="vibra_rounding_classic">Classic</string>
-    <string name="vibra_rounding_description">Automatic follows your screen’s curves. Classic keeps VIBRA’s standard rounding.</string>
+    <string name="vibra_rounding_description">Automatic follows your screen’s curves. Classic keeps vibra’s standard rounding.</string>
     <string name="vibra_track_details">Track details</string>
     <string name="vibra_technical_details">Technical data</string>
     <string name="vibra_section_expanded">Expanded</string>

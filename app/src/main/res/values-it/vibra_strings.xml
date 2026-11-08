@@ -223,7 +223,7 @@
     <string name="vibra_rounding_title">Stondatura</string>
     <string name="vibra_rounding_automatic">Automatico</string>
     <string name="vibra_rounding_classic">Classico</string>
-    <string name="vibra_rounding_description">Automatico segue le curve dello schermo. Classico mantiene la stondatura standard di VIBRA.</string>
+    <string name="vibra_rounding_description">Automatico segue le curve dello schermo. Classico mantiene la stondatura standard di vibra.</string>
     <string name="vibra_track_details">Dettagli del brano</string>
     <string name="vibra_technical_details">Dati tecnici</string>
     <string name="vibra_section_expanded">Espansa</string>
