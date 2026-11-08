@@ -100,7 +100,10 @@ import app.vibra.ui.motion.VibraButton as Button
 import app.vibra.ui.motion.VibraFilledTonalButton as FilledTonalButton
 import app.vibra.ui.theme.VibraShapes
 import java.util.WeakHashMap
+import kotlin.coroutines.cancellation.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -199,6 +202,30 @@ fun VibraBottomSheet(
               dismissed[0] = true
               currentDismiss()
             }
+          }
+        }
+    }
+    // When the sheet's anchors change while a drag or fling holds it, Material keeps a pending
+    // target that only a targeted animation clears. Until then every touch starts a drag, so a
+    // sheet pulled to full height ignored every tap. Settling it again on the value it already
+    // shows, once it rests, clears that target without moving it.
+    LaunchedEffect(sheetState, active) {
+      if (!active) return@LaunchedEffect
+      snapshotFlow {
+          Triple(
+            sheetState.currentValue,
+            sheetState.targetValue,
+            runCatching { sheetState.requireOffset() }.getOrNull(),
+          )
+        }
+        .distinctUntilChanged()
+        .collectLatest { (current, target, _) ->
+          if (current != target || current == SheetValue.Hidden) return@collectLatest
+          delay(120)
+          try {
+            if (current == SheetValue.Expanded) sheetState.expand() else sheetState.partialExpand()
+          } catch (e: CancellationException) {
+            currentCoroutineContext().ensureActive() // a gesture took over; it settles again
           }
         }
     }

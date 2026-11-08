@@ -58,6 +58,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -138,6 +139,13 @@ fun LyricsMenu(
   viewModel: LyricsMenuViewModel = hiltViewModel(),
 ) {
   val context = LocalContext.current
+  // The sheet keeps the offset it was opened with, so the menu tracks its own changes: without
+  // this, - and + showed the old value and every tap set the same offset again.
+  var shownSyncOffset by remember { mutableIntStateOf(lyricsSyncOffset) }
+  val changeSyncOffset = { offset: Int ->
+    shownSyncOffset = offset
+    onLyricsSyncOffsetChange(offset)
+  }
   val renderState by lyricsRenderViewModel.state.collectAsStateWithLifecycle()
   val preparedLyrics = (renderState.forMedia(mediaMetadataProvider().id) as? LyricsRenderScreenState.Success)?.lyrics
   val hasTranslations = preparedLyrics?.hasTranslations == true
@@ -323,12 +331,12 @@ fun LyricsMenu(
 
   if (showLyricsSyncOffsetDialog) {
     var tempLyricsSyncOffset by remember {
-      mutableFloatStateOf(lyricsSyncOffset.toFloat().coerceIn(-5000f, 5000f))
+      mutableFloatStateOf(shownSyncOffset.toFloat().coerceIn(-5000f, 5000f))
     }
 
     DefaultDialog(
       onDismiss = {
-        tempLyricsSyncOffset = lyricsSyncOffset.toFloat().coerceIn(-5000f, 5000f)
+        tempLyricsSyncOffset = shownSyncOffset.toFloat().coerceIn(-5000f, 5000f)
         showLyricsSyncOffsetDialog = false
       },
       icon = { Icon(painter = painterResource(R.drawable.speed), contentDescription = null) },
@@ -343,7 +351,7 @@ fun LyricsMenu(
         Spacer(modifier = Modifier.weight(1f))
         VibraDialogButton(
           onClick = {
-            tempLyricsSyncOffset = lyricsSyncOffset.toFloat().coerceIn(-5000f, 5000f)
+            tempLyricsSyncOffset = shownSyncOffset.toFloat().coerceIn(-5000f, 5000f)
             showLyricsSyncOffsetDialog = false
           },
           shapes = ButtonDefaults.shapes(),
@@ -353,7 +361,7 @@ fun LyricsMenu(
         VibraDialogButton(
           primary = true,
           onClick = {
-            onLyricsSyncOffsetChange(tempLyricsSyncOffset.roundToInt().coerceIn(-5000, 5000))
+            changeSyncOffset(tempLyricsSyncOffset.roundToInt().coerceIn(-5000, 5000))
             showLyricsSyncOffsetDialog = false
             onDismiss()
           },
@@ -737,7 +745,7 @@ fun LyricsMenu(
           horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
           FilledTonalIconButton(
-            onClick = { onLyricsSyncOffsetChange((lyricsSyncOffset - 100).coerceAtLeast(-5000)) },
+            onClick = { changeSyncOffset((shownSyncOffset - 100).coerceAtLeast(-5000)) },
             modifier = Modifier.size(32.dp),
           ) {
             Icon(
@@ -750,11 +758,11 @@ fun LyricsMenu(
             String.format(
               androidx.compose.ui.platform.LocalResources.current.configuration.locales[0],
               "%+.1f s",
-              lyricsSyncOffset / 1000f,
+              shownSyncOffset / 1000f,
             )
           )
           FilledTonalIconButton(
-            onClick = { onLyricsSyncOffsetChange((lyricsSyncOffset + 100).coerceAtMost(5000)) },
+            onClick = { changeSyncOffset((shownSyncOffset + 100).coerceAtMost(5000)) },
             modifier = Modifier.size(32.dp),
           ) {
             Icon(
