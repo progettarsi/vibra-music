@@ -410,11 +410,11 @@ private const val DrainSoftness = 0.16f
 private const val DrainedAlpha = 0.18f
 
 /** Bloom around the wave on completion: stroke widths (logo units) and their strengths. */
-private val GlowWidths = floatArrayOf(28f, 60f, 104f)
-private val GlowAlphas = floatArrayOf(0.34f, 0.15f, 0.06f)
+private val GlowWidths = floatArrayOf(24f, 48f, 76f, 110f, 150f)
+private val GlowAlphas = floatArrayOf(0.14f, 0.09f, 0.06f, 0.035f, 0.018f)
 
 /** How much light the flash adds to the wave at its peak. */
-private const val FlashCoreAlpha = 0.85f
+private const val FlashCoreAlpha = 0.5f
 
 private val LogoWidth = 51.dp
 private val LogoHeight = 35.dp
