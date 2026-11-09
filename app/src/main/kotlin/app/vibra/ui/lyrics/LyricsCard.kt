@@ -5,6 +5,7 @@
 
 package app.vibra.ui.lyrics
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -193,6 +194,8 @@ internal suspend fun renderLyricsCard(
     bitmap
 }
 
+// Layout.BREAK_STRATEGY_* has the same values as LineBreaker.BREAK_STRATEGY_*, which needs API 29.
+@SuppressLint("WrongConstant")
 private fun cardText(
     text: String,
     font: Typeface,
