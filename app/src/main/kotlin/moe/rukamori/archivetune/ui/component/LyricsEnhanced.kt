@@ -84,6 +84,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.media3.common.Player
+import app.vibra.ui.components.artworkAccent
 import app.vibra.ui.lyrics.LyricsEntrance
 import app.vibra.ui.lyrics.LyricsCardContent
 import app.vibra.ui.lyrics.LyricsExportDialog
@@ -451,7 +452,13 @@ fun LyricsEnhanced(
     }
 
     preview?.let { content ->
-        LyricsExportDialog(content = content, onDismiss = { preview = null }, saveLegacy = saveLegacy)
+        LyricsExportDialog(
+            content = content,
+            // Taken once when the card opens, so the preview is not redrawn while the accent fades.
+            accent = remember(content) { artworkAccent(exportTint) },
+            onDismiss = { preview = null },
+            saveLegacy = saveLegacy,
+        )
     }
 }
 

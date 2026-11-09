@@ -10,12 +10,10 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
-import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.Rect
 import android.graphics.RectF
-import android.graphics.Shader
 import android.graphics.Typeface
 import android.text.Layout
 import android.text.StaticLayout
@@ -29,9 +27,6 @@ import coil3.imageLoader
 import coil3.request.ImageRequest
 import coil3.request.allowHardware
 import coil3.toBitmap
-import kotlin.math.PI
-import kotlin.math.cos
-import kotlin.math.sin
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
@@ -79,21 +74,10 @@ internal suspend fun renderLyricsCard(
 ): Bitmap? = withContext(Dispatchers.Default) {
     val story = format == LyricsCardFormat.Story
     val height = format.height
-    val base = primary.toArgb()
-    val start = if (ColorUtils.calculateLuminance(base) < 0.45) {
-        ColorUtils.blendARGB(base, Color.WHITE, 0.64f)
-    } else {
-        base
-    }
-    val end = ColorUtils.blendARGB(start, Color.rgb(89, 53, 171), 0.20f)
-    val lowerCookie = ColorUtils.setAlphaComponent(Color.rgb(127, 95, 214), 41)
-    val darkest = ColorUtils.compositeColors(lowerCookie, end)
-    val themeInk = onPrimary.toArgb()
-    val violetInk = Color.rgb(56, 30, 114)
-    val ink = listOf(themeInk, violetInk).firstOrNull { candidate ->
-        ColorUtils.calculateLuminance(candidate) < ColorUtils.calculateLuminance(darkest) &&
-            ColorUtils.calculateContrast(candidate, darkest) >= 4.5
-    } ?: Color.rgb(23, 19, 27)
+    // Vibra: one flat field in the cover's colour, the same accent the player paints its controls with.
+    val background = primary.toArgb() or 0xFF000000.toInt()
+    val ink = onPrimary.toArgb().takeIf { ColorUtils.calculateContrast(it or 0xFF000000.toInt(), background) >= 4.5 }
+        ?: listOf(Color.rgb(23, 19, 27), Color.WHITE).maxBy { ColorUtils.calculateContrast(it, background) }
     val baseFont = context.resources.getFont(R.font.vibra_google_sans_flex)
     val coverSize = if (story) 104 else 84
     val headerTop = if (story) 230 else Margin
@@ -132,20 +116,8 @@ internal suspend fun renderLyricsCard(
     val bitmap = Bitmap.createBitmap(LyricsCardWidth, height, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(bitmap)
     val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
-    paint.shader = LinearGradient(
-        0f, 0f, height * 0.26f, height.toFloat(),
-        intArrayOf(start, ColorUtils.blendARGB(start, end, 0.44f), end),
-        null,
-        Shader.TileMode.CLAMP,
-    )
+    paint.color = background
     canvas.drawPaint(paint)
-    paint.shader = null
-    val upperRadius = if (story) 450f else 310f
-    paint.color = ColorUtils.setAlphaComponent(Color.WHITE, 56)
-    canvas.drawPath(cookie(LyricsCardWidth - upperRadius * 0.25f, upperRadius * 0.22f, upperRadius), paint)
-    val lowerRadius = if (story) 380f else 260f
-    paint.color = lowerCookie
-    canvas.drawPath(cookie(lowerRadius * 0.16f, height - lowerRadius * 0.24f, lowerRadius), paint)
 
     val coverBounds = RectF(Margin.toFloat(), headerTop.toFloat(), (Margin + coverSize).toFloat(), (headerTop + coverSize).toFloat())
     canvas.save()
@@ -170,7 +142,7 @@ internal suspend fun renderLyricsCard(
     val metaX = Margin + coverSize + 22
     val metaWidth = LyricsCardWidth - Margin - metaX
     val title = cardText(content.title, baseFont, if (story) 44f else 36f, ink, metaWidth, maxLines = 1, weight = 600)
-    val subtitleAlpha = maxOf(204, ColorUtils.calculateMinimumAlpha(ink, darkest, 4.5f))
+    val subtitleAlpha = maxOf(204, ColorUtils.calculateMinimumAlpha(ink, background, 4.5f))
     val subtitle = cardText(
         content.subtitle, baseFont, if (story) 34f else 28f,
         ColorUtils.setAlphaComponent(ink, subtitleAlpha), metaWidth, maxLines = 1, weight = 500,
@@ -237,15 +209,4 @@ private fun drawCardIcon(context: Context, icon: Int, canvas: Canvas, color: Int
         setBounds(x, y, x + size, y + size)
         draw(canvas)
     }
-}
-
-private fun cookie(centerX: Float, centerY: Float, radius: Float): Path = Path().apply {
-    for (step in 0 until 240) {
-        val angle = step * 2 * PI / 240
-        val distance = radius * (1 + 0.07 * cos(12 * angle))
-        val x = centerX + (distance * cos(angle)).toFloat()
-        val y = centerY + (distance * sin(angle)).toFloat()
-        if (step == 0) moveTo(x, y) else lineTo(x, y)
-    }
-    close()
 }

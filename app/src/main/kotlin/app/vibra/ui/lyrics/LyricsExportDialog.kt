@@ -77,6 +77,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import app.vibra.ui.components.ArtworkAccent
 import app.vibra.ui.components.VibraBottomSheet
 import app.vibra.ui.components.VibraDialogButton
 import app.vibra.ui.motion.Liquid
@@ -159,6 +160,7 @@ private sealed interface CardPreview {
 @Composable
 internal fun LyricsExportDialog(
     content: LyricsCardContent,
+    accent: ArtworkAccent,
     onDismiss: () -> Unit,
     saveLegacy: suspend (Bitmap) -> Unit,
 ) {
@@ -166,8 +168,9 @@ internal fun LyricsExportDialog(
     val scope = rememberCoroutineScope()
     val colors = MaterialTheme.colorScheme
     val haptics = rememberVibraHaptics()
-    val primary = colors.primary
-    val onPrimary = colors.onPrimary
+    // The card takes the cover's colour, like the player; the sheet itself stays in the theme.
+    val primary = accent.color
+    val onPrimary = accent.on
     var format by rememberSaveable { mutableStateOf(LyricsCardFormat.Square) }
     var cover by remember(content) { mutableStateOf<Bitmap?>(null) }
     var coverReady by remember(content) { mutableStateOf(false) }
