@@ -299,8 +299,11 @@ fun VibraLogoMark(
     color: Color = MaterialTheme.colorScheme.onBackground,
 ) {
     val logo = remember { logoPath() }
-    // On a light background a white flash would vanish: there the flash is the liquid's lilac.
-    val flashColor = if (color.luminance() > 0.5f) Color.White else Color(0xFF8B5CF6)
+    // The liquid takes the app's colour. On a light background a white flash would vanish:
+    // there the flash is the accent itself.
+    val accent = MaterialTheme.colorScheme.primary
+    val palette = remember(accent) { LiquidLogo.palette(accent) }
+    val flashColor = if (color.luminance() > 0.5f) Color.White else accent
     Canvas(modifier = modifier.size(LogoWidth, LogoHeight)) {
         if (state == null) {
             drawPath(logo.scaledTo(size), color)
@@ -333,7 +336,7 @@ fun VibraLogoMark(
                         ),
                     )
                 }
-                drawLiquidWave(logo, clock, liquid)
+                drawLiquidWave(palette, logo, clock, liquid)
                 if (flash > 0f) {
                     drawCircle(
                         Brush.radialGradient(

@@ -5,6 +5,7 @@
 
 package app.vibra.ui.components
 
+import android.graphics.Color as AndroidColor
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -14,6 +15,7 @@ import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.toArgb
 import kotlin.math.PI
 import kotlin.math.atan2
 import kotlin.math.cos
@@ -24,7 +26,8 @@ import kotlin.math.sqrt
 /**
  * The liquid gradient of the splash (res/drawable/splash_liquid.xml), live: five soft blobs
  * on springs chasing targets around the wave, one 4 s cycle that loops without a seam.
- * Same simulation and constants as the splash, so the two read as one animation.
+ * Same simulation and constants as the splash, so the two read as one animation; the
+ * colours follow the app's accent (see [palette]).
  *
  * Coordinates are the logo's own (the 1080 icon viewport the wave path is drawn in).
  */
@@ -73,26 +76,58 @@ internal object LiquidLogo {
     /** x, y, vx, vy per blob per recorded step: one cycle at steady state. */
     private val baked: FloatArray by lazy { bake() }
 
-    val baseBrush: Brush =
-        Brush.linearGradient(
-            0f to Color(0xFF3F3FC4),
-            0.5f to Color(0xFF7D55DC),
-            1f to Color(0xFFC39AF0),
-            start = Offset(160f, 800f),
-            end = Offset(920f, 300f),
-        )
+    /** The colours of one liquid: the wave's base gradient and one brush per blob. */
+    class Palette internal constructor(
+        internal val base: Brush,
+        internal val blobs: List<Brush>,
+    )
 
-    private val blobBrushes: List<Brush> =
-        blobs.map { b ->
-            val c = Color(b.color)
-            Brush.radialGradient(
-                0f to c.copy(alpha = 0.95f),
-                0.45f to c.copy(alpha = 0.55f),
-                1f to c.copy(alpha = 0f),
-                center = Offset.Zero,
-                radius = b.radius,
-            )
+    private val baseColors = longArrayOf(0xFF3F3FC4, 0xFF7D55DC, 0xFFC39AF0)
+
+    /** Hue of the splash palette's centre (its violet blob): the one the accent replaces. */
+    private const val PALETTE_HUE = 258f
+
+    /**
+     * The splash palette turned to the app's [accent]: every colour keeps its distance in hue
+     * from the centre (so the blue, cyan, pink and lilac stay relative to it) and its
+     * lightness; a greyish accent makes the whole liquid as muted.
+     */
+    fun palette(accent: Color): Palette {
+        val hsv = FloatArray(3)
+        AndroidColor.colorToHSV(accent.toArgb(), hsv)
+        val shift = hsv[0] - PALETTE_HUE
+        val mute = (hsv[1] / FULL_SATURATION).coerceIn(0f, 1f)
+        fun turn(argb: Long): Color {
+            val c = FloatArray(3)
+            AndroidColor.colorToHSV(argb.toInt(), c)
+            c[0] = ((c[0] + shift) % 360f + 360f) % 360f
+            c[1] *= mute
+            return Color(AndroidColor.HSVToColor(c))
         }
+        val base =
+            Brush.linearGradient(
+                0f to turn(baseColors[0]),
+                0.5f to turn(baseColors[1]),
+                1f to turn(baseColors[2]),
+                start = Offset(160f, 800f),
+                end = Offset(920f, 300f),
+            )
+        val blobBrushes =
+            blobs.map { b ->
+                val c = turn(b.color)
+                Brush.radialGradient(
+                    0f to c.copy(alpha = 0.95f),
+                    0.45f to c.copy(alpha = 0.55f),
+                    1f to c.copy(alpha = 0f),
+                    center = Offset.Zero,
+                    radius = b.radius,
+                )
+            }
+        return Palette(base, blobBrushes)
+    }
+
+    /** Accent saturation (HSV) from which the liquid keeps its full colour. */
+    private const val FULL_SATURATION = 0.25f
 
     private fun ease(t: Float) = (-(cos(PI * t) - 1) / 2).toFloat()
 
@@ -194,6 +229,7 @@ internal object LiquidLogo {
      * and out; above 1 (a spring overshooting) they swell.
      */
     private fun DrawScope.drawBlobs(
+        palette: Palette,
         timeMs: Float,
         intensity: Float,
     ) {
@@ -217,23 +253,24 @@ internal object LiquidLogo {
             translate(x, y) {
                 rotate(angle, pivot = Offset.Zero) {
                     scale(swell * (1 + 0.5f * stretch), swell * (1 - 0.2f * stretch), pivot = Offset.Zero) {
-                        drawCircle(blobBrushes[j], radius = blobs[j].radius, center = Offset.Zero, alpha = alpha)
+                        drawCircle(palette.blobs[j], radius = blobs[j].radius, center = Offset.Zero, alpha = alpha)
                     }
                 }
             }
         }
     }
 
-    /** The full liquid fill, clipped to [wave] (logo coordinates). */
+    /** The full liquid fill in [palette], clipped to [wave] (logo coordinates). */
     fun DrawScope.drawLiquidWave(
+        palette: Palette,
         wave: Path,
         timeMs: Float,
         intensity: Float,
     ) {
         if (intensity <= 0f) return
         clipPath(wave) {
-            drawPath(wave, baseBrush, alpha = intensity.coerceIn(0f, 1f))
-            drawBlobs(timeMs, intensity)
+            drawPath(wave, palette.base, alpha = intensity.coerceIn(0f, 1f))
+            drawBlobs(palette, timeMs, intensity)
         }
     }
 }
