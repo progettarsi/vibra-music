@@ -7,14 +7,12 @@
 
 package app.vibra.ui.components
 
+import android.os.SystemClock
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationSpec
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -32,19 +30,25 @@ import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Matrix
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
@@ -53,11 +57,10 @@ import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import app.vibra.ui.haptics.rememberVibraHaptics
-import app.vibra.ui.motion.Liquid
-import app.vibra.ui.motion.LiquidSpeed
 import kotlin.math.exp
 import kotlin.math.ln
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import moe.rukamori.archivetune.LocalAnimationsDisabled
@@ -67,14 +70,15 @@ import moe.rukamori.archivetune.LocalAnimationsDisabled
  *
  *  - Pulling lowers the content (iOS-style) against a growing resistance: it follows the
  *    finger closely at first and ever less after, like a rubber band, never stopping dead.
- *    The logo stays where it is and its fill *drains away* to the right in proportion to
- *    the pull; a haptic marks the point of no return.
+ *    The logo stays where it is and its fill *drains away* to the right, behind a soft
+ *    edge, in proportion to the pull; a haptic marks the point of no return.
  *  - Release: the content leaves the finger on a bouncy spring that keeps the finger's
  *    speed, into the refreshing position (a small dip below it) or, short of the
- *    threshold, back home (a small rise above it). While refreshing a bright band of fill
- *    flows through the wave in a loop.
- *  - Done: the wave fills back up from the left, the content springs home overshooting a
- *    touch upwards, and a haptic says it is finished.
+ *    threshold, back home (a small rise above it). While refreshing the liquid gradient of
+ *    the splash surges into the wave and keeps moving, glowing beyond it too. A refresh is
+ *    shown for at least [MinLiquidMs], so the phases never cut each other short.
+ *  - Done: the wave flashes white and slowly returns to its plain colour while the content
+ *    springs home overshooting a touch upwards, and a haptic says it is finished.
  *
  * [content] receives the modifier that applies the downward travel (put it on the root of
  * the content that moves, not around the logo) and the [RefreshLogoState] to hand to
@@ -92,16 +96,57 @@ fun VibraPullToRefresh(
     val animationsDisabled = LocalAnimationsDisabled.current
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
-    val refreshing by rememberUpdatedState(isRefreshing)
 
-    // Refill after a refresh completes.
-    val refill = remember { Animatable(1f) }
-    val refillSpec = Liquid.effects<Float>(LiquidSpeed.Slow)
+    // The refresh as shown: a refresh that ends very quickly is held until the liquid has had
+    // time to surge in and move, so the three phases always play out in full.
+    var shown by remember { mutableStateOf(isRefreshing) }
+    var shownSince by remember { mutableLongStateOf(0L) }
     LaunchedEffect(isRefreshing) {
         if (isRefreshing) {
-            refill.snapTo(0f)
-        } else if (refill.value < 1f) {
-            refill.animateTo(1f, refillSpec)
+            shownSince = SystemClock.uptimeMillis()
+            shown = true
+        } else if (shown) {
+            val held = SystemClock.uptimeMillis() - shownSince
+            if (!animationsDisabled && held < MinLiquidMs) delay(MinLiquidMs - held)
+            shown = false
+        }
+    }
+    val refreshing by rememberUpdatedState(shown)
+
+    // Liquid fill: surges in on a bouncy spring when the refresh starts (overshoot swells the
+    // blobs) and fades under the flash at the end. Flash: the wave glows white on completion,
+    // then slowly returns to its plain colour.
+    val liquid = remember { Animatable(0f) }
+    val flash = remember { Animatable(0f) }
+    var liquidClockMs by remember { mutableFloatStateOf(0f) }
+    LaunchedEffect(shown) {
+        if (shown) {
+            flash.snapTo(0f)
+            if (animationsDisabled) {
+                liquid.snapTo(1f)
+            } else {
+                liquid.snapTo(0f)
+                liquid.animateTo(1f, spring(dampingRatio = SurgeDamping, stiffness = SurgeStiffness))
+            }
+        } else if (liquid.value > 0f) {
+            if (animationsDisabled) {
+                liquid.snapTo(0f)
+                return@LaunchedEffect
+            }
+            flash.animateTo(1f, tween(FlashInMs, easing = LinearOutSlowInEasing))
+            launch { liquid.animateTo(0f, tween(LiquidOutMs, easing = FastOutSlowInEasing)) }
+            flash.animateTo(0f, tween(FlashOutMs, easing = FastOutSlowInEasing))
+        }
+    }
+    // The liquid's own clock, ticking only while it is visible (read in draw only).
+    LaunchedEffect(shown, animationsDisabled) {
+        if (animationsDisabled) return@LaunchedEffect
+        if (shown) {
+            val start = withFrameNanos { it }
+            while (true) withFrameNanos { liquidClockMs = (it - start) / 1_000_000f }
+        } else {
+            val start = withFrameNanos { it } - (liquidClockMs * 1_000_000f).toLong()
+            while (liquid.value > 0f || liquid.isRunning) withFrameNanos { liquidClockMs = (it - start) / 1_000_000f }
         }
     }
 
@@ -114,8 +159,8 @@ fun VibraPullToRefresh(
     var following by remember { mutableStateOf(true) }
     // The spring a release started; a new pull takes the content back from it.
     var settling by remember { mutableStateOf<Job?>(null) }
-    LaunchedEffect(isRefreshing) {
-        if (isRefreshing) {
+    LaunchedEffect(shown) {
+        if (shown) {
             following = false
             // Interrupts a release spring heading here, keeping its speed.
             travel.animateTo(1f, bounce)
@@ -153,28 +198,26 @@ fun VibraPullToRefresh(
         }
     }
     val latestRelease by rememberUpdatedState(release)
-    val flow =
-        if (isRefreshing && !animationsDisabled) {
-            rememberInfiniteTransition(label = "refreshFlow")
-                .animateFloat(
-                    initialValue = 0f,
-                    targetValue = 1f,
-                    animationSpec = infiniteRepeatable(tween(1_100, easing = LinearEasing), RepeatMode.Restart),
-                    label = "refreshFlowPhase",
-                )
-        } else {
-            null
-        }
     val logo =
         RefreshLogoState(
-            isRefreshing = isRefreshing,
+            isRefreshing = shown,
             pull = { state.distanceFraction.coerceIn(0f, 1f) },
-            refill = { refill.value },
-            flow = flow?.let { phase -> { phase.value } },
+            drain = {
+                when {
+                    refreshing -> 1f
+                    // Under the flash the wave is already full again, while the stock state
+                    // eases back on its own; a new pull takes over once the finger is followed.
+                    !following && (flash.value > 0f || flash.isRunning) -> 0f
+                    else -> state.distanceFraction.coerceIn(0f, 1f)
+                }
+            },
+            liquid = { liquid.value },
+            liquidClockMs = { liquidClockMs },
+            flash = { flash.value },
         )
 
     PullToRefreshBox(
-        isRefreshing = isRefreshing,
+        isRefreshing = shown,
         onRefresh = {
             haptics.threshold()
             onRefresh()
@@ -224,15 +267,31 @@ private fun rubberBand(fraction: Float): Float = MaxPull * (1f - exp(-fraction.c
 /** How much travel one more unit of pull gives at [fraction] (the rubber band's slope). */
 private fun rubberBandSlope(fraction: Float): Float = PullStretch * exp(-fraction.coerceAtLeast(0f) * PullStretch / MaxPull)
 
-/** Frame-time inputs of the animated logo (read in draw only). */
+/**
+ * Frame-time inputs of the animated logo (read in draw only).
+ *
+ * @property pull the stock pull, 0..1 of the refresh threshold.
+ * @property drain how far the plain fill has drained away (0 full, 1 empty).
+ * @property liquid strength of the liquid gradient (a spring: may overshoot 1).
+ * @property liquidClockMs the liquid's own clock.
+ * @property flash white glow on completion, 0..1.
+ */
 class RefreshLogoState(
     val isRefreshing: Boolean,
     val pull: () -> Float,
-    val refill: () -> Float,
-    val flow: (() -> Float)?,
+    val drain: () -> Float,
+    val liquid: () -> Float,
+    val liquidClockMs: () -> Float,
+    val flash: () -> Float,
 )
 
-/** The VIBRA wave; with a [state] it drains, flows and refills with the refresh. */
+/**
+ * The VIBRA wave. With a [state] it is the refresh indicator:
+ *  1. pulling: the fill drains away to the right behind a soft edge, the logo stays put;
+ *  2. refreshing: the liquid gradient of the splash surges in and keeps moving, glowing
+ *     beyond the wave as well;
+ *  3. done: the wave flashes white, then slowly returns to its plain colour.
+ */
 @Composable
 fun VibraLogoMark(
     state: RefreshLogoState?,
@@ -240,27 +299,58 @@ fun VibraLogoMark(
     color: Color = MaterialTheme.colorScheme.onBackground,
 ) {
     val logo = remember { logoPath() }
+    // On a light background a white flash would vanish: there the flash is the liquid's lilac.
+    val flashColor = if (color.luminance() > 0.5f) Color.White else Color(0xFF8B5CF6)
     Canvas(modifier = modifier.size(LogoWidth, LogoHeight)) {
-        val path = logo.scaledTo(size)
         if (state == null) {
-            drawPath(path, color)
+            drawPath(logo.scaledTo(size), color)
             return@Canvas
         }
-        val flow = state.flow
-        val refill = state.refill()
-        val pull = state.pull()
-        if (flow != null || refill < 1f || pull > 0f) drawPath(path, color.copy(alpha = 0.18f))
-        when {
-            flow != null -> {
-                // A band of fill travelling through the wave.
-                val band = 0.42f
-                val start = (flow() * (1f + band) - band) * size.width
-                clipRect(left = start, right = start + band * size.width) { drawPath(path, color) }
+        val drain = state.drain()
+        val liquid = state.liquid()
+        val flash = state.flash()
+        val clock = state.liquidClockMs()
+        // Everything below is drawn in the logo's own coordinates.
+        withTransform({
+            scale(size.width / LogoViewportWidth, size.height / LogoViewportHeight, pivot = Offset.Zero)
+            translate(-LogoViewportX, -LogoViewportY)
+        }) {
+            with(LiquidLogo) {
+                // Halo first, so the wave sits on top of it.
+                drawBlobs(clock, liquid, glow = true)
+                if (drain <= 0f) {
+                    drawPath(logo, color)
+                } else {
+                    // Faint on the left, full on the right, across a soft edge that moves with the pull.
+                    val edge = -DrainSoftness + drain * (1f + 2 * DrainSoftness)
+                    val x0 = LogoViewportX + (edge - DrainSoftness) * LogoViewportWidth
+                    val x1 = LogoViewportX + (edge + DrainSoftness) * LogoViewportWidth
+                    drawPath(
+                        logo,
+                        Brush.horizontalGradient(
+                            0f to color.copy(alpha = DrainedAlpha),
+                            1f to color,
+                            startX = x0,
+                            endX = x1,
+                        ),
+                    )
+                }
+                drawLiquidWave(logo, clock, liquid)
+                if (flash > 0f) {
+                    drawCircle(
+                        Brush.radialGradient(
+                            0f to flashColor.copy(alpha = 0.5f),
+                            1f to flashColor.copy(alpha = 0f),
+                            center = Offset(LogoCenterX, LogoCenterY),
+                            radius = LogoViewportWidth * 0.75f,
+                        ),
+                        radius = LogoViewportWidth * 0.75f,
+                        center = Offset(LogoCenterX, LogoCenterY),
+                        alpha = flash,
+                    )
+                    drawPath(logo, flashColor, alpha = flash)
+                }
             }
-            state.isRefreshing -> drawPath(path, color.copy(alpha = 0.6f))
-            refill < 1f -> clipRect(right = size.width * refill) { drawPath(path, color) }
-            // Pulling: the fill drains away to the right as the pull grows.
-            else -> clipRect(left = size.width * pull) { drawPath(path, color) }
         }
     }
 }
@@ -296,6 +386,27 @@ private const val StockDragMultiplier = 0.5f
 
 /** Cap on the speed a release hands to the spring (refreshing positions per second). */
 private const val MaxReleaseSpeed = 8f
+
+/** A refresh is shown at least this long, so the liquid always surges in and moves. */
+private const val MinLiquidMs = 1_100L
+
+/** The liquid's entrance: a strong, bouncy spring (its overshoot swells the blobs). */
+private const val SurgeDamping = 0.42f
+private const val SurgeStiffness = 420f
+
+/** Completion: quick white flash, liquid fading under it, slow return to the plain colour. */
+private const val FlashInMs = 140
+private const val LiquidOutMs = 520
+private const val FlashOutMs = 1_100
+
+/** Half width of the soft edge of the draining fill (fraction of the logo width). */
+private const val DrainSoftness = 0.16f
+
+/** What is left of the plain fill once drained. */
+private const val DrainedAlpha = 0.18f
+
+private const val LogoCenterX = 540f
+private const val LogoCenterY = 540f
 
 private val LogoWidth = 51.dp
 private val LogoHeight = 35.dp
