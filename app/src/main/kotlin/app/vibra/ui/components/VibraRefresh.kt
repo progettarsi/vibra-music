@@ -11,7 +11,6 @@ import android.os.SystemClock
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
@@ -42,10 +41,14 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Matrix
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
@@ -133,7 +136,7 @@ fun VibraPullToRefresh(
                 liquid.snapTo(0f)
                 return@LaunchedEffect
             }
-            flash.animateTo(1f, tween(FlashInMs, easing = LinearOutSlowInEasing))
+            flash.animateTo(1f, tween(FlashInMs, easing = FastOutSlowInEasing))
             launch { liquid.animateTo(0f, tween(LiquidOutMs, easing = FastOutSlowInEasing)) }
             flash.animateTo(0f, tween(FlashOutMs, easing = FastOutSlowInEasing))
         }
@@ -338,18 +341,18 @@ fun VibraLogoMark(
                 }
                 drawLiquidWave(palette, logo, clock, liquid)
                 if (flash > 0f) {
-                    drawCircle(
-                        Brush.radialGradient(
-                            0f to flashColor.copy(alpha = 0.5f),
-                            1f to flashColor.copy(alpha = 0f),
-                            center = Offset(LogoCenterX, LogoCenterY),
-                            radius = LogoViewportWidth * 0.75f,
-                        ),
-                        radius = LogoViewportWidth * 0.75f,
-                        center = Offset(LogoCenterX, LogoCenterY),
-                        alpha = flash,
-                    )
-                    drawPath(logo, flashColor, alpha = flash)
+                    // A bloom that hugs the wave: wider, fainter strokes of its own outline.
+                    for (i in GlowWidths.indices) {
+                        drawPath(
+                            logo,
+                            flashColor,
+                            alpha = flash * GlowAlphas[i],
+                            style = Stroke(width = GlowWidths[i], cap = StrokeCap.Round, join = StrokeJoin.Round),
+                        )
+                    }
+                    // Light added to the fill rather than paint over it: the liquid's colours
+                    // burn towards white and keep a trace of their hue.
+                    drawPath(logo, flashColor, alpha = flash * FlashCoreAlpha, blendMode = BlendMode.Plus)
                 }
             }
         }
@@ -396,9 +399,9 @@ private const val SurgeDamping = 0.42f
 private const val SurgeStiffness = 420f
 
 /** Completion: quick white flash, liquid fading under it, slow return to the plain colour. */
-private const val FlashInMs = 140
+private const val FlashInMs = 220
 private const val LiquidOutMs = 520
-private const val FlashOutMs = 1_100
+private const val FlashOutMs = 1_200
 
 /** Half width of the soft edge of the draining fill (fraction of the logo width). */
 private const val DrainSoftness = 0.16f
@@ -406,8 +409,12 @@ private const val DrainSoftness = 0.16f
 /** What is left of the plain fill once drained. */
 private const val DrainedAlpha = 0.18f
 
-private const val LogoCenterX = 540f
-private const val LogoCenterY = 540f
+/** Bloom around the wave on completion: stroke widths (logo units) and their strengths. */
+private val GlowWidths = floatArrayOf(28f, 60f, 104f)
+private val GlowAlphas = floatArrayOf(0.34f, 0.15f, 0.06f)
+
+/** How much light the flash adds to the wave at its peak. */
+private const val FlashCoreAlpha = 0.85f
 
 private val LogoWidth = 51.dp
 private val LogoHeight = 35.dp
