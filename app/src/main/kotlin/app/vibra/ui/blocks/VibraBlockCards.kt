@@ -13,6 +13,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import app.vibra.ui.motion.clickable
 import app.vibra.ui.motion.combinedClickable
+import app.vibra.ui.motion.interactiveLongSurface
 import app.vibra.ui.motion.interactiveSurface
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -284,7 +285,7 @@ private fun ForYouMosaic(
             Modifier
                 .fillMaxSize()
                 .background(Color.Black.copy(alpha = if (blurSupported) 0.22f else 0.5f))
-                .background(Brush.verticalGradient(0.35f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.45f))),
+                .background(Brush.verticalGradient(0.35f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.6f))),
         )
         Column(
             modifier = Modifier.align(Alignment.BottomStart).padding(start = 20.dp, end = 20.dp, top = 20.dp, bottom = if (compact) 88.dp else 20.dp),
@@ -483,18 +484,18 @@ private fun LabeledCover(
     onPlay: (() -> Unit)? = null,
     containerInset: Dp = 10.dp,
 ) {
+    val shape = concentricRoundedCornerShape(32.dp, containerInset)
     Column(
         modifier =
             modifier
                 .entryTapBounce(entry)
-                .clip(concentricRoundedCornerShape(32.dp, containerInset))
-                .combinedClickable(onClick = entry.onClick, onLongClick = entry.onLongClick),
+                .interactiveLongSurface(shape, entry.onLongClick, role = null, onClick = entry.onClick),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Box(modifier = Modifier.fillMaxWidth().aspectRatio(1f)) {
             VibraArtwork(
                 url = entry.thumbnailUrl,
-                shape = if (entry.circular) CircleShape else concentricRoundedCornerShape(32.dp, containerInset),
+                shape = if (entry.circular) CircleShape else shape,
                 contentDescription = entry.title,
                 modifier = Modifier.matchParentSize(),
             )
@@ -520,7 +521,7 @@ private fun LabeledCover(
             textAlign = TextAlign.Center,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.expansionElement(entry.title, "title").padding(top = 6.dp, start = 4.dp, end = 4.dp),
+            modifier = Modifier.padding(top = 6.dp, start = 4.dp, end = 4.dp).expansionElement(entry.title, "title"),
         )
         entry.subtitle?.takeIf { it.isNotBlank() }?.let {
             Text(
@@ -978,7 +979,7 @@ fun PlaylistsBlock(
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(top = 8.dp),
+                    modifier = Modifier.padding(top = 8.dp).expansionElement(first.title, "title"),
                 )
             }
             val rest = entries.drop(1).take(if (size == BlockSize.Large) 4 else 2)
@@ -1096,7 +1097,7 @@ const val MosaicMinCovers = 3
 /** How much the mosaic is enlarged and tilted so its edges never show inside the card. */
 private const val MosaicOverscan = 1.35f
 private const val MosaicTilt = -8f
-private val MosaicBlur = 22.dp
+private val MosaicBlur = 12.dp
 private val PlaylistRowHeight = 137.dp
 
 /** Spotlight cover: a little wider than tall, so the block is big without filling the screen. */

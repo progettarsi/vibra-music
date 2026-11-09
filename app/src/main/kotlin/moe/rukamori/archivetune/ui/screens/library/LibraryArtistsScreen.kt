@@ -7,6 +7,8 @@
 
 package moe.rukamori.archivetune.ui.screens.library
 
+import app.vibra.playback.lazyMediaItems
+import app.vibra.playback.metadataOf
 // Vibra: independent radii follow the global rounding style.
 import app.vibra.ui.theme.adaptiveRoundedCornerShape
 
@@ -81,7 +83,6 @@ import moe.rukamori.archivetune.constants.ArtistSortDescendingKey
 import moe.rukamori.archivetune.constants.ArtistSortType
 import moe.rukamori.archivetune.constants.ArtistSortTypeKey
 import moe.rukamori.archivetune.constants.YtmSyncKey
-import moe.rukamori.archivetune.extensions.toMediaItem
 import moe.rukamori.archivetune.playback.queues.ListQueue
 import moe.rukamori.archivetune.ui.component.ItemThumbnail
 import moe.rukamori.archivetune.ui.component.LocalMenuState
@@ -238,7 +239,7 @@ fun LibraryArtistsScreen(
                                                             ArtistSongSortType.CREATE_DATE,
                                                             true,
                                                         ).first()
-                                                        .map { it.toMediaItem() }
+                                                        .lazyMediaItems { metadataOf(it) }
                                                 if (songs.isNotEmpty()) {
                                                     playerConnection?.playQueue(
                                                         ListQueue(
@@ -576,7 +577,7 @@ fun LibraryArtistsScreen(
                                             ArtistSongSortType.CREATE_DATE,
                                             true,
                                         ).first()
-                                        .map { it.toMediaItem() }
+                                        .lazyMediaItems { metadataOf(it) }
                                 if (songs.isNotEmpty()) {
                                     playerConnection?.playQueue(
                                         ListQueue(

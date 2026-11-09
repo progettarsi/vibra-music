@@ -273,7 +273,7 @@ fun AddToPlaylistDialogOnline(
           .heightIn(max = app.vibra.ui.components.vibraDialogNaturalMaxHeight()),
         verticalArrangement = Arrangement.spacedBy(10.dp),
       ) {
-        ControlSheetHeader(stringResource(R.string.add_to_playlist), "", R.drawable.playlist_add)
+        ControlSheetHeader(stringResource(R.string.add_to_playlist), "", R.drawable.add_box)
         MenuCard(Modifier.weight(1f, fill = false)) {
           if (available.size > 8)
             androidx.compose.material3.TextField(

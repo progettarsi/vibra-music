@@ -6,7 +6,7 @@
     <string name="pause">Pausa</string>
     <string name="vibra_open_player">Apri il player</string>
     <string name="vibra_close_player">Chiudi il player</string>
-    <string name="vibra_search_hint">Cerca brani, artisti, album</string>
+    <string name="vibra_search_hint">Cerca brani e artisti</string>
     <string name="vibra_clear_search">Cancella la ricerca</string>
     <string name="vibra_from_source">Da: %1$s</string>
     <string name="vibra_now_playing">In riproduzione</string>
@@ -46,10 +46,16 @@
     <string name="vibra_liked_songs_count">Brani preferiti · %1$d</string>
     <string name="vibra_library_empty">La tua libreria è ancora vuota. Aggiungi brani ai preferiti, salva album o crea una playlist: li troverai qui, organizzati in base a ciò che ascolti di più.</string>
     <string name="vibra_listening_summary">I tuoi ascolti</string>
-    <string name="vibra_minutes_this_week">minuti questa settimana</string>
-    <string name="vibra_songs_this_week">brani diversi questa settimana</string>
+    <plurals name="vibra_minutes_this_week">
+        <item quantity="one">minuto questa settimana</item>
+        <item quantity="other">minuti questa settimana</item>
+    </plurals>
+    <plurals name="vibra_songs_this_week">
+        <item quantity="one">brano diverso questa settimana</item>
+        <item quantity="other">brani diversi questa settimana</item>
+    </plurals>
     <string name="vibra_edit_profile">Modifica profilo</string>
-    <string name="vibra_no_favourite_yet">Ascolta un po\' di musica per scoprirlo</string>
+    <string name="vibra_no_favourite_yet">Ascolta qualcosa per scoprirlo</string>
     <string name="vibra_profile_shape">Forma</string>
     <string name="vibra_profile_colour">Colore principale</string>
     <string name="vibra_shape_flower">Fiore</string>
@@ -133,7 +139,7 @@
     <string name="vibra_menu_start_timer">Avvia</string>
     <string name="vibra_timer_stops_at">Si ferma alle %1$s</string>
     <string name="vibra_menu_create">Crea</string>
-    <string name="vibra_menu_next">Dopo</string>
+    <string name="vibra_menu_next">Subito dopo</string>
     <string name="vibra_menu_queue">In coda</string>
     <string name="vibra_menu_playlist">Playlist</string>
     <string name="vibra_menu_download">Scarica</string>
@@ -236,4 +242,20 @@
     <string name="vibra_media_info_on_phone">Sul telefono</string>
     <string name="vibra_media_info_local_title">Numeri e descrizione non disponibili</string>
     <string name="vibra_media_info_local_body">Questo brano è un file sul telefono, quindi non ha visualizzazioni né descrizione online.</string>
+
+    <string name="vibra_lyrics_select_verse">Seleziona verso</string>
+    <string name="vibra_lyrics_card_preview">Anteprima della card. %1$s</string>
+    <string name="vibra_lyrics_card_too_long">I versi occupano troppo spazio per questo formato. Prova 9:16 o seleziona meno versi.</string>
+    <string name="vibra_lyrics_portrait_too_long">I versi occupano troppo spazio. Selezionane di meno.</string>
+    <string name="vibra_lyrics_card_failed">Impossibile creare l’anteprima.</string>
+    <string name="vibra_lyrics_retry">Riprova</string>
+    <string name="vibra_lyrics_save">Salva</string>
+    <string name="vibra_lyrics_share">Condividi</string>
+    <string name="vibra_lyrics_export_working">Preparazione immagine…</string>
+    <string name="vibra_lyrics_saved">Immagine salvata in Pictures/VIBRA.</string>
+    <string name="vibra_lyrics_document_saved">Immagine salvata.</string>
+    <string name="vibra_lyrics_save_failed">Impossibile salvare l’immagine. Riprova.</string>
+    <string name="vibra_lyrics_share_failed">Impossibile aprire la condivisione. Riprova.</string>
+    <string name="vibra_lyrics_story_format">Storia 9:16</string>
+    <string name="vibra_lyrics_square_format">Quadrato 1:1</string>
 </resources>

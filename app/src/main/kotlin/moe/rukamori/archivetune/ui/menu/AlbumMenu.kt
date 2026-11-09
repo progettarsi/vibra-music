@@ -9,6 +9,9 @@
 
 package moe.rukamori.archivetune.ui.menu
 
+import app.vibra.playback.lazyMediaItems
+import app.vibra.playback.metadataOf
+
 import android.annotation.SuppressLint
 import android.content.Intent
 import android.content.res.Configuration
@@ -438,7 +441,7 @@ fun AlbumMenu(originalAlbum: Album, navController: NavController, onDismiss: () 
         text = stringResource(R.string.play_next),
         onClick = {
           onDismiss()
-          playerConnection.playNext(songs.map { it.toMediaItem() })
+          playerConnection.playNext(songs.lazyMediaItems { metadataOf(it) })
         },
       ),
       NewAction(
@@ -449,13 +452,13 @@ fun AlbumMenu(originalAlbum: Album, navController: NavController, onDismiss: () 
         text = stringResource(R.string.add_to_queue),
         onClick = {
           onDismiss()
-          playerConnection.addToQueue(songs.map { it.toMediaItem() })
+          playerConnection.addToQueue(songs.lazyMediaItems { metadataOf(it) })
         },
       ),
       NewAction(
         id = MenuActionId.Playlist,
         icon = {
-          Icon(painter = painterResource(R.drawable.playlist_add), contentDescription = null)
+          Icon(painter = painterResource(R.drawable.add_box), contentDescription = null)
         },
         text = stringResource(R.string.add_to_playlist),
         onClick = { showChoosePlaylistDialog = true },

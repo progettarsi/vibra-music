@@ -126,17 +126,21 @@ fun AppearanceSettings(navController: NavController) {
                         } })
                 }
                 item {
+                    // Every row carries an icon, so all titles start on the same line.
                     SwitchPreference(title = { Text(stringResource(R.string.pure_black)) },
+                        icon = { Icon(painterResource(R.drawable.contrast), null) },
                         checked = pureBlack, onCheckedChange = onPureBlackChange)
                 }
                 item {
                     // Vibra: one switch for all motion — animations, Canvas and music videos.
                     SwitchPreference(title = { Text(stringResource(R.string.vibra_reduce_motion)) },
                         description = stringResource(R.string.vibra_reduce_motion_desc),
+                        icon = { Icon(painterResource(R.drawable.animation), null) },
                         checked = disableAnimations, onCheckedChange = onDisableAnimationsChange)
                 }
                 item {
                     SwitchPreference(title = { Text(stringResource(R.string.haptics)) },
+                        icon = { Icon(painterResource(R.drawable.vibration), null) },
                         checked = enableHapticFeedback, onCheckedChange = onEnableHapticFeedbackChange)
                 }
                 item {
@@ -152,6 +156,7 @@ fun AppearanceSettings(navController: NavController) {
                 item(visible = fontPreference == AppFontPreference.CUSTOM) {
                     PreferenceEntry(title = { Text(stringResource(R.string.custom_font)) },
                         description = customFontName.ifBlank { stringResource(R.string.custom_font_desc) },
+                        icon = { Icon(painterResource(R.drawable.edit), null) },
                         onClick = pickCustomFont)
                 }
             }

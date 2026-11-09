@@ -21,6 +21,8 @@ enum class StreamSource {
     PIPED,
 }
 
+enum class GvsPoTokenBinding { VIDEO, SESSION }
+
 data class AudioStreamRequest(
     val mediaId: String,
     val playlistId: String? = null,
@@ -60,4 +62,5 @@ data class ResolvedAudioStream(
     val playbackAttemptId: Long = 0,
     val recoveryStage: app.vibra.playback.PlaybackStage = app.vibra.playback.PlaybackStage.DIRECT,
     val mixedVideo: Boolean = false,
+    val gvsPoTokenBinding: GvsPoTokenBinding? = null,
 )

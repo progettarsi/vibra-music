@@ -96,6 +96,8 @@ class App :
     @Inject lateinit var libraryActions: app.vibra.library.LibraryActions
     @Inject lateinit var spotifySync: app.vibra.spotify.SpotifySyncRepository
 
+    @Inject lateinit var resolveAudioStream: moe.rukamori.archivetune.playback.stream.ResolveAudioStreamUseCase
+
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
     @Volatile private var isInitialized = false
@@ -176,6 +178,7 @@ class App :
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)
         youtubeiStreamRepository.trimMemory(level)
+        app.vibra.performance.ArtworkPalettes.trim()
     }
 
     private fun initializeCriticalSync() {
@@ -281,13 +284,16 @@ class App :
         }
 
         applicationScope.launch(Dispatchers.IO) {
+            var observedFingerprint = YouTube.currentPlaybackAuthState().fingerprint
             dataStore.data
                 .map { it.toPlaybackAuthState() }
                 .distinctUntilChanged()
                 .collect { authState ->
-                    val previousFingerprint = YouTube.currentPlaybackAuthState().fingerprint
                     YouTube.authState = authState
-                    if (previousFingerprint != authState.fingerprint) {
+                    if (observedFingerprint != authState.fingerprint) {
+                        observedFingerprint = authState.fingerprint
+                        resolveAudioStream.clear()
+                        BotGuardTokenGenerator.invalidateAll()
                         YTPlayerUtils.clearPlaybackAuthCaches()
                         youtubeiStreamRepository.invalidateSessions()
                     }

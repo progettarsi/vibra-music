@@ -7,6 +7,9 @@
 
 package moe.rukamori.archivetune.ui.screens.artist
 
+import app.vibra.playback.lazyMediaItems
+import app.vibra.playback.metadataOf
+
 import androidx.compose.foundation.ExperimentalFoundationApi
 import app.vibra.ui.motion.combinedClickable
 import androidx.compose.foundation.layout.Box
@@ -46,7 +49,6 @@ import moe.rukamori.archivetune.constants.ArtistSongSortType
 import moe.rukamori.archivetune.constants.ArtistSongSortTypeKey
 import moe.rukamori.archivetune.constants.CONTENT_TYPE_HEADER
 import moe.rukamori.archivetune.constants.HideExplicitKey
-import moe.rukamori.archivetune.extensions.toMediaItem
 import moe.rukamori.archivetune.extensions.togglePlayPause
 import moe.rukamori.archivetune.playback.queues.ListQueue
 import moe.rukamori.archivetune.ui.component.HideOnScrollFAB
@@ -166,7 +168,7 @@ fun ArtistSongsScreen(
                                         playerConnection.playQueue(
                                             ListQueue(
                                                 title = context.getString(R.string.queue_all_songs),
-                                                items = songs.map { it.toMediaItem() },
+                                                items = songs.lazyMediaItems { metadataOf(it) },
                                                 startIndex = index,
                                             ),
                                         )
@@ -207,7 +209,7 @@ fun ArtistSongsScreen(
                 playerConnection.playQueue(
                     ListQueue(
                         title = artist?.artist?.name,
-                        items = songs.shuffled().map { it.toMediaItem() },
+                        items = songs.shuffled().lazyMediaItems { metadataOf(it) },
                     ),
                 )
             },

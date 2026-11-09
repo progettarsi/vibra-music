@@ -186,7 +186,7 @@ private fun CreatePlaylistDialogContent(
       Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
       verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-      ControlSheetHeader(stringResource(R.string.create_playlist), "", R.drawable.playlist_add)
+      ControlSheetHeader(stringResource(R.string.create_playlist), "", R.drawable.add)
       MenuCard {
         Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
           val nameLabel = stringResource(R.string.playlist_name)
@@ -207,7 +207,9 @@ private fun CreatePlaylistDialogContent(
               colors = vibraOutlinedTextFieldColors(),
             )
           }
-          if (data.allowSyncing) SyncPlaylistSection(data, enabled, onSyncRequestedChange)
+          // Without a YouTube account the switch could never turn on: leave it out.
+          if (data.allowSyncing && data.isSignedIn)
+            SyncPlaylistSection(data, enabled, onSyncRequestedChange)
           if (errorMessageResId != null)
             Text(stringResource(errorMessageResId), color = MaterialTheme.colorScheme.error)
         }
@@ -229,10 +231,15 @@ private fun CreatePlaylistDialogContent(
         ) {
           Text(stringResource(android.R.string.cancel))
         }
+        // The suggested name is a real default: "Create" works without typing anything.
+        val defaultName = stringResource(R.string.vibra_menu_playlist_name_hint)
         VibraDialogButton(
-          onClick = onSubmit,
+          onClick = {
+            if (data.name.isBlank()) onNameChange(defaultName)
+            onSubmit()
+          },
           primary = true,
-          enabled = enabled && data.name.isNotBlank(),
+          enabled = enabled,
           modifier = Modifier.weight(1f),
         ) {
           if (data.isSubmitting)

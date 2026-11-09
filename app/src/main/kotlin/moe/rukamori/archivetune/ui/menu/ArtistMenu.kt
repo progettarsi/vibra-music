@@ -7,6 +7,9 @@
 
 package moe.rukamori.archivetune.ui.menu
 
+import app.vibra.playback.lazyMediaItems
+import app.vibra.playback.metadataOf
+
 import android.content.Intent
 import android.content.res.Configuration
 import androidx.compose.foundation.clickable
@@ -38,7 +41,6 @@ import moe.rukamori.archivetune.LocalPlayerConnection
 import moe.rukamori.archivetune.R
 import moe.rukamori.archivetune.constants.ArtistSongSortType
 import moe.rukamori.archivetune.db.entities.Artist
-import moe.rukamori.archivetune.extensions.toMediaItem
 import moe.rukamori.archivetune.playback.queues.ListQueue
 import moe.rukamori.archivetune.ui.component.NewAction
 
@@ -75,7 +77,7 @@ fun ArtistMenu(originalArtist: Artist, coroutineScope: CoroutineScope, onDismiss
                   database
                     .artistSongs(artist.id, ArtistSongSortType.CREATE_DATE, true)
                     .first()
-                    .map { it.toMediaItem() }
+                    .lazyMediaItems { metadataOf(it) }
                 }
               playerConnection.playQueue(ListQueue(title = artist.artist.name, items = songs))
             }
@@ -101,7 +103,7 @@ fun ArtistMenu(originalArtist: Artist, coroutineScope: CoroutineScope, onDismiss
                   database
                     .artistSongs(artist.id, ArtistSongSortType.CREATE_DATE, true)
                     .first()
-                    .map { it.toMediaItem() }
+                    .lazyMediaItems { metadataOf(it) }
                     .shuffled()
                 }
               playerConnection.playQueue(ListQueue(title = artist.artist.name, items = songs))

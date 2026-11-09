@@ -79,7 +79,14 @@ class PlayerConnection(
     val userQueueCount = _userQueueCount.asStateFlow()
 
     val queueTitle = MutableStateFlow<String?>(null)
-    val queueWindows = MutableStateFlow<List<Timeline.Window>>(emptyList())
+    val queueRows = MutableStateFlow<List<app.vibra.playback.QueueEntry>>(emptyList())
+    fun seekToEntry(uid: Long) {
+        val logical = player as? app.vibra.playback.ProgressivePlayer ?: return
+        val index = logical.queue.indexOf(uid)
+        if (index >= 0) { player.seekToDefaultPosition(index); player.playWhenReady = true }
+    }
+    internal fun removeQueueEntries(entries: List<app.vibra.playback.QueueEntry>): QueueRemoval? =
+        service.removeQueueEntries(entries)
     val currentMediaItemIndex = MutableStateFlow(-1)
     val currentWindowIndex = MutableStateFlow(-1)
 
@@ -111,7 +118,7 @@ class PlayerConnection(
         _isPlaying.value = player.isPlaying
         playbackParameters.value = player.playbackParameters
         queueTitle.value = service.queueTitle
-        queueWindows.value = player.getQueueWindows()
+        queueRows.value = (player as? app.vibra.playback.ProgressivePlayer)?.queue?.rows.orEmpty()
         currentWindowIndex.value = player.getCurrentQueueIndex()
         currentMediaItemIndex.value = player.currentMediaItemIndex
         shuffleModeEnabled.value = player.shuffleModeEnabled
@@ -311,7 +318,7 @@ class PlayerConnection(
         timeline: Timeline,
         reason: Int,
     ) {
-        queueWindows.value = player.getQueueWindows()
+        queueRows.value = (player as? app.vibra.playback.ProgressivePlayer)?.queue?.rows.orEmpty()
         queueTitle.value = service.queueTitle
         currentMediaItemIndex.value = player.currentMediaItemIndex
         currentWindowIndex.value = player.getCurrentQueueIndex()
@@ -320,7 +327,7 @@ class PlayerConnection(
 
     override fun onShuffleModeEnabledChanged(enabled: Boolean) {
         shuffleModeEnabled.value = enabled
-        queueWindows.value = player.getQueueWindows()
+        queueRows.value = (player as? app.vibra.playback.ProgressivePlayer)?.queue?.rows.orEmpty()
         currentWindowIndex.value = player.getCurrentQueueIndex()
         updateCanSkipPreviousAndNext()
     }
@@ -337,8 +344,9 @@ class PlayerConnection(
     }
 
     private fun updateUserQueueCount() {
+        (player as? app.vibra.playback.ProgressivePlayer)?.let { _userQueueCount.value = it.queue.userCount(); return }
         _userQueueCount.value = userQueueRegionSize(
-            queueWindows.value.map { it.firstPeriodIndex }, player.currentMediaItemIndex,
+            player.getQueueWindows().map { it.firstPeriodIndex }, player.currentMediaItemIndex,
         ) { player.getMediaItemAt(it).isUserQueued() }
     }
 

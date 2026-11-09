@@ -7,13 +7,16 @@ package app.vibra.ui.shell
 
 import android.os.SystemClock
 import app.vibra.ui.motion.ExpansionSource
+import app.vibra.ui.motion.OpeningMediaPreview
 import androidx.compose.ui.unit.dp
 import app.vibra.ui.motion.ExpansionSession
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameNanos
 import kotlinx.coroutines.flow.collect
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.EnterExitState
@@ -23,7 +26,6 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
@@ -46,6 +48,7 @@ import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.positionInWindow
@@ -140,15 +143,11 @@ class PageMotion {
     private val expansionSources = HashMap<String, ExpansionSource>()
     private val expansionDescriptors = HashMap<String, ExpansionSource>()
     private val expansionKeys = HashMap<String, Set<String>>()
+    private val mediaPreviews = mutableStateMapOf<String, OpeningMediaPreview>()
+    internal fun mediaPreview(entry: String): OpeningMediaPreview? = mediaPreviews[entry]
     internal fun registerExpansion(source: ExpansionSource) {
         expansionSources[source.id] = source
         expansion?.takeIf { it.source.id == source.id }?.source = source
-    }
-    internal fun validateExpansion(session: ExpansionSession) {
-        if (expansion === session && expansionSources[session.source.id]?.bounds == null) {
-            roles[session.entry]?.let { roles[session.entry] = it.copy(style = PageStyle.Push, origin = null) }
-            finishExpansion(session)
-        }
     }
     internal fun unregisterExpansion(source: ExpansionSource) {
         if (expansionSources[source.id] === source) expansionSources.remove(source.id)
@@ -170,26 +169,53 @@ class PageMotion {
         if (source != null && expansionSources[source.id] === source && source.bounds != null) prepareExpansion(source)
         navigate()
     }
-    private fun startExpansion(source: ExpansionSource?, entry: String, fallbackBounds: Rect? = null) {
+    private fun startExpansion(source: ExpansionSource?, entry: String, origin: PageOrigin?, returning: Boolean = false) {
         expansion?.dispose()
-        expansion = (source?.bounds ?: fallbackBounds)?.takeIf { source != null }?.let { bounds ->
-            ExpansionSession(source!!, bounds, entry).also { session ->
+        expansion = if (source != null && origin != null) {
+            ExpansionSession(
+                source, origin.bounds, entry,
+                initialProgress = if (returning) 1f else 0f,
+                originCornerPx = origin.cornerPx,
+                returning = returning,
+            ).also { session ->
                 session.candidateKeys.addAll(expansionKeys[entry].orEmpty())
                 expansionElements.forEach { element ->
                     val coordinates = element.coordinates
                     if (element.owner == source.owner && coordinates?.isAttached == true &&
-                        coordinates.boundsInWindow().overlaps(bounds)) session.candidateKeys.add(element.pairingKey)
+                        coordinates.boundsInWindow().overlaps(origin.bounds)) session.candidateKeys.add(element.pairingKey)
                 }
             }
-        }
+        } else null
     }
     internal fun finishExpansion(session: ExpansionSession, restoreFocus: Boolean = false) {
         if (expansion === session) {
-            session.dispose(); expansion = null
+            session.dispose()
+            expansion = null
+            // A cancelled predictive back can be retried between the same two entries.
+            lastTransition = null
             if (restoreFocus) {
                 try { expansionSources[session.source.id]?.focus?.requestFocus() }
                 catch (_: IllegalStateException) { /* Source was detached during navigation. */ }
             }
+        }
+    }
+
+    internal fun resolveReturnOrigin(session: ExpansionSession) {
+        if (expansion !== session || !session.returning) return
+        val role = roles[session.entry] ?: return
+        val original = role.origin ?: return
+        val actual = expansionSources[session.source.id]?.bounds
+        if (actual == null) {
+            // The feed may have changed while this page was open. Never shrink into
+            // coordinates whose card is no longer present in the revealed page.
+            roles[session.entry] = role.copy(style = PageStyle.Push, origin = null)
+            roles[original.hostId]?.let { roles[original.hostId] = it.copy(style = PageStyle.Push, origin = null) }
+            finishExpansion(session)
+        } else if (actual != original.bounds) {
+            val origin = original.copy(bounds = actual)
+            roles[session.entry] = role.copy(origin = origin)
+            roles[original.hostId]?.let { roles[original.hostId] = it.copy(origin = origin) }
+            session.bounds = actual
         }
     }
 
@@ -217,6 +243,7 @@ class PageMotion {
         excluded: Boolean,
     ) {
         pressPosition = position
+        pendingExpansion = null
         pressExcluded = excluded
         releaseUptime = Long.MAX_VALUE
     }
@@ -237,11 +264,21 @@ class PageMotion {
         val source = pendingExpansion?.takeIf { !to.isSearchResults && it.owner == from.id && SystemClock.uptimeMillis() - pendingTime in 0..600 && it.bounds?.overlaps(Rect(0f, 0f, window.width.toFloat(), window.height.toFloat())) == true }
         pendingExpansion = null
         if (source != null) pressPosition = null
-        val origin = source?.bounds?.let { PageOrigin(it, minOf(it.minDimension / 2f, maxOriginCornerPx), from.id, window) }
+        val origin = source?.bounds?.let {
+            PageOrigin(it, minOf(it.minDimension / 2f, source.cornerRadius() ?: maxOriginCornerPx), from.id, window)
+        }
             ?: if (to.isSearchResults) null else takeTapOrigin(hostId = from.id)
         if (source != null) expansionOrigins[to.id] = source.id
         if (source != null) expansionDescriptors[to.id] = source
-        startExpansion(source, to.id)
+        if (source != null && origin != null) {
+            val elements = source.elementsInside(expansionElements, origin.bounds)
+            val artwork = elements.mapNotNull { it.artwork }.singleOrNull()
+            val title = elements.singleOrNull { it.role == "title" }?.key ?: artwork?.label
+            if (artwork != null && !title.isNullOrBlank()) {
+                mediaPreviews[to.id] = OpeningMediaPreview(title, artwork.url, artwork.sizePx, artwork.painter?.value)
+            }
+        }
+        startExpansion(source, to.id, origin)
         expansion?.let { expansionKeys[to.id] = it.candidateKeys.toSet() }
         if (origin != null) origins[to.id] = origin else origins.remove(to.id)
         val style =
@@ -260,13 +297,13 @@ class PageMotion {
         predictive: Boolean,
     ) {
         if (!begin(if (predictive) "gesture" else "back", from, to)) return
-        // Only into the element it came from, and only if that element is still there:
-        // the same page beneath, in a window of the same size.
+        // Keep the origin fixed for this transition. The source can be reattached by
+        // the revealed page after the animation starts, without changing the page's pose.
         var origin = origins[from.id]?.takeIf { it.hostId == to.id && it.window == window }
         val sourceId = expansionOrigins[from.id]
         val source = expansionSources[sourceId] ?: expansionDescriptors[from.id]
         if (source?.bounds != null && origin != null) origin = origin.copy(bounds = source.bounds!!)
-        startExpansion(source?.takeIf { origin != null }, from.id, origin?.bounds)
+        startExpansion(source, from.id, origin, returning = true)
         val style =
             when {
                 from.isSearchResults -> PageStyle.Fade
@@ -287,6 +324,7 @@ class PageMotion {
                     expansionOrigins.remove(entry.id)
                     expansionDescriptors.remove(entry.id)
                     expansionKeys.remove(entry.id)
+                    mediaPreviews.remove(entry.id)
                     roles.remove(entry.id)
                     watched.remove(entry.id)
                 }
@@ -360,6 +398,7 @@ class PageFlight internal constructor(
     private val shown: () -> Float,
     private val frame: FrameGeometry,
 ) {
+    fun openingMediaPreview(): OpeningMediaPreview? = motion?.mediaPreview(entryId)
     /** Layout coordinates of the page's content root (set by [PageFrame]). */
     internal var contentCoordinates: LayoutCoordinates? = null
 
@@ -423,7 +462,8 @@ internal fun AnimatedVisibilityScope.PageFrame(
     content: @Composable () -> Unit,
 ) {
     val motion = LocalPageMotion.current
-    val springSpec = Liquid.container<Float>()
+    // Keep the card-to-page motion visible when Android shortens the animation.
+    val springSpec = Liquid.container<Float>(minimumDurationScale = 0.85f)
     val gestureSpec: FiniteAnimationSpec<Float> = if (LocalAnimationsDisabled.current) snap() else GestureSpec
     // 1 = the page at rest, 0 = not there (still to come in, or gone).
     val shown =
@@ -438,11 +478,12 @@ internal fun AnimatedVisibilityScope.PageFrame(
     DisposableEffect(entry, motion) { motion?.watch(entry); onDispose { motion?.expansion?.takeIf { it.entry == entry.id }?.let { motion.finishExpansion(it) } } }
     val session = motion?.expansion?.takeIf { it.entry == entry.id }
     if (session != null) {
-        session.endCorner = with(screenCorners) { minOf(topLeft, topRight, bottomRight, bottomLeft) }
         session.progress = { PagePose.progress(shown.value, motion.role(entry.id)?.predictive == true) }
         LaunchedEffect(session) {
-            androidx.compose.runtime.withFrameNanos { }
-            motion.validateExpansion(session)
+            if (session.returning) {
+                withFrameNanos { }
+                motion.resolveReturnOrigin(session)
+            }
             snapshotFlow { transition.currentState == transition.targetState && !transition.isRunning }
                 .collect { settled -> if (settled) motion.finishExpansion(session, restoreFocus = shown.value < 0.001f) }
         }
@@ -457,19 +498,29 @@ internal fun AnimatedVisibilityScope.PageFrame(
                     val shownNow = shown.value
                     val role = motion?.role(entry.id) ?: return@graphicsLayer
                     poseContainer(role, PagePose.progress(shownNow, role.predictive), frame.windowOffset, screenCorners)
-                }.background(background)
+                }
                 .drawWithContent {
-                    drawContent()
                     val shownNow = shown.value
-                    val role = motion?.role(entry.id) ?: return@drawWithContent
-                    val progress = PagePose.progress(shownNow, role.predictive)
+                    val role = motion?.role(entry.id)
+                    val progress = role?.let { PagePose.progress(shownNow, it.predictive) } ?: 1f
+                    val sourceColor = session?.source?.color ?: Color.Transparent
+                    val expanding = role?.top == true && role.style == PageStyle.Origin && progress < 1f
+                    val surface =
+                        if (expanding && sourceColor != Color.Transparent) {
+                            lerp(sourceColor, background, PagePose.contentAlpha(progress))
+                        } else {
+                            background
+                        }
+                    drawRect(surface)
+                    drawContent()
+                    if (role == null) return@drawWithContent
                     if (role.top) {
                         // A page growing out of an origin shows its content through the
                         // container's own colour: a veil over the content, which looks the
                         // same as fading the content in and needs no offscreen buffer.
-                        if (role.style == PageStyle.Origin && progress < 1f) {
+                        if (expanding) {
                             val veil = 1f - PagePose.contentAlpha(progress)
-                            if (veil > 0f) drawRect(background, alpha = veil)
+                            if (veil > 0f) drawRect(surface, alpha = veil)
                         }
                     } else if (role.style != PageStyle.Fade) {
                         val scrim = PagePose.scrim(1f - progress)

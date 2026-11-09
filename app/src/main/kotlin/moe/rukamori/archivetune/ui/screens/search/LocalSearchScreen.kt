@@ -7,6 +7,8 @@
 
 package moe.rukamori.archivetune.ui.screens.search
 
+import app.vibra.playback.lazyMediaItems
+import app.vibra.playback.metadataOf
 // Vibra: independent radii follow the global rounding style.
 import app.vibra.ui.theme.adaptiveRoundedCornerShape
 
@@ -42,7 +44,6 @@ import moe.rukamori.archivetune.db.entities.Album
 import moe.rukamori.archivetune.db.entities.Artist
 import moe.rukamori.archivetune.db.entities.Playlist
 import moe.rukamori.archivetune.db.entities.Song
-import moe.rukamori.archivetune.extensions.toMediaItem
 import moe.rukamori.archivetune.extensions.togglePlayPause
 import moe.rukamori.archivetune.playback.queues.ListQueue
 import moe.rukamori.archivetune.ui.component.*
@@ -251,7 +252,7 @@ fun LocalSearchScreen(
                                                         result.map
                                                             .getOrDefault(LocalFilter.SONG, emptyList())
                                                             .filterIsInstance<Song>()
-                                                            .map { it.toMediaItem() }
+                                                            .lazyMediaItems { metadataOf(it) }
                                                     playerConnection.playQueue(
                                                         ListQueue(
                                                             title = context.getString(R.string.queue_searched_songs),

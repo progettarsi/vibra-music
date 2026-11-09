@@ -9,6 +9,8 @@
 
 package moe.rukamori.archivetune.ui.screens.artist
 
+import app.vibra.playback.lazyMediaItems
+import app.vibra.playback.metadataOf
 // Vibra: independent radii follow the global rounding style.
 import app.vibra.ui.theme.adaptiveRoundedCornerShape
 
@@ -23,6 +25,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import app.vibra.ui.motion.combinedClickable
+import app.vibra.ui.motion.expansionElement
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -45,8 +48,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import app.vibra.ui.components.VibraArtwork
+import app.vibra.ui.components.VibraCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
@@ -109,7 +112,6 @@ import moe.rukamori.archivetune.constants.CONTENT_TYPE_ALBUM
 import moe.rukamori.archivetune.constants.CONTENT_TYPE_HEADER
 import moe.rukamori.archivetune.constants.HideExplicitKey
 import moe.rukamori.archivetune.db.entities.ArtistEntity
-import moe.rukamori.archivetune.extensions.toMediaItem
 import moe.rukamori.archivetune.innertube.models.AlbumItem
 import moe.rukamori.archivetune.innertube.models.AlbumReleaseType
 import moe.rukamori.archivetune.innertube.models.BrowseEndpoint
@@ -377,8 +379,11 @@ fun ArtistScreen(
                     val unknownArtist = stringResource(R.string.unknown_artist)
                     val songsLabel = stringResource(R.string.songs)
                     val albumsLabel = stringResource(R.string.albums)
-                    val monthlyListenersLabel = stringResource(R.string.monthly_listeners)
-                    val subscribersLabel = stringResource(R.string.subscribers)
+                    // Both follow a number in one line ("85M monthly listeners • 18M subscribers"):
+                    // same case for both, whatever each string looks like on its own.
+                    val labelLocale = LocalConfiguration.current.locales[0]
+                    val monthlyListenersLabel = stringResource(R.string.monthly_listeners).lowercase(labelLocale)
+                    val subscribersLabel = stringResource(R.string.subscribers).lowercase(labelLocale)
                     val artistStats =
                         remember(
                             showLocal,
@@ -470,6 +475,7 @@ fun ArtistScreen(
                         ) {
                             Text(
                                 text = artistName ?: unknownArtist,
+                                modifier = Modifier.expansionElement(artistName, "title"),
                                 style = MaterialTheme.typography.headlineLarge,
                                 color = heroContentColor,
                                 fontWeight = FontWeight.Bold,
@@ -540,7 +546,7 @@ fun ArtistScreen(
                                             playerConnection.playQueue(
                                                 ListQueue(
                                                     title = artistName ?: unknownArtist,
-                                                    items = librarySongs.shuffled().map { it.toMediaItem() },
+                                                    items = librarySongs.shuffled().lazyMediaItems { metadataOf(it) },
                                                 ),
                                             )
                                         }
@@ -556,7 +562,7 @@ fun ArtistScreen(
                                             playerConnection.playQueue(
                                                 ListQueue(
                                                     title = artistName ?: unknownArtist,
-                                                    items = librarySongs.map { it.toMediaItem() },
+                                                    items = librarySongs.lazyMediaItems { metadataOf(it) },
                                                 ),
                                             )
                                         }
@@ -867,13 +873,11 @@ private fun ArtistNewReleaseSection(
                 .padding(start = 16.dp, top = 8.dp, end = 16.dp, bottom = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Card(
+        // Vibra: this card and the album header share the cover and title in flight.
+        VibraCard(
             onClick = onClick,
             shape = MaterialTheme.shapes.large,
-            colors =
-                CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-                ),
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
             modifier =
                 Modifier
                     .fillMaxWidth()
@@ -888,19 +892,13 @@ private fun ArtistNewReleaseSection(
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 if (release.thumbnailUrl != null) {
-                    AsyncImage(
-                        model =
-                            release.thumbnailUrl.resize(
-                                width = ArtistReleaseArtworkSizePx,
-                                height = ArtistReleaseArtworkSizePx,
-                                ytimgResizePolicy = YtimgResizePolicy.PreserveOriginal,
-                            ),
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier =
-                            Modifier
-                                .size(ArtistReleaseArtworkSize)
-                                .clip(adaptiveRoundedCornerShape(10.dp)),
+                    VibraArtwork(
+                        url = release.thumbnailUrl,
+                        shape = adaptiveRoundedCornerShape(10.dp),
+                        sizePx = ArtistReleaseArtworkSizePx,
+                        fallbackIcon = R.drawable.album,
+                        ytimgResizePolicy = YtimgResizePolicy.PreserveOriginal,
+                        modifier = Modifier.size(ArtistReleaseArtworkSize),
                     )
                 } else {
                     Box(
@@ -933,6 +931,7 @@ private fun ArtistNewReleaseSection(
                     )
                     Text(
                         text = release.title,
+                        modifier = Modifier.expansionElement(release.title, "title"),
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurface,
                         fontWeight = FontWeight.Bold,

@@ -29,11 +29,13 @@ class PlaybackSourcesExhausted : IOException("No playable source available")
 @Singleton
 class PlaybackFallbackResolver @Inject constructor(
     private val native: YoutubeiStreamRepository,
+    private val sessionReset: moe.rukamori.archivetune.playback.stream.PlaybackSessionReset,
     private val publicStreams: PublicStreamRepository,
     private val attempts: PlaybackAttemptController,
 ) {
     internal suspend fun resolve(request: AudioStreamRequest, priority: StreamResolutionPriority): ResolvedAudioStream {
         if (request.playbackAttemptId == 0L) {
+            resetNativeSessionIfRequired()
             return native.resolve(request.copy(authState = YTPlayerUtils.ensureYoutubeiPoTokensForPlayback(
                 request.mediaId, request.authState,
             )), priority)
@@ -47,10 +49,7 @@ class PlaybackFallbackResolver @Inject constructor(
             when (attempt.stage) {
                 PlaybackStage.INVIDIOUS, PlaybackStage.PIPED -> publicStreams.resolve(request, attempt.stage)
                 else -> {
-                    if (attempt.stage == PlaybackStage.REFRESHED) {
-                        BotGuardTokenGenerator.invalidateAll()
-                        native.invalidateSessions()
-                    }
+                    resetNativeSessionIfRequired()
                     val auth = if (attempt.stage == PlaybackStage.ANONYMOUS) PlaybackAuthState() else request.authState
                     val state = YTPlayerUtils.ensureYoutubeiPoTokensForPlayback(request.mediaId, auth)
                     native.resolveSingle(request.copy(authState = state, allowCatalogReplacement = false), priority)
@@ -67,6 +66,13 @@ class PlaybackFallbackResolver @Inject constructor(
         }
         if (!attempts.isCurrent(attempt.id, request.mediaId)) throw CancellationException("Playback attempt changed")
         return stream.copy(playbackAttemptId = attempt.id, recoveryStage = attempt.stage)
+    }
+
+    private suspend fun resetNativeSessionIfRequired() {
+        sessionReset.resetIfRequired {
+            BotGuardTokenGenerator.invalidateAll()
+            native.invalidateSessions()
+        }
     }
 
     private suspend fun probeNative(stream: ResolvedAudioStream) = withContext(Dispatchers.IO) {

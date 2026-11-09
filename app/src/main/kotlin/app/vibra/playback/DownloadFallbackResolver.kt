@@ -13,6 +13,7 @@ import moe.rukamori.archivetune.utils.potoken.BotGuardTokenGenerator
 @Singleton
 class DownloadFallbackResolver @Inject constructor(
     private val native: YoutubeiStreamRepository,
+    private val sessionReset: moe.rukamori.archivetune.playback.stream.PlaybackSessionReset,
     private val publicStreams: PublicStreamRepository,
 ) {
     internal suspend fun resolve(request: AudioStreamRequest, stage: PlaybackStage): ResolvedAudioStream = withTimeout(30_000L) {
@@ -20,6 +21,13 @@ class DownloadFallbackResolver @Inject constructor(
         when (stage) {
             PlaybackStage.INVIDIOUS, PlaybackStage.PIPED -> publicStreams.resolveDownload(exact, stage)
             else -> {
+                // A foreground 403 may have left a shared reset pending; perform it once.
+                sessionReset.resetIfRequired {
+                    BotGuardTokenGenerator.invalidateAll()
+                    native.invalidateSessions()
+                }
+                // Vibra: a background download refreshes only its own token, never the
+                // whole app session (that would cancel the song currently resolving).
                 if (stage == PlaybackStage.REFRESHED) {
                     BotGuardTokenGenerator.invalidateVideo(request.mediaId)
                     native.invalidateSessions()

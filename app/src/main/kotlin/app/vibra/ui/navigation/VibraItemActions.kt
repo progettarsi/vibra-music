@@ -5,6 +5,9 @@
 
 package app.vibra.ui.navigation
 
+import app.vibra.playback.lazyMediaItems
+import app.vibra.playback.metadataOf
+
 import android.net.Uri
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
@@ -169,7 +172,7 @@ class VibraItemActions internal constructor(
                         haptics.reject()
                     } else {
                         player.playQueue(
-                            ListQueue(title = item.playlist.name, items = songs.map { it.toMediaItem() }),
+                            ListQueue(title = item.playlist.name, items = songs.lazyMediaItems { metadataOf(it) }),
                         )
                     }
                 }
@@ -190,7 +193,7 @@ class VibraItemActions internal constructor(
         when {
             player.mediaMetadata.value?.id == start.id -> player.player.togglePlayPause()
             songs.size == 1 && !start.song.isLocal -> player.playQueue(YouTubeQueue.radio(start.toMediaMetadata()))
-            else -> player.playQueue(ListQueue(title = title, items = songs.map { it.toMediaItem() }, startIndex = startIndex))
+            else -> player.playQueue(ListQueue(title = title, items = songs.lazyMediaItems { metadataOf(it) }, startIndex = startIndex))
         }
     }
 

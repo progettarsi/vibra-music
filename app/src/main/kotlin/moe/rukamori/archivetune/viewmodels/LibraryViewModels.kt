@@ -10,13 +10,13 @@
 package moe.rukamori.archivetune.viewmodels
 
 import android.content.Context
+import app.vibra.performance.completedMembership
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.media3.exoplayer.offline.Download
 import com.google.common.collect.ImmutableList
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -35,7 +35,9 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.transformLatest
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 import moe.rukamori.archivetune.R
 import moe.rukamori.archivetune.constants.AiApiKeyKey
@@ -199,48 +201,23 @@ class LibrarySongsViewModel
                         }
 
                         SongFilter.DOWNLOADED -> {
-                            downloadUtil.downloads.flatMapLatest { downloads ->
-                                database
-                                    .allSongs()
-                                    .flowOn(Dispatchers.IO)
-                                    .map { songs ->
-                                        songs.filter { song: Song ->
-                                            downloads[song.id]?.state == Download.STATE_COMPLETED
-                                        }
-                                    }.map { songs ->
-                                        when (sortType) {
-                                            SongSortType.CREATE_DATE -> {
-                                                songs.sortedBy { song: Song ->
-                                                    downloads[song.id]?.updateTimeMs ?: 0L
-                                                }
-                                            }
-
-                                            SongSortType.NAME -> {
-                                                songs.sortedBy { song: Song -> song.song.title }
-                                            }
-
-                                            SongSortType.ARTIST -> {
-                                                val collator =
-                                                    Collator.getInstance(Locale.getDefault())
-                                                collator.strength = Collator.PRIMARY
-                                                songs.sortedWith(
-                                                    compareBy<Song, String>(collator) { song ->
-                                                        song.artists.joinToString("") { artist -> artist.name }
-                                                    },
-                                                )
-                                            }
-
-                                            SongSortType.PLAY_TIME -> {
-                                                songs.sortedBy { song: Song -> song.song.totalPlayTime }
-                                            }
-                                        }.reversed(descending)
-                                            .filterExplicit(hideExplicit)
-                                            .filterVideo(hideVideo)
+                            combine(downloadUtil.downloads.completedMembership(), database.allSongs()) { downloads, songs ->
+                                val completed = songs.filter { it.id in downloads }
+                                val sorted = when (sortType) {
+                                    SongSortType.CREATE_DATE -> completed.sortedBy { downloads[it.id] ?: 0L }
+                                    SongSortType.NAME -> completed.sortedBy { it.song.title }
+                                    SongSortType.ARTIST -> {
+                                        val collator = Collator.getInstance(Locale.getDefault()).apply { strength = Collator.PRIMARY }
+                                        completed.map { it to it.artists.joinToString("") { artist -> artist.name } }
+                                            .sortedWith(compareBy(collator) { it.second }).map { it.first }
                                     }
+                                    SongSortType.PLAY_TIME -> completed.sortedBy { it.song.totalPlayTime }
+                                }
+                                sorted.reversed(descending).filterExplicit(hideExplicit).filterVideo(hideVideo)
                             }
                         }
                     }
-                }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+                }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
         fun refresh(filter: SongFilter) {
             when (filter) {
@@ -274,17 +251,9 @@ class LibraryArtistsViewModel
                         ArtistFilter.LIBRARY -> database.artists(sortType, descending)
                         ArtistFilter.LIKED -> database.artistsBookmarked(sortType, descending)
                     }
-                }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
-
-        fun refresh(filter: ArtistFilter) {
-            refreshLibrary(
-                if (filter == ArtistFilter.LIBRARY) LibrarySyncTarget.All else LibrarySyncTarget.Artists,
-            )
-        }
-
-        init {
-            viewModelScope.launch(Dispatchers.IO) {
-                allArtists.collect { artists ->
+                }.transformLatest { artists ->
+                    emit(artists)
+                    withContext(Dispatchers.IO) {
                     artists
                         .map { it.artist }
                         .filter {
@@ -299,9 +268,16 @@ class LibraryArtistsViewModel
                                 }
                             }
                         }
-                }
-            }
+                    }
+                }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+        fun refresh(filter: ArtistFilter) {
+            refreshLibrary(
+                if (filter == ArtistFilter.LIBRARY) LibrarySyncTarget.All else LibrarySyncTarget.Artists,
+            )
         }
+
+
     }
 
 @HiltViewModel
@@ -329,47 +305,16 @@ class LibraryAlbumsViewModel
                 .flatMapLatest { (filterSort, hideExplicit) ->
                     val (filter, sortType, descending) = filterSort
                     when (filter) {
-                        AlbumFilter.DOWNLOADED -> {
-                            downloadUtil.downloads.flatMapLatest { downloads ->
-                                database
-                                    .allSongs()
-                                    .flowOn(Dispatchers.IO)
-                                    .map { songs ->
-                                        songs
-                                            .filter { song -> downloads[song.id]?.state == Download.STATE_COMPLETED }
-                                            .mapNotNull { it.song.albumId }
-                                            .toSet()
-                                    }.flatMapLatest { downloadedAlbumIds ->
-                                        database
-                                            .albumsByIds(downloadedAlbumIds, sortType, descending)
-                                            .map { albums -> albums.filterExplicitAlbums(hideExplicit) }
-                                    }
-                            }
-                        }
-
-                        AlbumFilter.DOWNLOADED_FULL -> {
-                            downloadUtil.downloads.flatMapLatest { downloads ->
-                                database
-                                    .allSongs()
-                                    .flowOn(Dispatchers.IO)
-                                    .map { songs ->
-                                        songs
-                                            .filter { song -> downloads[song.id]?.state == Download.STATE_COMPLETED }
-                                            .mapNotNull { song -> song.song.albumId?.let { albumId -> albumId to song } }
-                                            .groupBy({ it.first }, { it.second })
-                                            .mapValues { (_, songList) -> songList.size }
-                                    }.flatMapLatest { downloadedCountByAlbum ->
-                                        database
-                                            .albumsByIds(downloadedCountByAlbum.keys, sortType, descending)
-                                            .map { albums ->
-                                                albums
-                                                    .filter { album ->
-                                                        val totalSongsInAlbum = album.album.songCount
-                                                        val downloadedSongsCount = downloadedCountByAlbum[album.album.id] ?: 0
-                                                        totalSongsInAlbum > 0 && downloadedSongsCount >= totalSongsInAlbum
-                                                    }.filterExplicitAlbums(hideExplicit)
-                                            }
-                                    }
+                        AlbumFilter.DOWNLOADED, AlbumFilter.DOWNLOADED_FULL -> {
+                            combine(downloadUtil.downloads.completedMembership(), database.allSongs()) { downloads, songs ->
+                                songs.filter { it.id in downloads }.mapNotNull { it.song.albumId }
+                                    .groupingBy { it }.eachCount()
+                            }.distinctUntilChanged().flatMapLatest { counts ->
+                                database.albumsByIds(counts.keys, sortType, descending).map { albums ->
+                                    albums.filter { filter != AlbumFilter.DOWNLOADED_FULL ||
+                                        (it.album.songCount > 0 && counts.getOrDefault(it.id, 0) >= it.album.songCount) }
+                                        .filterExplicitAlbums(hideExplicit)
+                                }
                             }
                         }
 
@@ -381,21 +326,9 @@ class LibraryAlbumsViewModel
                             database.albumsLiked(sortType, descending).map { it.filterExplicitAlbums(hideExplicit) }
                         }
                     }
-                }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
-
-        fun refresh(filter: AlbumFilter) {
-            when (filter) {
-                AlbumFilter.LIBRARY -> refreshLibrary(LibrarySyncTarget.All)
-                AlbumFilter.LIKED -> refreshLibrary(LibrarySyncTarget.Albums)
-                AlbumFilter.DOWNLOADED,
-                AlbumFilter.DOWNLOADED_FULL,
-                -> Unit
-            }
-        }
-
-        init {
-            viewModelScope.launch(Dispatchers.IO) {
-                allAlbums.collect { albums ->
+                }.transformLatest { albums ->
+                    emit(albums)
+                    withContext(Dispatchers.IO) {
                     albums
                         .filter {
                             it.album.songCount == 0
@@ -415,9 +348,20 @@ class LibraryAlbumsViewModel
                                     }
                                 }
                         }
-                }
+                    }
+                }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+        fun refresh(filter: AlbumFilter) {
+            when (filter) {
+                AlbumFilter.LIBRARY -> refreshLibrary(LibrarySyncTarget.All)
+                AlbumFilter.LIKED -> refreshLibrary(LibrarySyncTarget.Albums)
+                AlbumFilter.DOWNLOADED,
+                AlbumFilter.DOWNLOADED_FULL,
+                -> Unit
             }
         }
+
+
     }
 
 @HiltViewModel
@@ -439,12 +383,12 @@ class LibraryPlaylistsViewModel
                 }.distinctUntilChanged()
                 .flatMapLatest { (sortType, descending) ->
                     database.playlists(sortType, descending)
-                }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+                }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
         val downloadedPlaylistIds =
             combine(
                 database.allPlaylistSongMapsForDownloads(),
-                downloadUtil.downloads,
+                downloadUtil.downloads.completedMembership(),
             ) { playlistSongMaps, downloads ->
                 playlistSongMaps
                     .groupBy { it.playlistId }
@@ -459,11 +403,11 @@ class LibraryPlaylistsViewModel
                         playlistId.takeIf {
                             songIds.isNotEmpty() &&
                                 songIds.all { songId ->
-                                    downloads[songId]?.state == Download.STATE_COMPLETED
+                                    songId in downloads
                                 }
                         }
                     }.toSet()
-            }.stateIn(viewModelScope, SharingStarted.Lazily, emptySet())
+            }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
 
         fun sync() {
             refreshLibrary(LibrarySyncTarget.Playlists)
@@ -517,7 +461,7 @@ class ArtistSongsViewModel
                     database.artistSongs(artistId, sortType, descending).map {
                         it.filterExplicit(hideExplicit).filterVideo(hideVideo)
                     }
-                }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+                }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     }
 
 @HiltViewModel
@@ -741,7 +685,7 @@ class LibraryMixViewModel
                 .distinctUntilChanged()
                 .flatMapLatest { hideExplicit ->
                     database.albumsLiked(AlbumSortType.CREATE_DATE, true).map { it.filterExplicitAlbums(hideExplicit) }
-                }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+                }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
         var playlists =
             context.dataStore.data
                 .map {

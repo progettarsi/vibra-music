@@ -7,10 +7,12 @@
 
 package moe.rukamori.archivetune.playback.queues
 
+import app.vibra.playback.lazyMediaItems
+import app.vibra.playback.metadataOf
+
 import androidx.media3.common.MediaItem
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.withContext
-import moe.rukamori.archivetune.extensions.toMediaItem
 import moe.rukamori.archivetune.innertube.YouTube
 import moe.rukamori.archivetune.innertube.models.WatchEndpoint
 import moe.rukamori.archivetune.models.MediaMetadata
@@ -37,7 +39,7 @@ class YouTubeQueue(
         continuation = nextResult.continuation
         return Queue.Status(
             title = nextResult.title,
-            items = nextResult.items.map { it.toMediaItem() },
+            items = nextResult.items.lazyMediaItems { metadataOf(it) },
             mediaItemIndex = nextResult.currentIndex ?: 0,
         )
     }
@@ -58,7 +60,7 @@ class YouTubeQueue(
             }
         endpoint = nextResult.endpoint
         continuation = nextResult.continuation
-        return nextResult.items.map { it.toMediaItem() }
+        return nextResult.items.lazyMediaItems { metadataOf(it) }
     }
 
     companion object {

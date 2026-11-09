@@ -9,6 +9,9 @@
 
 package moe.rukamori.archivetune.ui.menu
 
+import app.vibra.playback.lazyMediaItems
+import app.vibra.playback.metadataOf
+
 import android.annotation.SuppressLint
 import android.content.Intent
 import android.content.res.Configuration
@@ -64,7 +67,6 @@ import moe.rukamori.archivetune.R
 import moe.rukamori.archivetune.constants.ListItemHeight
 import moe.rukamori.archivetune.constants.ListThumbnailSize
 import moe.rukamori.archivetune.db.entities.Song
-import moe.rukamori.archivetune.extensions.toMediaItem
 import moe.rukamori.archivetune.innertube.YouTube
 import moe.rukamori.archivetune.innertube.models.AlbumItem
 import moe.rukamori.archivetune.playback.ExoDownloadService
@@ -400,7 +402,7 @@ fun YouTubeAlbumMenu(albumItem: AlbumItem, navController: NavController, onDismi
         },
         text = stringResource(R.string.play_next),
         onClick = {
-          album?.songs?.map { it.toMediaItem() }?.let(playerConnection::playNext)
+          album?.songs?.lazyMediaItems { metadataOf(it) }?.let(playerConnection::playNext)
           onDismiss()
         },
       ),
@@ -411,14 +413,14 @@ fun YouTubeAlbumMenu(albumItem: AlbumItem, navController: NavController, onDismi
         },
         text = stringResource(R.string.add_to_queue),
         onClick = {
-          album?.songs?.map { it.toMediaItem() }?.let(playerConnection::addToQueue)
+          album?.songs?.lazyMediaItems { metadataOf(it) }?.let(playerConnection::addToQueue)
           onDismiss()
         },
       ),
       NewAction(
         id = MenuActionId.Playlist,
         icon = {
-          Icon(painter = painterResource(R.drawable.playlist_add), contentDescription = null)
+          Icon(painter = painterResource(R.drawable.add_box), contentDescription = null)
         },
         text = stringResource(R.string.add_to_playlist),
         onClick = { showChoosePlaylistDialog = true },

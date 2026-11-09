@@ -596,7 +596,10 @@ private fun MoodTile(
         Spacer(Modifier.width(12.dp))
         Text(
             text = mood.title,
-            style = MaterialTheme.typography.titleMedium,
+            // Long single words ("Concentrazione") step down a size instead of being cut.
+            style =
+                if (mood.title.length > MoodTitleLongChars) MaterialTheme.typography.titleSmall
+                else MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurface,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -834,6 +837,7 @@ private val RecentChipHeight = 40.dp
 private val RecentChipMaxTextWidth = 220.dp
 private val MoodTileHeight = 64.dp
 private val MoodCookieSize = 40.dp
+private const val MoodTitleLongChars = 11
 private val BestArtworkSize = 72.dp
 private val BestActionHeight = 48.dp
 

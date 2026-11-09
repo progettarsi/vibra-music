@@ -8,6 +8,7 @@ package app.vibra.ui.components
 import app.vibra.ui.motion.ambientMotionAllowed
 import android.os.Build
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -62,9 +63,6 @@ import androidx.graphics.shapes.toPath
 import app.vibra.ui.theme.MoodTone
 import androidx.palette.graphics.Palette
 import coil3.imageLoader
-import coil3.request.ImageRequest
-import coil3.request.allowHardware
-import coil3.toBitmap
 import app.vibra.ui.motion.Liquid
 import app.vibra.ui.motion.LiquidSpeed
 import kotlin.math.PI
@@ -73,8 +71,6 @@ import kotlin.math.cos
 import kotlin.math.max
 import kotlin.math.sin
 import kotlin.math.sqrt
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import moe.rukamori.archivetune.LocalAnimationsDisabled
 import moe.rukamori.archivetune.ui.screens.library.rememberArtworkGradient
 import moe.rukamori.archivetune.ui.theme.PlayerColorExtractor
@@ -105,8 +101,7 @@ import moe.rukamori.archivetune.ui.theme.PlayerColorExtractor
  * placeholder, which used to tint the player with the app colour between two tracks).
  */
 @Composable
-fun rememberArtworkColors(url: String?): List<Color> {
-    val fallback = MaterialTheme.colorScheme.primaryContainer
+fun rememberArtworkColors(url: String?, fallback: Color = MaterialTheme.colorScheme.primaryContainer): List<Color> {
     val extracted = rememberArtworkGradient(thumbnailUrl = url, fallbackColor = fallback)
     val pending = extracted.size == 2 && extracted[0] == fallback && extracted[1] == fallback.copy(alpha = 0.5f)
     val held = remember { arrayOfNulls<List<Color>>(1) }
@@ -166,22 +161,8 @@ fun rememberArtworkAccent(url: String?): ArtworkAccent {
     var vivid by remember { mutableStateOf<Color?>(null) }
     LaunchedEffect(url) {
         if (url == null) return@LaunchedEffect
-        val request =
-            ImageRequest.Builder(context)
-                .data(url)
-                .size(PlayerColorExtractor.Config.IMAGE_SIZE, PlayerColorExtractor.Config.IMAGE_SIZE)
-                .allowHardware(false)
-                .build()
-        val bitmap = runCatching { context.imageLoader.execute(request).image?.toBitmap() }.getOrNull() ?: return@LaunchedEffect
-        vivid =
-            withContext(Dispatchers.Default) {
-                val palette =
-                    Palette.from(bitmap)
-                        .maximumColorCount(PlayerColorExtractor.Config.MAX_COLOR_COUNT)
-                        .resizeBitmapArea(PlayerColorExtractor.Config.BITMAP_AREA)
-                        .generate()
-                vividSwatch(palette.swatches.map { CoverSwatch(Color(it.rgb), it.population) })
-            }
+        val palette = app.vibra.performance.ArtworkPalettes.load(context, url) ?: return@LaunchedEffect
+        vivid = vividSwatch(palette.swatches.map { CoverSwatch(Color(it.rgb), it.population) })
     }
     val target = vivid?.let { artworkAccent(it) } ?: artworkAccent(colors)
     val spec = Liquid.effects<Color>(LiquidSpeed.Fast)
@@ -289,11 +270,20 @@ fun ArtworkGlow(
     modifier: Modifier = Modifier,
     spread: Dp = 56.dp,
     alpha: Float = 0.55f,
+    visibility: () -> Float = { 1f },
 ) {
-    val colors = rememberArtworkColors(url)
+    val colors = rememberArtworkColors(url, fallback = Color.Transparent)
+    val animationsDisabled = LocalAnimationsDisabled.current
+    val reveal = remember { Animatable(if (animationsDisabled) 1f else 0f) }
+    val spec = Liquid.effects<Float>(LiquidSpeed.Fast)
+    LaunchedEffect(animationsDisabled, spec) {
+        if (animationsDisabled) reveal.snapTo(1f) else reveal.animateTo(1f, spec)
+    }
     Box(
         modifier =
             modifier.drawBehind {
+                val strength = alpha * reveal.value.coerceIn(0f, 1f) * visibility()
+                if (strength <= 0f) return@drawBehind
                 val reach = spread.toPx()
                 val radius = max(size.width, size.height) / 2f + reach
                 val centre = center
@@ -302,11 +292,13 @@ fun ArtworkGlow(
                     colors[1] to Offset(size.width * 0.14f, size.height * 0.1f),
                     colors[2] to Offset(0f, size.height * 0.16f),
                 ).forEach { (color, shift) ->
+                    val opacity = strength * color.alpha
+                    if (opacity <= 0f) return@forEach
                     drawCircle(
                         brush =
                             Brush.radialGradient(
-                                0f to color.copy(alpha = alpha),
-                                0.55f to color.copy(alpha = alpha * 0.45f),
+                                0f to color.copy(alpha = opacity),
+                                0.55f to color.copy(alpha = opacity * 0.45f),
                                 1f to Color.Transparent,
                                 center = centre + shift,
                                 radius = radius,

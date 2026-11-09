@@ -7,12 +7,14 @@
 
 package moe.rukamori.archivetune.playback.queues
 
+import app.vibra.playback.lazyMediaItems
+import app.vibra.playback.metadataOf
+
 import androidx.media3.common.MediaItem
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import moe.rukamori.archivetune.db.MusicDatabase
-import moe.rukamori.archivetune.extensions.toMediaItem
 import moe.rukamori.archivetune.innertube.YouTube
 import moe.rukamori.archivetune.innertube.models.WatchEndpoint
 import moe.rukamori.archivetune.models.MediaMetadata
@@ -46,7 +48,7 @@ class LocalMixQueue(
             if (finalMix.isNotEmpty()) {
                 return@withContext Queue.Status(
                     title = "Mix from Playlist",
-                    items = finalMix.map { it.toMediaItem() },
+                    items = finalMix.lazyMediaItems { metadataOf(it) },
                     mediaItemIndex = 0,
                 )
             }
@@ -59,7 +61,7 @@ class LocalMixQueue(
             val fromNext =
                 nextResult
                     ?.items
-                    ?.map { it.toMediaItem() }
+                    ?.lazyMediaItems { metadataOf(it) }
                     ?.filter { it.mediaId !in playlistSongIds }
                     .orEmpty()
 
@@ -71,7 +73,7 @@ class LocalMixQueue(
                             .related(endpoint)
                             .getOrNull()
                             ?.songs
-                            ?.map { it.toMediaItem() }
+                            ?.lazyMediaItems { metadataOf(it) }
                             ?.filter { it.mediaId !in playlistSongIds }
                     }.orEmpty()
 

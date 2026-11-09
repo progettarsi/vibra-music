@@ -63,6 +63,7 @@ class YouTubeLoginRepository
     @Inject
     constructor(
         @ApplicationContext private val context: Context,
+        private val resolveAudioStream: moe.rukamori.archivetune.playback.stream.ResolveAudioStreamUseCase,
     ) {
         fun observeAccountIdentity(): Flow<AccountIdentity> =
             context.dataStore.data
@@ -81,6 +82,7 @@ class YouTubeLoginRepository
         ): Result<YouTubeLoginSession> =
             withContext(Dispatchers.IO) {
                 runCatchingPreservingCancellation {
+                    val previousFingerprint = YouTube.currentPlaybackAuthState().fingerprint
                     val normalizedCookie = cookie.trim()
                     check(hasYouTubeLoginCookie(normalizedCookie)) { "YouTube login cookie is missing" }
                     check(hasCompleteYouTubeLoginCookies(normalizedCookie)) { "YouTube login cookies are incomplete" }
@@ -99,6 +101,7 @@ class YouTubeLoginRepository
                     val resolvedDataSyncId = resolveRequiredDataSyncId(initialAuthState.dataSyncId)
                     val resolvedAuthState = initialAuthState.copy(dataSyncId = resolvedDataSyncId).normalized()
                     YouTube.authState = resolvedAuthState
+                    if (previousFingerprint != resolvedAuthState.fingerprint) resolveAudioStream.invalidateSession()
 
                     persistLoginSession(
                         authState = resolvedAuthState,
@@ -117,6 +120,7 @@ class YouTubeLoginRepository
         suspend fun switchSavedAccount(account: SavedAccount): Result<PlaybackAuthState> =
             withContext(Dispatchers.IO) {
                 runCatchingPreservingCancellation {
+                    val previousFingerprint = YouTube.currentPlaybackAuthState().fingerprint
                     check(hasYouTubeLoginCookie(account.innerTubeCookie)) { "Saved account login cookie is missing" }
                     check(hasCompleteYouTubeLoginCookies(account.innerTubeCookie)) {
                         "Saved account login cookies are incomplete"
@@ -133,6 +137,7 @@ class YouTubeLoginRepository
                     val resolvedDataSyncId = resolveRequiredDataSyncId(initialAuthState.dataSyncId)
                     val resolvedAuthState = initialAuthState.copy(dataSyncId = resolvedDataSyncId).normalized()
                     YouTube.authState = resolvedAuthState
+                    if (previousFingerprint != resolvedAuthState.fingerprint) resolveAudioStream.invalidateSession()
 
                     context.dataStore.edit { preferences ->
                         preferences[InnerTubeCookieKey] = account.innerTubeCookie

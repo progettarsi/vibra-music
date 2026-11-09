@@ -7,6 +7,10 @@
 
 package moe.rukamori.archivetune.playback
 
+import app.vibra.playback.lazyMediaItems
+import app.vibra.playback.metadataOf
+import app.vibra.playback.metadataAt
+
 import android.content.ContentResolver
 import android.content.Context
 import android.net.Uri
@@ -92,6 +96,8 @@ class MediaLibrarySessionCallback
         private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
         private var pendingSearchJob: Job? = null
         private val onlineSearchItemCache = ConcurrentHashMap<String, MediaItem>()
+        var awaitQueueRestored: suspend () -> Unit = {}
+        var prepareLargeQueue: suspend (List<MediaItem>, Int, Long) -> MediaSession.MediaItemsWithStartPosition? = { _, _, _ -> null }
         var toggleLike: () -> Unit = {}
         var toggleStartRadio: () -> Unit = {}
         var toggleLibrary: () -> Unit = {}
@@ -134,8 +140,9 @@ class MediaLibrarySessionCallback
             controller: MediaSession.ControllerInfo,
         ): MediaSession.ConnectionResult {
             val builder = MediaSession.ConnectionResult.AcceptedResultBuilder(session, controller)
-            val defaults = builder.build()
-            val availableSessionCommands = defaults.availableSessionCommands
+            val carController = isCarController(session, controller)
+            if (!controllerGetsFullCommands(controller.isTrusted, carController)) return builder.build()
+            val availableSessionCommands = MediaSession.ConnectionResult.DEFAULT_SESSION_AND_LIBRARY_COMMANDS
                 .buildUpon()
                 .add(MediaSessionConstants.CommandToggleStartRadio)
                 .add(MediaSessionConstants.CommandToggleShuffle)
@@ -147,6 +154,7 @@ class MediaLibrarySessionCallback
                     .add(MediaSessionConstants.CommandToggleLibrary)
             }
             builder.setAvailableSessionCommands(availableSessionCommands.build())
+                .setAvailablePlayerCommands(MediaSession.ConnectionResult.DEFAULT_PLAYER_COMMANDS)
             if (isCarController(session, controller)) {
                 val carButtons = carMediaButtonPreferences(androidAutoSettings.currentConfiguration())
                 builder
@@ -189,13 +197,14 @@ class MediaLibrarySessionCallback
             isForPlayback: Boolean,
         ): ListenableFuture<MediaSession.MediaItemsWithStartPosition> =
             scope.future {
+                awaitQueueRestored()
                 val player = mediaSession.player
                 val currentItems = List(player.mediaItemCount) { index -> player.getMediaItemAt(index) }
                 val persistedItems =
                     withContext(Dispatchers.IO) {
-                        readPersistentQueue()?.let { queue ->
+                        readPersistentQueue()?.takeUnless { app.vibra.playback.QueuePersistenceDisk(context.filesDir).exists() }?.let { queue ->
                             PlaybackResumptionPlanner.PersistedItems(
-                                items = queue.items.map { it.toMediaItem() },
+                                items = queue.items.lazyMediaItems { metadataOf(it) },
                                 mediaItemIndex = queue.mediaItemIndex,
                                 positionMs = queue.position,
                             )
@@ -1196,7 +1205,7 @@ class MediaLibrarySessionCallback
             scope.future(Dispatchers.IO) {
                 // Play from Android Auto
                 val defaultResult =
-                    MediaSession.MediaItemsWithStartPosition(emptyList(), startIndex, startPositionMs)
+                    preparedQueue(emptyList(), startIndex, startPositionMs)
                 val firstItem = mediaItems.firstOrNull() ?: return@future defaultResult
                 val isCarController = isCarController(mediaSession, controller)
                 val configuration = if (isCarController) androidAutoSettings.currentConfiguration() else null
@@ -1213,8 +1222,8 @@ class MediaLibrarySessionCallback
                         val songs = playlistSongs(playlist.id)
                             .availableForCar(localSongsAllowed, onlineContentAllowed)
                         if (songs.isNotEmpty()) {
-                            return@future MediaSession.MediaItemsWithStartPosition(
-                                songs.map { it.toMediaItem() },
+                            return@future preparedQueue(
+                                songs.lazyMediaItems { metadataOf(it) },
                                 0,
                                 startPositionMs,
                             )
@@ -1237,7 +1246,7 @@ class MediaLibrarySessionCallback
                         interleaveMediaItems(offlineSongs.items, onlineSongs)
                     }
                     if (searchQueue.isNotEmpty()) {
-                        return@future MediaSession.MediaItemsWithStartPosition(
+                        return@future preparedQueue(
                             searchQueue,
                             0,
                             startPositionMs,
@@ -1278,7 +1287,7 @@ class MediaLibrarySessionCallback
                         val songs = if (configuration == null ||
                             (configuration.onlineRecommendations && onlineContentAllowed)
                         ) {
-                            homeSuggestedSongs().map { it.toMediaItem() }
+                            homeSuggestedSongs().lazyMediaItems { metadataOf(it) }
                         } else {
                             emptyList()
                         }
@@ -1317,8 +1326,8 @@ class MediaLibrarySessionCallback
                         val songId = path.getOrNull(1) ?: return@future defaultResult
                         val allSongs = database.songsByCreateDateAsc().first()
                             .let { if (isCarController) it.availableForCar(localSongsAllowed, onlineContentAllowed) else it }
-                        MediaSession.MediaItemsWithStartPosition(
-                            allSongs.map { it.toMediaItem() },
+                        preparedQueue(
+                            allSongs.lazyMediaItems { metadataOf(it) },
                             allSongs.indexOfFirst { it.id == songId }.takeIf { it != -1 } ?: 0,
                             startPositionMs,
                         )
@@ -1329,8 +1338,8 @@ class MediaLibrarySessionCallback
                         val artistId = path.getOrNull(1) ?: return@future defaultResult
                         val songs = database.artistSongsByCreateDateAsc(artistId).first()
                             .let { if (isCarController) it.availableForCar(localSongsAllowed, onlineContentAllowed) else it }
-                        MediaSession.MediaItemsWithStartPosition(
-                            songs.map { it.toMediaItem() },
+                        preparedQueue(
+                            songs.lazyMediaItems { metadataOf(it) },
                             songs.indexOfFirst { it.id == songId }.takeIf { it != -1 } ?: 0,
                             startPositionMs,
                         )
@@ -1343,8 +1352,8 @@ class MediaLibrarySessionCallback
                             database.albumWithSongs(albumId).first() ?: return@future defaultResult
                         val songs = albumWithSongs.songs
                             .let { if (isCarController) it.availableForCar(localSongsAllowed, onlineContentAllowed) else it }
-                        MediaSession.MediaItemsWithStartPosition(
-                            songs.map { it.toMediaItem() },
+                        preparedQueue(
+                            songs.lazyMediaItems { metadataOf(it) },
                             songs.indexOfFirst { it.id == songId }.takeIf { it != -1 }
                                 ?: 0,
                             startPositionMs,
@@ -1386,8 +1395,8 @@ class MediaLibrarySessionCallback
                                 mediaSession.player.shuffleModeEnabled = true
                             }
                         }
-                        MediaSession.MediaItemsWithStartPosition(
-                            songs.map { it.toMediaItem() },
+                        preparedQueue(
+                            songs.lazyMediaItems { metadataOf(it) },
                             selectedSongId?.let { songId ->
                                 songs.indexOfFirst { it.id == songId }.takeIf { it != -1 }
                             } ?: 0,
@@ -1410,11 +1419,11 @@ class MediaLibrarySessionCallback
                                 mediaSession.player.shuffleModeEnabled = true
                             }
                         }
-                        val mediaItems = songs.map { it.toMediaItem() }
-                        MediaSession.MediaItemsWithStartPosition(
+                        val mediaItems = songs.lazyMediaItems { metadataOf(it) }
+                        preparedQueue(
                             mediaItems,
                             selectedSongId?.let { songId ->
-                                mediaItems.indexOfFirst { it.mediaId == songId }.takeIf { it != -1 }
+                                mediaItems.indices.firstOrNull { mediaItems.metadataAt(it)?.id == songId }
                             } ?: 0,
                             startPositionMs,
                         )
@@ -1430,7 +1439,7 @@ class MediaLibrarySessionCallback
                                 )
                             ) return@future defaultResult
                             val selectedItem = onlineSearchItemCache[directMediaId] ?: firstItem
-                            return@future MediaSession.MediaItemsWithStartPosition(
+                            return@future preparedQueue(
                                 listOf(selectedItem),
                                 0,
                                 startPositionMs,
@@ -1448,8 +1457,8 @@ class MediaLibrarySessionCallback
                         val songId = matchedSongs.firstOrNull()?.id ?: return@future defaultResult
                         val allSongs = database.songsByCreateDateAsc().first()
                             .let { if (isCarController) it.availableForCar(localSongsAllowed, onlineContentAllowed) else it }
-                        MediaSession.MediaItemsWithStartPosition(
-                            allSongs.map { it.toMediaItem() },
+                        preparedQueue(
+                            allSongs.lazyMediaItems { metadataOf(it) },
                             allSongs.indexOfFirst { it.id == songId }.takeIf { it != -1 } ?: 0,
                             startPositionMs,
                         )
@@ -1551,7 +1560,7 @@ class MediaLibrarySessionCallback
                                         "$parentId/$PLAYLIST_ACTION_ADD_CURRENT_SONG",
                                         context.getString(R.string.add_current_song),
                                         playlistEntity?.name,
-                                        drawableUri(R.drawable.playlist_add),
+                                        drawableUri(R.drawable.add_box),
                                         MediaMetadata.MEDIA_TYPE_MUSIC,
                                     ),
                                 )
@@ -1625,7 +1634,7 @@ class MediaLibrarySessionCallback
                         mediaId,
                         context.getString(R.string.add_current_song),
                         playlistHeaderItem(playlistId)?.mediaMetadata?.title?.toString(),
-                        drawableUri(R.drawable.playlist_add),
+                        drawableUri(R.drawable.add_box),
                         MediaMetadata.MEDIA_TYPE_MUSIC,
                     )
                 }
@@ -2002,14 +2011,19 @@ class MediaLibrarySessionCallback
                 )
             }
 
+        private suspend fun preparedQueue(items: List<MediaItem>, index: Int, position: Long): MediaSession.MediaItemsWithStartPosition {
+            if (items.size > 100) prepareLargeQueue(items, index, position)?.let { return it }
+            return MediaSession.MediaItemsWithStartPosition(items, index, position)
+        }
+
         @JvmName("mediaItemsToMediaItemsWithStartPosition")
-        private fun List<MediaItem>.toMediaItemsWithStartPosition(
+        private suspend fun List<MediaItem>.toMediaItemsWithStartPosition(
             selectedMediaId: String?,
             startPositionMs: Long,
-        ) = MediaSession.MediaItemsWithStartPosition(
+        ) = preparedQueue(
             this,
             selectedMediaId?.let { mediaId ->
-                indexOfFirst { it.mediaId == mediaId }.takeIf { it != -1 }
+                indices.firstOrNull { metadataAt(it)?.id == mediaId }
             } ?: 0,
             startPositionMs,
         )
@@ -2208,11 +2222,11 @@ class MediaLibrarySessionCallback
         }
 
         @JvmName("songsToMediaItemsWithStartPosition")
-        private fun List<Song>.toMediaItemsWithStartPosition(
+        private suspend fun List<Song>.toMediaItemsWithStartPosition(
             selectedSongId: String?,
             startPositionMs: Long,
-        ) = MediaSession.MediaItemsWithStartPosition(
-            map { it.toMediaItem() },
+        ) = preparedQueue(
+            lazyMediaItems { metadataOf(it) },
             selectedSongId?.let { id ->
                 indexOfFirst { it.id == id }.takeIf { it != -1 }
             } ?: 0,
@@ -2268,7 +2282,7 @@ class MediaLibrarySessionCallback
 
             val items = interleaveMediaItems(
                 first = librarySongs.map { it.toMediaItem(MusicService.SONG) },
-                second = cachedOnlySongs.take(previewSize).map { it.toMediaItem() },
+                second = cachedOnlySongs.take(previewSize).lazyMediaItems { metadataOf(it) },
             ).take(previewSize)
             return OfflineSongSearchResult(
                 items = items,
@@ -2480,3 +2494,6 @@ internal fun controllerMayChangeLibrary(
     isCarController: Boolean,
     packageMatchesUid: Boolean,
 ): Boolean = isOwnApp || isTrustedBySystem || (isCarController && packageMatchesUid)
+
+// Vibra: Media3 1.11 restricts the builder defaults even for car controllers.
+internal fun controllerGetsFullCommands(isTrusted: Boolean, isCarController: Boolean): Boolean = isTrusted || isCarController

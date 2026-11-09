@@ -148,6 +148,9 @@ fun VibraBottomSheet(
   containerColor: Color = MaterialTheme.colorScheme.background,
   contentWindowInsets: @Composable () -> WindowInsets = { BottomSheetDefaults.modalWindowInsets },
   properties: ModalBottomSheetProperties = ModalBottomSheetProperties(),
+  openExpanded: Boolean = false,
+  sheetShape: androidx.compose.ui.graphics.Shape = VibraShapes.SheetTop,
+  handleWidth: Dp = 32.dp,
   content: @Composable ColumnScope.() -> Unit,
 ) {
   val density = LocalDensity.current
@@ -164,7 +167,7 @@ fun VibraBottomSheet(
   var expansionUnlocked by remember { mutableStateOf(false) }
   var hasBeenActive by remember { mutableStateOf(false) }
   var previouslyActive by remember { mutableStateOf(false) }
-  val openingLimitReached = sheetOpeningLimitReached(measuredHeight, windowHeight)
+  val openingLimitReached = !openExpanded && sheetOpeningLimitReached(measuredHeight, windowHeight)
   // Only the shown/hidden flip matters; reading the inset directly would recompose every open
   // sheet on each frame of the keyboard animation.
   val imeInsets = WindowInsets.ime
@@ -310,7 +313,7 @@ fun VibraBottomSheet(
         sheetState = sheetState,
         sheetMaxWidth = 560.dp,
         sheetGesturesEnabled = sheetGesturesEnabled && active,
-        shape = VibraShapes.SheetTop,
+        shape = sheetShape,
         containerColor = if (active) containerColor else Color.Transparent,
         contentColor = MaterialTheme.colorScheme.onSurface,
         tonalElevation = 0.dp,
@@ -339,7 +342,7 @@ fun VibraBottomSheet(
                 },
               contentAlignment = Alignment.Center,
             ) {
-              VibraSheetHandle()
+              VibraSheetHandle(width = handleWidth)
             }
           }
         },
@@ -422,12 +425,12 @@ internal fun sheetOpeningTarget(
 
 /** The grabber at the top of every sheet. */
 @Composable
-fun VibraSheetHandle(modifier: Modifier = Modifier) {
+fun VibraSheetHandle(modifier: Modifier = Modifier, width: Dp = 32.dp) {
   Box(
     modifier =
       modifier
         .padding(vertical = (MenuTokens.SheetHandleHeight - 4.dp) / 2)
-        .size(width = 32.dp, height = 4.dp)
+        .size(width = width, height = 4.dp)
         .background(
           MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
           VibraShapes.Pill,
@@ -450,6 +453,7 @@ fun VibraDialog(
   properties: DialogProperties = DialogProperties(usePlatformDefaultWidth = false),
   contentPadding: PaddingValues = PaddingValues(24.dp),
   groupContent: Boolean = true,
+  openExpanded: Boolean = false,
   content: @Composable ColumnScope.() -> Unit,
 ) {
   val outsideDismissAllowed =
@@ -460,12 +464,13 @@ fun VibraDialog(
   }
   val state =
     rememberModalBottomSheetState(
-      skipPartiallyExpanded = false,
+      skipPartiallyExpanded = openExpanded,
       confirmValueChange = confirmDismiss,
     )
   VibraBottomSheet(
     onDismissRequest = onDismissRequest,
     sheetState = state,
+    openExpanded = openExpanded,
     properties =
       ModalBottomSheetProperties(
         securePolicy = properties.securePolicy,

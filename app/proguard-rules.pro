@@ -148,3 +148,13 @@
 
 # engine HTTP Android/OkHttp Ktor
 -dontwarn kotlinx.coroutines.**
+
+# Stable v2 on-disk queue schema across debug/release and future minified builds.
+-keep class app.vibra.playback.QueueEntry { *; }
+-keep class app.vibra.playback.QueueContent { *; }
+-keep class app.vibra.playback.QueueContentV2 { *; }
+-keep class app.vibra.playback.QueueCheckpointV2 { *; }
+-keep class moe.rukamori.archivetune.models.MediaMetadata { *; }
+-keep class moe.rukamori.archivetune.models.MediaMetadata$* { *; }
+-keep class moe.rukamori.archivetune.models.QueueData$* { *; }
+-keep class moe.rukamori.archivetune.models.QueueType$* { *; }

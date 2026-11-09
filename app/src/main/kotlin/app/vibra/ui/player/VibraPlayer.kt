@@ -38,6 +38,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -115,6 +116,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
@@ -552,6 +554,13 @@ fun VibraPlayerSheet(
                         )
                         revealed?.let { url ->
                             CoverExtension(url = url, baker = backdropBaker, visibility = backdropVisibility, offsetX = revealedOffset)
+                        }
+                        // No artwork (often a local file): the backdrop has nothing to continue,
+                        // so the cover's place gets a music note instead of staying empty.
+                        if (metadata.thumbnailUrl == null) {
+                            coverSlot?.let { slot ->
+                                NoArtworkMark(slot = slot, visibility = backdropVisibility, offsetX = { coverSwipe.value })
+                            }
                         }
                     }
 
@@ -1024,6 +1033,9 @@ private fun FlyingCover(
                     }
                 },
         ) {
+            // A track without artwork (often a local file) shows the themed placeholder, not
+            // an empty backdrop.
+            if (url == null) app.vibra.ui.components.ArtworkPlaceholder(R.drawable.music_note)
             listOfNotNull(url, fadingUrl?.takeIf { it != url }).forEach { layerUrl ->
                 key(layerUrl) {
                     val sourceLayer = rememberGraphicsLayer()
@@ -1369,6 +1381,30 @@ private fun rememberCoverSwipeGesture(
     }
 }
 
+/** A large note centred in the cover's slot, in the player's text colour (no box around it). */
+@Composable
+private fun NoArtworkMark(
+    slot: Rect,
+    visibility: () -> Float,
+    offsetX: () -> Float,
+) {
+    val density = LocalDensity.current
+    Box(
+        Modifier
+            .offset { IntOffset((slot.left + offsetX()).roundToInt(), slot.top.roundToInt()) }
+            .size(with(density) { slot.width.toDp() }, with(density) { slot.height.toDp() })
+            .graphicsLayer { alpha = visibility() },
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            painter = painterResource(R.drawable.music_note),
+            contentDescription = null,
+            tint = OnBackdrop.copy(alpha = 0.55f),
+            modifier = Modifier.fillMaxSize(0.36f),
+        )
+    }
+}
+
 /** Title and artists; the title block the mini-player text flies into. */
 @Composable
 private fun PlayerTitleBlock(
@@ -1406,9 +1442,12 @@ private fun PlayerArtists(
 ) {
     val haptics = rememberVibraHaptics()
     val currentOnArtist by rememberUpdatedState(onArtist)
+    // A file without artist tags still gets its line, so the title never stands alone.
+    val unknownArtist = stringResource(R.string.unknown_artist)
     val text =
-        remember(artists) {
+        remember(artists, unknownArtist) {
             buildAnnotatedString {
+                if (artists.none { it.name.isNotBlank() }) append(unknownArtist)
                 artists.forEachIndexed { index, artist ->
                     if (index > 0) append(", ")
                     val id = artist.id
@@ -1563,7 +1602,7 @@ private fun PlayerControls(
         Spacer(Modifier.weight(1f))
         SleepTimerButton(timer = connection.service.sleepTimer)
         BackdropCircleButton(
-            icon = R.drawable.playlist_add,
+            icon = R.drawable.add_box,
             contentDescription = stringResource(R.string.add_to_playlist),
             onClick = showAddToPlaylist,
             size = 44.dp,

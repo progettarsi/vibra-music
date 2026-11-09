@@ -66,6 +66,7 @@ import moe.rukamori.archivetune.di.PlayerCache
 import moe.rukamori.archivetune.downloads.DownloadedArtworkRepository
 import moe.rukamori.archivetune.innertube.YouTube
 import moe.rukamori.archivetune.playback.stream.AudioStreamRequest
+import moe.rukamori.archivetune.playback.stream.PlaybackHttpClient
 import moe.rukamori.archivetune.playback.stream.ResolveAudioStreamUseCase
 import moe.rukamori.archivetune.playback.stream.ResolvedAudioStream
 import moe.rukamori.archivetune.playback.stream.StreamPurpose
@@ -114,7 +115,6 @@ class DownloadUtil
         private val mediaOkHttpClient: OkHttpClient by lazy {
             OkHttpClient
                 .Builder()
-                .proxy(YouTube.streamOkHttpProxy)
                 .followRedirects(true)
                 .followSslRedirects(true)
                 .retryOnConnectionFailure(true)
@@ -200,7 +200,9 @@ class DownloadUtil
 
         private val resolvedNetworkDataSourceFactory =
             ResolvingDataSource.Factory(
-                OkHttpDataSource.Factory(mediaOkHttpClient),
+                OkHttpDataSource.Factory(PlaybackHttpClient(context, mediaOkHttpClient) {
+                    ConnectionPool(MAX_IDLE_DOWNLOAD_CONNECTIONS, DOWNLOAD_CONNECTION_KEEP_ALIVE_MINUTES, TimeUnit.MINUTES)
+                }),
                 ::resolveDownloadDataSpec,
             )
 
@@ -367,8 +369,15 @@ class DownloadUtil
             }
         }
 
-        private fun invalidateResolvedStream(mediaId: String) =
+        private fun invalidateResolvedStream(mediaId: String, failure: IOException? = null) {
+            val rejected = generateSequence<Throwable>(failure) { it.cause }
+                .filterIsInstance<androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException>()
+                .firstOrNull { it.responseCode == 403 }
+            // Vibra: remember the rejected token binding, but leave the shared session
+            // alone; the download's own REFRESHED stage renews just this video's token.
+            rejected?.let { resolveAudioStream.reportRejectedStream(it.dataSpec.uri.toString()) }
             resolveAudioStream.invalidate(mediaId, StreamPurpose.DOWNLOAD)
+        }
 
         private fun resetDownloadContent(mediaId: String) {
             downloadCache.removeResource(mediaId)
@@ -689,7 +698,7 @@ class DownloadUtil
 
         private class InvalidatingDataSource(
             private val upstream: DataSource,
-            private val onFailure: (String) -> Unit,
+            private val onFailure: (String, IOException) -> Unit,
         ) : DataSource {
             private var mediaId: String? = null
             private var invalidated = false
@@ -705,7 +714,7 @@ class DownloadUtil
                 return try {
                     upstream.open(dataSpec).also { bytesRemaining = it }
                 } catch (exception: IOException) {
-                    invalidateOnce()
+                    invalidateOnce(exception)
                     throw exception
                 }
             }
@@ -725,7 +734,7 @@ class DownloadUtil
                     }
                     bytesRead
                 } catch (exception: IOException) {
-                    invalidateOnce()
+                    invalidateOnce(exception)
                     throw exception
                 }
 
@@ -737,7 +746,7 @@ class DownloadUtil
                 try {
                     upstream.close()
                 } catch (exception: IOException) {
-                    invalidateOnce()
+                    invalidateOnce(exception)
                     throw exception
                 } finally {
                     mediaId = null
@@ -745,10 +754,10 @@ class DownloadUtil
                 }
             }
 
-            private fun invalidateOnce() {
+            private fun invalidateOnce(failure: IOException) {
                 if (invalidated) return
                 invalidated = true
-                mediaId?.let(onFailure)
+                mediaId?.let { onFailure(it, failure) }
             }
         }
 

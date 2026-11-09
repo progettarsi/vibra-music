@@ -175,13 +175,16 @@ fun RowSubtitleText(text: String) {
     )
 }
 
-/** Duration on the trailing edge (Figma "3:00", secondary colour, title-medium). */
+/**
+ * Duration on the trailing edge (Figma "3:00", title-medium). Muted rather than the accent
+ * colour: it is the least important fact in the row and must not pull the eye from the title.
+ */
 @Composable
 fun RowDurationText(text: String) {
     Text(
         text = text,
         style = MaterialTheme.typography.titleMedium,
-        color = MaterialTheme.colorScheme.secondary,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
         maxLines = 1,
         modifier = Modifier.padding(start = 8.dp),
     )

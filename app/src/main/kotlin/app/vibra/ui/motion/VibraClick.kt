@@ -81,7 +81,7 @@ fun Modifier.interactiveSurface(
     interactionSource: MutableInteractionSource? = null,
     onClick: () -> Unit,
 ): Modifier = composed {
-    expandingClick(onClick, shape, containerColor) { click ->
+    expandingClick(onClick, containerColor, shape) { click ->
     surfaceLayers(shape, containerColor, enabled)
         .foundationClickable(
             interactionSource = interactionSource,
@@ -98,7 +98,7 @@ fun Modifier.interactiveSurface(
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 fun Modifier.interactiveLongSurface(
     shape: Shape,
-    onLongClick: () -> Unit,
+    onLongClick: (() -> Unit)?,
     containerColor: Color = Color.Transparent,
     enabled: Boolean = true,
     role: Role? = Role.Button,
@@ -107,7 +107,7 @@ fun Modifier.interactiveLongSurface(
     interactionSource: MutableInteractionSource? = null,
     onClick: () -> Unit,
 ): Modifier = composed {
-    expandingClick(onClick, shape, containerColor) { click ->
+    expandingClick(onClick, containerColor, shape) { click ->
     surfaceLayers(shape, containerColor, enabled)
         .foundationCombinedClickable(
             interactionSource = interactionSource,

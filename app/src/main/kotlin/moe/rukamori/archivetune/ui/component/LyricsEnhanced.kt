@@ -17,6 +17,7 @@ package moe.rukamori.archivetune.ui.component
 import app.vibra.ui.theme.adaptiveRoundedCornerShape
 
 import android.app.Activity
+import android.graphics.Bitmap
 import android.os.SystemClock
 import android.view.WindowManager
 import android.widget.Toast
@@ -28,38 +29,27 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
-import app.vibra.ui.motion.clickable
+import androidx.compose.foundation.background
 import app.vibra.ui.motion.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import app.vibra.ui.components.VibraBasicAlertDialog as BasicAlertDialog
-import app.vibra.ui.motion.VibraButton as Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import app.vibra.ui.motion.VibraTextButton as TextButton
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -67,11 +57,9 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
@@ -80,10 +68,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.invisibleToUser
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -97,8 +84,11 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.media3.common.Player
-import app.vibra.ui.components.VibraBottomSheet
 import app.vibra.ui.lyrics.LyricsEntrance
+import app.vibra.ui.lyrics.LyricsCardContent
+import app.vibra.ui.lyrics.LyricsExportDialog
+import app.vibra.ui.lyrics.LyricsSelectionBar
+import app.vibra.ui.lyrics.MaxExportVerses
 import app.vibra.ui.lyrics.VibraLyricsList
 import app.vibra.ui.lyrics.VibraLyricsSkeleton
 import app.vibra.ui.lyrics.rememberLyricsEntrance
@@ -138,9 +128,11 @@ fun LyricsEnhanced(
     lyricsState: LyricsRenderScreenState,
     sliderPositionProvider: () -> Long?,
     lyricsSyncOffset: Int,
+    saveLegacy: suspend (Bitmap) -> Unit,
+    exportTint: Color,
     modifier: Modifier = Modifier,
     textColorOverride: Color? = null,
-    lyricsLineBlurOverride: Boolean? = null,
+    lyricsListModifier: Modifier = Modifier,
     lyricsRenderViewModel: LyricsRenderViewModel = hiltViewModel(),
     paneActive: Boolean = true,
 ) {
@@ -165,14 +157,6 @@ fun LyricsEnhanced(
         } else {
             Color.White
         }
-
-    var isSelectionModeActive by rememberSaveable { mutableStateOf(false) }
-    val selectedLineKeys = remember { mutableStateListOf<String>() }
-    var showMaxSelectionToast by remember { mutableStateOf(false) }
-    val maxSelectionLimit = 5
-    var showShareDialog by remember { mutableStateOf(false) }
-    var shareDialogData by remember { mutableStateOf<Triple<String, String, String>?>(null) }
-    var showShareImageDialog by remember { mutableStateOf(false) }
 
     val showTranslations =
         preparedLyrics?.hasTranslations == true && preferences?.showTranslations == true
@@ -229,9 +213,24 @@ fun LyricsEnhanced(
     val playbackPositionMs = lyricsRenderViewModel.playbackPositionMs.collectAsStateWithLifecycle()
     val plainLyricsListState = key(lyricsSessionKey) { rememberLazyListState() }
 
-    LaunchedEffect(lyricsSessionKey) {
-        isSelectionModeActive = false
-        selectedLineKeys.clear()
+    var selectedIndices by remember(lyricsSessionKey) { mutableStateOf(emptySet<Int>()) }
+    var preview by remember(lyricsSessionKey) { mutableStateOf<LyricsCardContent?>(null) }
+    val selecting = selectedIndices.isNotEmpty()
+    BackHandler(enabled = selecting && preview == null) { selectedIndices = emptySet() }
+
+    fun toggleVerse(index: Int) {
+        selectedIndices = when {
+            index in selectedIndices -> selectedIndices - index
+            selectedIndices.size < MaxExportVerses -> selectedIndices + index
+            else -> {
+                Toast.makeText(
+                    context,
+                    context.getString(R.string.max_selection_limit, MaxExportVerses),
+                    Toast.LENGTH_SHORT,
+                ).show()
+                selectedIndices
+            }
+        }
     }
 
     DisposableEffect(player, lyricsRenderViewModel) {
@@ -285,23 +284,6 @@ fun LyricsEnhanced(
                     .toInt()
             }
         }
-    BackHandler(enabled = isSelectionModeActive) {
-        isSelectionModeActive = false
-        selectedLineKeys.clear()
-    }
-
-    LaunchedEffect(showMaxSelectionToast) {
-        if (showMaxSelectionToast) {
-            Toast
-                .makeText(
-                    context,
-                    context.getString(R.string.max_selection_limit, maxSelectionLimit),
-                    Toast.LENGTH_SHORT,
-                ).show()
-            showMaxSelectionToast = false
-        }
-    }
-
     val activity = context as? Activity
     DisposableEffect(Unit) {
         activity?.window?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -321,11 +303,6 @@ fun LyricsEnhanced(
             fontSize = (lyricsTextSize * 0.82f).sp,
             fontFamily = lyricsFontFamily ?: MaterialTheme.typography.titleLarge.fontFamily,
         )
-    val phoneticTextStyle =
-        MaterialTheme.typography.bodyMedium.copy(
-            fontSize = (lyricsTextSize * 0.55f).sp,
-            fontWeight = FontWeight.Normal,
-        )
     val plainLyrics =
         remember(lyricsEntries, isSynced) {
             PlainLyrics(
@@ -334,81 +311,29 @@ fun LyricsEnhanced(
                         emptyList()
                     } else {
                         lyricsEntries.mapIndexedNotNull { index, entry ->
-                            val text = entry.text.trim()
-                            if (text.isBlank()) {
-                                null
-                            } else {
-                                val selectionId = "plain:$index:${text.hashCode()}"
-                                PlainLyricLine(
-                                    itemId = "$selectionId#$index",
-                                    selectionId = selectionId,
-                                    text = text,
-                                )
-                            }
+                            entry.text.trim().takeIf(String::isNotBlank)?.let { PlainLyricLine(index, it) }
                         }
                     },
             )
         }
-    val selectionLines =
-        remember(isSynced, syncedLyrics, plainLyrics) {
+    fun selectedCard(): LyricsCardContent? {
+        val metadata = mediaMetadata ?: return null
+        val verses =
             if (isSynced) {
-                syncedLyrics.lines.mapIndexedNotNull { index, line ->
-                    val text = line.lineText()
-                    if (text.isBlank()) {
-                        null
-                    } else {
-                        val selectionId = line.selectionKey(text)
-                        LyricSelectionLine(
-                            itemId = "$selectionId#$index",
-                            selectionId = selectionId,
-                            text = text,
-                        )
-                    }
+                selectedIndices.sorted().mapNotNull { index ->
+                    syncedLyrics.lines.getOrNull(index)?.lineText()?.takeIf(String::isNotBlank)
                 }
             } else {
-                plainLyrics.items.map { line ->
-                    LyricSelectionLine(
-                        itemId = line.itemId,
-                        selectionId = line.selectionId,
-                        text = line.text,
-                    )
-                }
+                plainLyrics.items.filter { it.index in selectedIndices }.map { it.text }
             }
-        }
-    val selectedLineKeySnapshot = selectedLineKeys.toList()
-    val selectedLineKeySet = remember(selectedLineKeySnapshot) { selectedLineKeySnapshot.toSet() }
-    val dismissSelection = {
-        isSelectionModeActive = false
-        selectedLineKeys.clear()
-    }
-    val toggleSelectedLine: (String) -> Unit = { lineKey ->
-        if (selectedLineKeys.contains(lineKey)) {
-            selectedLineKeys.remove(lineKey)
-            if (selectedLineKeys.isEmpty()) isSelectionModeActive = false
-        } else if (selectedLineKeys.size < maxSelectionLimit) {
-            selectedLineKeys.add(lineKey)
-        } else {
-            showMaxSelectionToast = true
-        }
-    }
-    val shareSelectedLyrics: () -> Unit = {
-        val metadata = mediaMetadata
-        if (metadata != null) {
-            val selectedLyricsText =
-                selectionLines
-                    .filter { line -> line.selectionId in selectedLineKeySet }
-                    .joinToString("\n") { line -> line.text }
-            if (selectedLyricsText.isNotBlank()) {
-                shareDialogData =
-                    Triple(
-                        selectedLyricsText,
-                        metadata.title,
-                        metadata.artists.joinToString { it.name },
-                    )
-                showShareDialog = true
-            }
-        }
-        dismissSelection()
+        if (verses.isEmpty()) return null
+        return LyricsCardContent(
+            title = metadata.title,
+            subtitle = metadata.album?.title?.takeIf { it.isNotBlank() && it != metadata.title }
+                ?: metadata.artists.joinToString { it.name },
+            coverUrl = metadata.thumbnailUrl,
+            verses = verses,
+        )
     }
 
     // Vibra: loading, lyrics and "not found" cross-fade; a view on its way out keeps its own
@@ -429,216 +354,104 @@ fun LyricsEnhanced(
     val viewEnter = Liquid.effects<Float>(LiquidSpeed.Slow)
     val viewExit = Liquid.effects<Float>(LiquidSpeed.Fast)
 
-    Box(
-        contentAlignment = Alignment.TopCenter,
-        modifier =
-            modifier
-                .fillMaxSize()
-                .padding(bottom = 12.dp),
-    ) {
-        AnimatedContent(
-            targetState = lyricsView,
-            transitionSpec = {
-                // Vibra: the skeleton and the first visible verses own this handoff.
-                val transition =
-                    if (initialState == LyricsView.Loading || animationsDisabled) {
-                        EnterTransition.None togetherWith ExitTransition.None
-                    } else {
-                        fadeIn(viewEnter) togetherWith fadeOut(viewExit)
+    Column(modifier.fillMaxSize()) {
+        Box(Modifier.weight(1f).fillMaxWidth().then(lyricsListModifier)) {
+            AnimatedContent(
+                targetState = lyricsView,
+                transitionSpec = {
+                    // Vibra: the skeleton and the first visible verses own this handoff.
+                    val transition =
+                        if (initialState == LyricsView.Loading || animationsDisabled) {
+                            EnterTransition.None togetherWith ExitTransition.None
+                        } else {
+                            fadeIn(viewEnter) togetherWith fadeOut(viewExit)
+                        }
+                    transition using null
+                },
+                contentKey = { view -> view.key },
+                contentAlignment = Alignment.Center,
+                label = "lyricsView",
+                modifier = Modifier.fillMaxSize(),
+            ) { view ->
+                when (view) {
+                    LyricsView.Loading -> Unit
+
+                    LyricsView.Missing -> LyricsMissing(textColor = textColor)
+
+                    is LyricsView.Plain -> {
+                        val isCurrent = view.session == lyricsSessionKey
+                        PlainLyricsView(
+                            lines = view.lyrics,
+                            listState = plainLyricsListState,
+                            selectedIndices = if (isCurrent) selectedIndices else emptySet(),
+                            textColor = textColor,
+                            textStyle = normalTextStyle,
+                            onLineClicked = { index ->
+                                if (isCurrent && selecting) toggleVerse(index)
+                            },
+                            onLinePressed = { index ->
+                                if (isCurrent) toggleVerse(index)
+                            },
+                            modifier = Modifier.fillMaxSize(),
+                            entrance = entrance.takeIf { view.key == lyricsView.key },
+                        )
                     }
-                transition using null
-            },
-            contentKey = { view -> view.key },
-            contentAlignment = Alignment.Center,
-            label = "lyricsView",
-            modifier = Modifier.fillMaxSize(),
-        ) { view ->
-            when (view) {
-                LyricsView.Loading -> Unit
 
-                LyricsView.Missing -> LyricsMissing(textColor = textColor)
-
-                is LyricsView.Plain -> {
-                    PlainLyricsView(
-                        lines = view.lyrics,
-                        listState = plainLyricsListState,
-                        selectedLineKeys = selectedLineKeySet,
-                        textColor = textColor,
-                        textStyle = normalTextStyle,
-                        onLineClicked = { lineKey ->
-                            if (isSelectionModeActive) toggleSelectedLine(lineKey)
-                        },
-                        onLinePressed = { lineKey ->
-                            if (!isSelectionModeActive) {
-                                isSelectionModeActive = true
-                                if (!selectedLineKeys.contains(lineKey)) {
-                                    selectedLineKeys.add(lineKey)
-                                }
-                            } else if (!selectedLineKeys.contains(lineKey)) {
-                                toggleSelectedLine(lineKey)
-                            }
-                        },
-                        modifier = Modifier.fillMaxSize(),
-                        entrance = entrance.takeIf { view.key == lyricsView.key },
-                    )
-                }
-
-                is LyricsView.Synced -> {
-                    CompositionLocalProvider(LocalLayoutDirection provides view.direction) {
-                        key(view.session, view.lyrics) {
-                            // Vibra's own list: the library's karaoke view re-rendered every line
-                            // into new bitmaps on each frame (see VibraLyricsList).
-                            VibraLyricsList(
-                                lyrics = view.lyrics,
-                                currentPosition = playbackSyncPosition,
-                                onLineClicked = { line ->
-                                    if (isSelectionModeActive) {
-                                        toggleSelectedLine(line.selectionKey())
-                                        false
-                                    } else if (lyricsClick && line.start > 0) {
-                                        player.seekTo(line.start.toLong())
-                                        true
-                                    } else {
-                                        false
-                                    }
-                                },
-                                onLinePressed = { line ->
-                                    val lineKey = line.selectionKey()
-                                    if (!isSelectionModeActive) {
-                                        isSelectionModeActive = true
-                                        if (!selectedLineKeys.contains(lineKey)) {
-                                            selectedLineKeys.add(lineKey)
+                    is LyricsView.Synced -> {
+                        val isCurrent = view.session == lyricsSessionKey
+                        CompositionLocalProvider(LocalLayoutDirection provides view.direction) {
+                            key(view.session, view.lyrics) {
+                                VibraLyricsList(
+                                    lyrics = view.lyrics,
+                                    currentPosition = playbackSyncPosition,
+                                    selectedIndices = if (isCurrent) selectedIndices else emptySet(),
+                                    onLineClicked = { index, line ->
+                                        when {
+                                            !isCurrent -> false
+                                            selecting -> {
+                                                if (line.lineText().isNotBlank()) toggleVerse(index)
+                                                false
+                                            }
+                                            lyricsClick && line.start > 0 -> {
+                                                player.seekTo(line.start.toLong())
+                                                true
+                                            }
+                                            else -> false
                                         }
-                                    } else if (!selectedLineKeys.contains(lineKey)) {
-                                        toggleSelectedLine(lineKey)
-                                    }
-                                },
-                                textColor = textColor,
-                                textStyle = normalTextStyle,
-                                accompanimentStyle = accompanimentTextStyle,
-                                showTranslation = showTranslations,
-                                modifier = Modifier.fillMaxSize(),
-                                entrance = entrance.takeIf { view.key == lyricsView.key },
-                            )
+                                    },
+                                    onLinePressed = { index, line ->
+                                        if (isCurrent && line.lineText().isNotBlank()) toggleVerse(index)
+                                    },
+                                    textColor = textColor,
+                                    textStyle = normalTextStyle,
+                                    accompanimentStyle = accompanimentTextStyle,
+                                    showTranslation = showTranslations,
+                                    modifier = Modifier.fillMaxSize(),
+                                    entrance = entrance.takeIf { view.key == lyricsView.key },
+                                )
+                            }
                         }
                     }
                 }
             }
-        }
-        if (entrance.shown && (loading || hasLyrics)) {
-            VibraLyricsSkeleton(entrance, textColor, normalTextStyle.fontSize, loading)
-        }
-    }
-
-    if (isSelectionModeActive && selectionLines.isNotEmpty()) {
-        LyricsSelectionBottomSheet(
-            lines = selectionLines,
-            selectedLineKeys = selectedLineKeySet,
-            onToggleLine = toggleSelectedLine,
-            onDismissRequest = dismissSelection,
-            onShareSelected = shareSelectedLyrics,
-        )
-    }
-
-    if (showShareDialog && shareDialogData != null) {
-        val (lyricsText, songTitle, artists) = shareDialogData!!
-        BasicAlertDialog(onDismissRequest = { showShareDialog = false }) {
-            Card(
-                shape = adaptiveRoundedCornerShape(28.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                modifier =
-                    Modifier
-                        .padding(16.dp)
-                        .fillMaxWidth(0.85f),
-            ) {
-                Column(modifier = Modifier.padding(20.dp)) {
-                    Text(
-                        text = stringResource(R.string.share_lyrics),
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 20.sp,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Row(
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    shareLyricsAsText(
-                                        context = context,
-                                        payload = LyricsSharePayload(lyricsText, songTitle, artists),
-                                        songId = mediaMetadata?.id,
-                                    )
-                                    showShareDialog = false
-                                }.padding(vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(
-                            painter = painterResource(id = R.drawable.share),
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text(
-                            text = stringResource(R.string.share_as_text),
-                            fontSize = 16.sp,
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
-                    }
-                    Row(
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    shareDialogData = Triple(lyricsText, songTitle, artists)
-                                    showShareImageDialog = true
-                                    showShareDialog = false
-                                }.padding(vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(
-                            painter = painterResource(id = R.drawable.share),
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text(
-                            text = stringResource(R.string.share_as_image),
-                            fontSize = 16.sp,
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
-                    }
-                    Row(
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(top = 8.dp, bottom = 4.dp),
-                        horizontalArrangement = Arrangement.End,
-                    ) {
-                        Text(
-                            text = stringResource(R.string.cancel),
-                            fontSize = 16.sp,
-                            color = MaterialTheme.colorScheme.error,
-                            fontWeight = FontWeight.Medium,
-                            modifier =
-                                Modifier
-                                    .clickable { showShareDialog = false }
-                                    .padding(vertical = 8.dp, horizontal = 12.dp),
-                        )
-                    }
-                }
+            if (entrance.shown && (loading || hasLyrics)) {
+                VibraLyricsSkeleton(entrance, textColor, normalTextStyle.fontSize, loading)
             }
         }
+        if (selecting) {
+            LyricsSelectionBar(
+                exportTint = exportTint,
+                onCancel = { selectedIndices = emptySet() },
+                onPreview = { preview = selectedCard() },
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+            )
+        } else {
+            Spacer(Modifier.height(12.dp))
+        }
     }
 
-    if (showShareImageDialog && shareDialogData != null) {
-        val (lyricsText, songTitle, artists) = shareDialogData!!
-        LyricsShareImageDialog(
-            mediaMetadata = mediaMetadata,
-            payload = LyricsSharePayload(lyricsText, songTitle, artists),
-            onDismissRequest = { showShareImageDialog = false },
-        )
+    preview?.let { content ->
+        LyricsExportDialog(content = content, onDismiss = { preview = null }, saveLegacy = saveLegacy)
     }
 }
 
@@ -690,28 +503,17 @@ private fun LyricsMissing(textColor: Color) {
 }
 
 @Immutable
-private data class PlainLyricLine(
-    val itemId: String,
-    val selectionId: String,
-    val text: String,
-)
-
-@Immutable
-private data class LyricSelectionLine(
-    val itemId: String,
-    val selectionId: String,
-    val text: String,
-)
+private data class PlainLyricLine(val index: Int, val text: String)
 
 @Composable
 private fun PlainLyricsView(
     lines: PlainLyrics,
     listState: LazyListState,
-    selectedLineKeys: Set<String>,
+    selectedIndices: Set<Int>,
     textColor: Color,
     textStyle: TextStyle,
-    onLineClicked: (String) -> Unit,
-    onLinePressed: (String) -> Unit,
+    onLineClicked: (Int) -> Unit,
+    onLinePressed: (Int) -> Unit,
     modifier: Modifier = Modifier,
     entrance: LyricsEntrance? = null,
 ) {
@@ -742,12 +544,12 @@ private fun PlainLyricsView(
     ) {
         itemsIndexed(
             items = lines.items,
-            key = { _, line -> line.itemId },
+            key = { _, line -> line.index },
             contentType = { _, _ -> "plain_lyric_line" },
         ) { index, line ->
             PlainLyricLineItem(
                 line = line,
-                selected = line.selectionId in selectedLineKeys,
+                selected = line.index in selectedIndices,
                 textColor = textColor,
                 textStyle = textStyle,
                 onLineClicked = onLineClicked,
@@ -765,189 +567,30 @@ private fun PlainLyricLineItem(
     selected: Boolean,
     textColor: Color,
     textStyle: TextStyle,
-    onLineClicked: (String) -> Unit,
-    onLinePressed: (String) -> Unit,
+    onLineClicked: (Int) -> Unit,
+    onLinePressed: (Int) -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
 ) {
-    val contentColor =
-        if (selected) {
-            MaterialTheme.colorScheme.primary
-        } else {
-            textColor
-        }
-
     Text(
         text = line.text,
         style = textStyle,
-        color = contentColor,
+        color = textColor,
         modifier =
             modifier
                 .fillMaxWidth()
                 .heightIn(min = 48.dp)
+                .background(
+                    if (selected) Color.White.copy(alpha = 0.20f) else Color.Transparent,
+                    RoundedCornerShape(16.dp),
+                ).semantics { this.selected = selected }
                 .combinedClickable(
                     enabled = enabled,
-                    onClick = { onLineClicked(line.selectionId) },
-                    onLongClick = { onLinePressed(line.selectionId) },
+                    onClick = { onLineClicked(line.index) },
+                    onLongClickLabel = stringResource(R.string.vibra_lyrics_select_verse),
+                    onLongClick = { onLinePressed(line.index) },
                 ).padding(horizontal = 12.dp, vertical = 8.dp),
     )
-}
-
-@Composable
-private fun LyricsSelectionBottomSheet(
-    lines: List<LyricSelectionLine>,
-    selectedLineKeys: Set<String>,
-    onToggleLine: (String) -> Unit,
-    onDismissRequest: () -> Unit,
-    onShareSelected: () -> Unit,
-) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
-    val firstSelectedIndex =
-        remember(lines, selectedLineKeys) {
-            lines
-                .indexOfFirst { line -> line.selectionId in selectedLineKeys }
-                .coerceAtLeast(0)
-        }
-    val sheetListState =
-        rememberLazyListState(
-            initialFirstVisibleItemIndex = firstSelectedIndex,
-        )
-    val selectedCount = selectedLineKeys.size
-
-    VibraBottomSheet(
-        onDismissRequest = onDismissRequest,
-        sheetState = sheetState,
-    ) {
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 560.dp),
-        ) {
-            Row(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 24.dp, vertical = 12.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = stringResource(R.string.share_selected),
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Medium,
-                    )
-                    Text(
-                        text = pluralStringResource(R.plurals.n_element, selectedCount, selectedCount),
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                TextButton(onClick = onDismissRequest) {
-                    Text(text = stringResource(R.string.close))
-                }
-            }
-
-            LazyColumn(
-                state = sheetListState,
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .weight(1f, fill = false)
-                        .padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                items(
-                    items = lines,
-                    key = { line -> line.itemId },
-                    contentType = { "lyric_selection_line" },
-                ) { line ->
-                    LyricsSelectionLineItem(
-                        line = line,
-                        selected = line.selectionId in selectedLineKeys,
-                        onClick = { onToggleLine(line.selectionId) },
-                    )
-                }
-            }
-
-            Row(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 24.dp, vertical = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                TextButton(onClick = onDismissRequest) {
-                    Text(text = stringResource(R.string.cancel))
-                }
-                Button(
-                    onClick = onShareSelected,
-                    enabled = selectedCount > 0,
-                    shape = MaterialTheme.shapes.extraLarge,
-                    colors =
-                        ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                        ),
-                ) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.share),
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp),
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Text(text = stringResource(R.string.share_selected))
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun LyricsSelectionLineItem(
-    line: LyricSelectionLine,
-    selected: Boolean,
-    onClick: () -> Unit,
-) {
-    val containerColor =
-        if (selected) {
-            MaterialTheme.colorScheme.primaryContainer
-        } else {
-            MaterialTheme.colorScheme.surfaceVariant
-        }
-    val contentColor =
-        if (selected) {
-            MaterialTheme.colorScheme.onPrimaryContainer
-        } else {
-            MaterialTheme.colorScheme.onSurfaceVariant
-        }
-
-    Card(
-        onClick = onClick,
-        shape = MaterialTheme.shapes.extraLarge,
-        colors = CardDefaults.cardColors(containerColor = containerColor),
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .heightIn(min = 72.dp),
-    ) {
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 18.dp),
-            contentAlignment = Alignment.CenterStart,
-        ) {
-            Text(
-                text = line.text,
-                style = MaterialTheme.typography.headlineSmall,
-                color = contentColor,
-                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-            )
-        }
-    }
 }
 
 private fun ISyncedLine.lineText(): String =
@@ -956,8 +599,6 @@ private fun ISyncedLine.lineText(): String =
         is SyncedLine -> content
         else -> ""
     }
-
-private fun ISyncedLine.selectionKey(text: String = lineText()): String = "$start:$end:${text.hashCode()}"
 
 private fun List<WordTimestamp>.toKaraokeSyllables(phonetics: List<String?>): List<KaraokeSyllable> =
     mapIndexed { index, word ->

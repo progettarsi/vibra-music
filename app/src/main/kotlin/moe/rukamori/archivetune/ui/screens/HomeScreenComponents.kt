@@ -7,6 +7,8 @@
 
 package moe.rukamori.archivetune.ui.screens
 
+import app.vibra.playback.lazyMediaItems
+import app.vibra.playback.metadataOf
 // Vibra: independent radii follow the global rounding style.
 import app.vibra.ui.theme.adaptiveRoundedCornerShape
 
@@ -934,7 +936,7 @@ fun SpeedDialSection(
         playerConnection.playQueue(
             ListQueue(
                 title = context.getString(R.string.speed_dial),
-                items = speedDialSongs.map { it.toMediaItem() },
+                items = speedDialSongs.lazyMediaItems { metadataOf(it) },
                 startIndex = startIndex,
             ),
         )
@@ -1869,7 +1871,7 @@ private fun FeaturedPlaylistCard(
     val secondaryEndpoint = card.radioEndpoint ?: card.shuffleEndpoint
     val playSecondary =
         remember(secondaryEndpoint, playerConnection) {
-            secondaryEndpoint?.let { endpoint -> { playerConnection.playQueue(YouTubeQueue.playlist(endpoint)) } }
+            secondaryEndpoint?.let { endpoint -> { playerConnection.playQueue(if (card.radioEndpoint != null) YouTubeQueue.playlist(endpoint) else moe.rukamori.archivetune.playback.queues.YouTubePlaylistShuffleQueue.create(card.id, endpoint)) } }
         }
     val showPlaylistMenu =
         remember(playlist, menuState, scope) {

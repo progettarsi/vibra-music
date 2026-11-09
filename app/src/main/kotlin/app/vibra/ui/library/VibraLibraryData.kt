@@ -49,11 +49,11 @@ class VibraLibraryViewModel
         private val weekAgo = daysAgoMillis(7)
 
         val playlists = database.playlistsByUpdatedDateAsc().retainIn(this, emptyList())
-        val likedSongs = database.likedSongsByCreateDateAsc().retainIn(this, emptyList())
+        val likedSongs = database.likedSongsPreview().retainIn(this, emptyList())
         val likedCount = database.likedSongsCount().retainIn(this, 0)
         val onRepeat = database.mostPlayedSongs(weekAgo, limit = 8).retainIn(this, emptyList())
-        val albums = database.albumsByPlayTimeAsc().retainIn(this, emptyList())
-        val artists = database.artistsByPlayTimeAsc().retainIn(this, emptyList())
+        val albums = database.albumsPreview().retainIn(this, emptyList())
+        val artists = database.artistsPreview().retainIn(this, emptyList())
 
         /** The week's most played artist (a list of at most one). */
         val weekTopArtist = database.mostPlayedArtists(weekAgo, limit = 1).retainIn(this, emptyList())

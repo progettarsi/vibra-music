@@ -9,6 +9,9 @@
 
 package moe.rukamori.archivetune.ui.screens.playlist
 
+import app.vibra.playback.lazyMediaItems
+import app.vibra.playback.metadataOf
+
 import android.widget.Toast
 import app.vibra.ui.components.VibraLoadingIndicator
 import app.vibra.ui.motion.clickable
@@ -49,7 +52,6 @@ import kotlinx.coroutines.withContext
 import moe.rukamori.archivetune.LocalDatabase
 import moe.rukamori.archivetune.LocalPlayerConnection
 import moe.rukamori.archivetune.R
-import moe.rukamori.archivetune.extensions.toMediaItem
 import moe.rukamori.archivetune.extensions.togglePlayPause
 import moe.rukamori.archivetune.innertube.models.SongItem
 import moe.rukamori.archivetune.playback.queues.ListQueue
@@ -244,7 +246,7 @@ fun PlaylistSuggestionsSection(
                             onLongClick = {},
                         ) {
                             Icon(
-                                painter = painterResource(R.drawable.playlist_add),
+                                painter = painterResource(R.drawable.add_box),
                                 contentDescription = stringResource(R.string.add_to_playlist),
                             )
                         }
@@ -265,7 +267,7 @@ fun PlaylistSuggestionsSection(
                                             playerConnection.playQueue(
                                                 ListQueue(
                                                     title = context.getString(R.string.you_might_like),
-                                                    items = songItems.map { it.toMediaItem() },
+                                                    items = songItems.lazyMediaItems { metadataOf(it) },
                                                     startIndex = startIndex,
                                                 ),
                                             )

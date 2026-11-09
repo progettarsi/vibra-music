@@ -7,6 +7,9 @@
 
 package moe.rukamori.archivetune.ui.screens.library
 
+import app.vibra.playback.lazyMediaItems
+import app.vibra.playback.metadataOf
+
 import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -41,7 +44,6 @@ import app.vibra.ui.components.VibraLoadingIndicator
 import moe.rukamori.archivetune.LocalPlayerAwareWindowInsets
 import moe.rukamori.archivetune.LocalPlayerConnection
 import moe.rukamori.archivetune.R
-import moe.rukamori.archivetune.extensions.toMediaItem
 import moe.rukamori.archivetune.playback.queues.ListQueue
 import moe.rukamori.archivetune.podcast.PodcastLibraryAction
 import moe.rukamori.archivetune.podcast.PodcastLibraryEvent
@@ -107,7 +109,7 @@ fun LibraryPodcastsScreen(
                     playerConnection?.playQueue(
                         ListQueue(
                             title = event.request.title,
-                            items = event.request.items.map { metadata -> metadata.toMediaItem() },
+                            items = event.request.items.lazyMediaItems { metadata -> metadataOf(metadata) },
                             startIndex = event.request.startIndex,
                         ),
                     )

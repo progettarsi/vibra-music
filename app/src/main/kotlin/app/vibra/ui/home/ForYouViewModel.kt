@@ -1,6 +1,9 @@
 /* Vibra (2026) — GPL-3.0 License. Derived from ArchiveTune © Rukamori (github.com/rukamori). */
 package app.vibra.ui.home
 
+import app.vibra.playback.lazyMediaItems
+import app.vibra.playback.metadataOf
+
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -16,7 +19,6 @@ import moe.rukamori.archivetune.playback.PlayerConnection
 import moe.rukamori.archivetune.playback.queues.ListQueue
 import moe.rukamori.archivetune.models.MediaMetadata
 import moe.rukamori.archivetune.models.toMediaMetadata
-import moe.rukamori.archivetune.extensions.toMediaItem
 import moe.rukamori.archivetune.innertube.models.SongItem
 import androidx.media3.exoplayer.offline.Download
 
@@ -74,7 +76,7 @@ class ForYouViewModel @Inject constructor(
                 val chosen = bag.choose(candidates.map { it.id }, player.mediaMetadata.value?.id, first)
                 if (chosen == null) unavailable() else {
                     val ordered = candidates.shuffled().sortedBy { if (it.id == chosen) 0 else 1 }
-                    player.playQueue(ListQueue(title = "For You", items = ordered.map { it.toMediaItem() }))
+                    player.playQueue(ListQueue(title = "For You", items = ordered.lazyMediaItems { metadataOf(it) }))
                 }
             } finally { selecting = false }
         }

@@ -7,9 +7,11 @@
 
 package moe.rukamori.archivetune.playback.stream
 
+import android.content.Context
 import android.os.Looper
 import android.os.SystemClock
 import androidx.annotation.WorkerThread
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
@@ -19,8 +21,13 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.guava.future
+import kotlinx.coroutines.sync.Mutex
+import moe.rukamori.archivetune.morideobfuscator.youtubei.YoutubeiNetworkConfiguration
+import moe.rukamori.archivetune.utils.YTPlayerUtils
 import timber.log.Timber
 import java.io.InterruptedIOException
+import java.net.ConnectException
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutionException
 import javax.inject.Inject
@@ -31,10 +38,13 @@ import kotlin.coroutines.coroutineContext
 class ResolveAudioStreamUseCase
     @Inject
     constructor(
+        @ApplicationContext private val context: Context,
+        private val youtubeiRepository: YoutubeiStreamRepository,
+        private val sessionReset: PlaybackSessionReset,
         private val fallbackResolver: app.vibra.playback.PlaybackFallbackResolver,
         private val playbackAttempts: app.vibra.playback.PlaybackAttemptController,
     ) {
-        private data class CacheKey(
+        internal data class CacheKey(
             val mediaId: String,
             val quality: String,
             val networkMetered: Boolean,
@@ -46,6 +56,7 @@ class ResolveAudioStreamUseCase
             val playbackAttemptId: Long,
             val recoveryStage: app.vibra.playback.PlaybackStage,
             val allowCatalogReplacement: Boolean,
+            val network: YoutubeiNetworkConfiguration,
         )
 
         private data class InFlightKey(
@@ -187,6 +198,9 @@ class ResolveAudioStreamUseCase
                                         "Audio stream resolution no longer has active consumers",
                                     )
                                 }
+                                if (key.network != playbackNetworkConfiguration(context)) {
+                                    throw ConnectException("Playback network changed during stream resolution")
+                                }
                                 storeResolvedStream(key, resolved)
                             }
                             resolved
@@ -309,6 +323,17 @@ class ResolveAudioStreamUseCase
             cache.entries.removeIf { it.value.url == url }
         }
 
+        /** Records a fresh native URL rejection and evicts this account/binding from the cache. */
+        fun reportRejectedStream(url: String): Boolean = synchronized(inFlightLock) {
+            reportRejectedCachedStream(url, cache, youtubeiRepository::reportRejectedGvsPoToken)
+        }
+
+        /** Cancels cached/in-flight streams; the next native resolution performs one shared reset. */
+        fun invalidateSession() {
+            sessionReset.requestReset()
+            clear()
+        }
+
         fun peek(request: AudioStreamRequest): ResolvedAudioStream? {
             val key = request.cacheKey()
             val resolved = cache[key] ?: return null
@@ -355,6 +380,7 @@ class ResolveAudioStreamUseCase
                 playbackAttemptId = playbackAttemptId,
                 recoveryStage = recoveryStage,
                 allowCatalogReplacement = allowCatalogReplacement,
+                network = playbackNetworkConfiguration(context),
             )
 
         private fun storeResolvedStream(
@@ -413,3 +439,44 @@ class ResolveAudioStreamUseCase
             const val MAX_CACHE_ENTRIES = 256
         }
     }
+
+/** Vibra: shares deferred resets between playback and the independent download fallback. */
+@Singleton
+class PlaybackSessionReset @Inject constructor() {
+    private val mutex = Mutex()
+    private val sessionResetRequired = AtomicBoolean(false)
+
+    /** Coalesces pending requests; an invalidation arriving during a reset remains pending. */
+    fun requestReset() {
+        sessionResetRequired.set(true)
+    }
+
+    internal suspend fun resetIfRequired(reset: suspend () -> Unit): Boolean {
+        mutex.lock()
+        try {
+            if (!sessionResetRequired.getAndSet(false)) return false
+            try {
+                reset()
+            } catch (failure: Throwable) {
+                sessionResetRequired.set(true)
+                throw failure
+            }
+            return true
+        } finally {
+            mutex.unlock()
+        }
+    }
+}
+
+internal fun <K> reportRejectedCachedStream(
+    url: String,
+    cache: MutableMap<K, ResolvedAudioStream>,
+    report: (String, GvsPoTokenBinding) -> Unit,
+): Boolean {
+    if (YTPlayerUtils.isExpiredOrNearExpiredStreamUrl(url)) return false
+    val rejected = cache.values.firstOrNull { it.url == url && it.source == StreamSource.YOUTUBEI } ?: return false
+    val binding = rejected.gvsPoTokenBinding ?: return false
+    report(rejected.authFingerprint, binding)
+    cache.entries.removeIf { it.value.authFingerprint == rejected.authFingerprint && it.value.gvsPoTokenBinding == binding }
+    return true
+}

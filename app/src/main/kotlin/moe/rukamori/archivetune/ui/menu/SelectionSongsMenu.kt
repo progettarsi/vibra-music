@@ -9,6 +9,9 @@
 
 package moe.rukamori.archivetune.ui.menu
 
+import app.vibra.playback.lazyMediaItems
+import app.vibra.playback.metadataOf
+
 import android.annotation.SuppressLint
 import android.content.res.Configuration
 import android.widget.Toast
@@ -57,7 +60,6 @@ import moe.rukamori.archivetune.LocalSyncUtils
 import moe.rukamori.archivetune.R
 import moe.rukamori.archivetune.db.entities.PlaylistSongMap
 import moe.rukamori.archivetune.db.entities.Song
-import moe.rukamori.archivetune.extensions.toMediaItem
 import moe.rukamori.archivetune.models.MediaMetadata
 import moe.rukamori.archivetune.playback.ExoDownloadService
 import moe.rukamori.archivetune.playback.queues.ListQueue
@@ -201,7 +203,7 @@ fun SelectionSongMenu(
         onClick = {
           onDismiss()
           playerConnection.playQueue(
-            ListQueue(title = "Selection", items = songSelection.map { it.toMediaItem() })
+            ListQueue(title = "Selection", items = songSelection.lazyMediaItems { metadataOf(it) })
           )
           clearAction()
         },
@@ -220,7 +222,7 @@ fun SelectionSongMenu(
           playerConnection.playQueue(
             ListQueue(
               title = "Selection",
-              items = songSelection.shuffled().map { it.toMediaItem() },
+              items = songSelection.shuffled().lazyMediaItems { metadataOf(it) },
             )
           )
           clearAction()
@@ -229,7 +231,7 @@ fun SelectionSongMenu(
       NewAction(
         icon = {
           Icon(
-            painter = painterResource(R.drawable.playlist_add),
+            painter = painterResource(R.drawable.add_box),
             contentDescription = null,
             modifier = Modifier.size(24.dp),
           )
@@ -258,7 +260,7 @@ fun SelectionSongMenu(
         modifier =
           Modifier.clickable {
             onDismiss()
-            playerConnection.addToQueue(songSelection.map { it.toMediaItem() })
+            playerConnection.addToQueue(songSelection.lazyMediaItems { metadataOf(it) })
             clearAction()
           },
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
@@ -609,7 +611,7 @@ fun SelectionMediaMetadataMenu(
         onClick = {
           onDismiss()
           playerConnection.playQueue(
-            ListQueue(title = "Selection", items = songSelection.map { it.toMediaItem() })
+            ListQueue(title = "Selection", items = songSelection.lazyMediaItems { metadataOf(it) })
           )
           clearAction()
         },
@@ -628,7 +630,7 @@ fun SelectionMediaMetadataMenu(
           playerConnection.playQueue(
             ListQueue(
               title = "Selection",
-              items = songSelection.shuffled().map { it.toMediaItem() },
+              items = songSelection.shuffled().lazyMediaItems { metadataOf(it) },
             )
           )
           clearAction()
@@ -637,7 +639,7 @@ fun SelectionMediaMetadataMenu(
       NewAction(
         icon = {
           Icon(
-            painter = painterResource(R.drawable.playlist_add),
+            painter = painterResource(R.drawable.add_box),
             contentDescription = null,
             modifier = Modifier.size(24.dp),
           )
@@ -729,7 +731,7 @@ fun SelectionMediaMetadataMenu(
         modifier =
           Modifier.clickable {
             onDismiss()
-            playerConnection.addToQueue(songSelection.map { it.toMediaItem() })
+            playerConnection.addToQueue(songSelection.lazyMediaItems { metadataOf(it) })
             clearAction()
           },
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),

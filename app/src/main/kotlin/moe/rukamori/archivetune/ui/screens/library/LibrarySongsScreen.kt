@@ -7,6 +7,8 @@
 
 package moe.rukamori.archivetune.ui.screens.library
 
+import app.vibra.playback.lazyMediaItems
+import app.vibra.playback.metadataOf
 // Vibra: independent radii follow the global rounding style.
 import app.vibra.ui.theme.adaptiveRoundedCornerShape
 
@@ -79,7 +81,6 @@ import moe.rukamori.archivetune.constants.SongFilterKey
 import moe.rukamori.archivetune.constants.SongSortDescendingKey
 import moe.rukamori.archivetune.constants.SongSortType
 import moe.rukamori.archivetune.constants.SongSortTypeKey
-import moe.rukamori.archivetune.extensions.toMediaItem
 import moe.rukamori.archivetune.extensions.togglePlayPause
 import moe.rukamori.archivetune.playback.queues.ListQueue
 import moe.rukamori.archivetune.ui.component.ItemThumbnail
@@ -387,7 +388,7 @@ fun LibrarySongsScreen(
                                             playerConnection.playQueue(
                                                 ListQueue(
                                                     title = context.getString(R.string.queue_all_songs),
-                                                    items = filteredSongs.map { it.item.toMediaItem() },
+                                                    items = filteredSongs.lazyMediaItems { metadataOf(it.item) },
                                                 ),
                                             )
                                         }
@@ -437,10 +438,10 @@ fun LibrarySongsScreen(
                     // Issue 7: active song gets fully rounded shape + artwork-based color
                     // inactive songs use theme color and are more rounded than before
                     val activeCardColor =
-                        rememberArtworkCardColor(
+                        if (isActive) rememberArtworkCardColor(
                             thumbnailUrl = song.song.thumbnailUrl,
                             fallbackColor = MaterialTheme.colorScheme.primaryContainer,
-                        )
+                        ) else MaterialTheme.colorScheme.surfaceContainerLow
                     val inactiveCardColor = MaterialTheme.colorScheme.surfaceContainerLow
 
                     // Issue 6: divider between cards visible in pure black dark theme
@@ -473,7 +474,7 @@ fun LibrarySongsScreen(
                                             playerConnection.playQueue(
                                                 ListQueue(
                                                     title = context.getString(R.string.queue_all_songs),
-                                                    items = filteredSongs.map { it.item.toMediaItem() },
+                                                    items = filteredSongs.lazyMediaItems { metadataOf(it.item) },
                                                     startIndex = index,
                                                 ),
                                             )

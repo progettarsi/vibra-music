@@ -26,6 +26,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.MotionDurationScale
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.LookaheadScope
@@ -89,8 +90,23 @@ object Liquid {
      * "bounce" of everything inside it, so containers settle critically damped.
      */
     @Composable
-    fun <T> container(): FiniteAnimationSpec<T> =
-        if (LocalAnimationsDisabled.current) snap() else spring(dampingRatio = 1f, stiffness = ContainerStiffness)
+    fun <T> container(minimumDurationScale: Float = 0f): FiniteAnimationSpec<T> {
+        if (LocalAnimationsDisabled.current) return snap()
+        val scale = if (minimumDurationScale > 0f) {
+            rememberCoroutineScope().coroutineContext[MotionDurationScale]?.scaleFactor ?: 1f
+        } else {
+            1f
+        }
+        // A spring's duration is proportional to the inverse square root of its stiffness.
+        // At scale zero Compose still snaps, including when Android disables animations.
+        val stiffness = if (scale > 0f && scale < minimumDurationScale) {
+            val ratio = scale / minimumDurationScale
+            ContainerStiffness * ratio * ratio
+        } else {
+            ContainerStiffness
+        }
+        return spring(dampingRatio = 1f, stiffness = stiffness)
+    }
 }
 
 private const val ContainerStiffness = 300f

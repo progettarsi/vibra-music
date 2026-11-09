@@ -114,11 +114,11 @@ fun rememberLibraryData(viewModel: VibraLibraryViewModel = hiltViewModel()): Lib
         // "Asc" queries list oldest/least first; habits read best most-recent/most-used first.
         // Pinned playlists lead, in their pinned order.
         playlists = remember(playlists, pinned) { playlists.asReversed().pinnedFirst(pinned) { it.id } },
-        likedSongs = liked.asReversed().take(8),
+        likedSongs = liked,
         likedCount = likedCount,
         onRepeat = onRepeat,
-        albums = albums.asReversed().take(8),
-        artists = artists.asReversed().take(8),
+        albums = albums,
+        artists = artists,
     )
 }
 

@@ -414,7 +414,7 @@ fun EditPlaylistDialog(
       ControlSheetHeader(
         stringResource(R.string.edit_playlist),
         initialName,
-        R.drawable.playlist_add,
+        R.drawable.edit,
       )
       MenuCard {
         Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -447,12 +447,23 @@ fun EditPlaylistDialog(
       }
       if (playlistId != null || onChangeCover != null || onRemoveCover != null)
         MenuCard {
+          // Same order and wording as "Create playlist": shape first, then the picture.
           Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            if (playlistId != null)
+              PlaylistCoverStylePicker(
+                parsePlaylistCoverStyle(selectedStyle),
+                onChange = { selectedStyle = it.name },
+              )
             if (onChangeCover != null || onRemoveCover != null)
               Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 onChangeCover?.let { change ->
                   VibraDialogButton(onClick = change) {
-                    Text(stringResource(R.string.vibra_change_cover))
+                    Text(
+                      stringResource(
+                        if (onRemoveCover == null) R.string.vibra_choose_cover
+                        else R.string.vibra_change_cover
+                      )
+                    )
                   }
                 }
                 onRemoveCover?.let { remove ->
@@ -461,11 +472,6 @@ fun EditPlaylistDialog(
                   }
                 }
               }
-            if (playlistId != null)
-              PlaylistCoverStylePicker(
-                parsePlaylistCoverStyle(selectedStyle),
-                onChange = { selectedStyle = it.name },
-              )
           }
         }
       Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

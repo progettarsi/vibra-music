@@ -8,6 +8,7 @@ package app.vibra.ui.lyrics
 import android.os.Build
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import app.vibra.ui.motion.combinedClickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -22,6 +23,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -44,6 +46,8 @@ import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.invisibleToUser
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextLayoutResult
@@ -64,6 +68,7 @@ import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import moe.rukamori.archivetune.LocalAnimationsDisabled
+import moe.rukamori.archivetune.R
 
 /*
  * ─────────────────────────────────────────────────────────────────────────────────────
@@ -98,8 +103,9 @@ internal fun VibraLyricsList(
     textStyle: TextStyle,
     accompanimentStyle: TextStyle,
     showTranslation: Boolean,
-    onLineClicked: (ISyncedLine) -> Boolean,
-    onLinePressed: (ISyncedLine) -> Unit,
+    selectedIndices: Set<Int>,
+    onLineClicked: (Int, ISyncedLine) -> Boolean,
+    onLinePressed: (Int, ISyncedLine) -> Unit,
     modifier: Modifier = Modifier,
     entrance: LyricsEntrance? = null,
 ) {
@@ -125,7 +131,13 @@ internal fun VibraLyricsList(
             focus = Liquid.container(),
             cascade = !LocalAnimationsDisabled.current,
         )
+    val selecting = selectedIndices.isNotEmpty()
+    val latestSelecting = rememberUpdatedState(selecting)
     SideEffect { follow.specs = specs }
+
+    LaunchedEffect(follow, selecting) {
+        if (selecting) follow.startBrowsing() else follow.stopBrowsing()
+    }
 
     LaunchedEffect(follow) {
         snapshotFlow { position.value() }.collect { follow.onPosition(it) }
@@ -137,7 +149,7 @@ internal fun VibraLyricsList(
     }
     // Back to the sung line once the text has rested, untouched, for a while.
     LaunchedEffect(follow, listState) {
-        snapshotFlow { follow.browsing && !follow.touching && !listState.isScrollInProgress }
+        snapshotFlow { !latestSelecting.value && follow.browsing && !follow.touching && !listState.isScrollInProgress }
             .collectLatest { resting ->
                 if (resting) {
                     delay(ResyncAfterMillis)
@@ -197,8 +209,9 @@ internal fun VibraLyricsList(
                     textStyle = textStyle,
                     accompanimentStyle = accompanimentStyle,
                     showTranslation = showTranslation,
-                    onClick = { if (onLineClicked(line)) follow.seekedTo(index) },
-                    onLongClick = { onLinePressed(line) },
+                    selected = index in selectedIndices,
+                    onClick = { if (onLineClicked(index, line)) follow.seekedTo(index) },
+                    onLongClick = { onLinePressed(index, line) },
                     revealModifier = if (revealRows) entrance.rowModifier(index) else Modifier,
                     enabled = !waitingForRows,
                 )
@@ -219,6 +232,7 @@ private fun LyricLine(
     textStyle: TextStyle,
     accompanimentStyle: TextStyle,
     showTranslation: Boolean,
+    selected: Boolean,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
     revealModifier: Modifier,
@@ -236,7 +250,7 @@ private fun LyricLine(
     val blur = animateFloatAsState(lineBlurDp(distance), Liquid.effects(), label = "lyricBlur")
     val scale = animateFloatAsState(if (active) 1f else InactiveScale, Liquid.spatial(), label = "lyricScale")
     // What is not lit: the depth dimming, evened out while the reader browses.
-    val base = { lerp(dim.value, BrowseDim, follow.focus.value) }
+    val base = { if (selected) 1f else lerp(dim.value, BrowseDim, follow.focus.value) }
     val glow = { lerp(base(), 1f, lit.value) }
     val softness = remember { LineSoftness() }
 
@@ -254,12 +268,18 @@ private fun LyricLine(
                     scaleX = scale.value
                     scaleY = scale.value
                     transformOrigin = TransformOrigin(if (endAligned) 1f else 0f, 0.5f)
-                    renderEffect = softness.effect((blur.value * (1f - follow.focus.value)).dp.toPx())
-                }.combinedClickable(
+                    renderEffect =
+                        if (selected) null else softness.effect((blur.value * (1f - follow.focus.value)).dp.toPx())
+                }.background(
+                    if (selected) Color.White.copy(alpha = 0.20f) else Color.Transparent,
+                    RoundedCornerShape(16.dp),
+                ).semantics { this.selected = selected }
+                .combinedClickable(
                     enabled = enabled,
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
                     onClick = onClick,
+                    onLongClickLabel = stringResource(R.string.vibra_lyrics_select_verse),
                     onLongClick = onLongClick,
                     // The gap between lines is part of each line, so there is nowhere to tap in vain.
                 ).padding(horizontal = 4.dp, vertical = LineGap / 2),

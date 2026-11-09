@@ -7,6 +7,8 @@
 
 package moe.rukamori.archivetune.ui.screens
 
+import app.vibra.playback.lazyMediaItems
+import app.vibra.playback.metadataOf
 // Vibra: independent radii follow the global rounding style.
 import app.vibra.ui.theme.adaptiveRoundedCornerShape
 
@@ -104,7 +106,6 @@ import moe.rukamori.archivetune.db.entities.ListeningBySlot
 import moe.rukamori.archivetune.db.entities.ListeningSummary
 import moe.rukamori.archivetune.db.entities.Song
 import moe.rukamori.archivetune.db.entities.SongWithStats
-import moe.rukamori.archivetune.extensions.toMediaItem
 import moe.rukamori.archivetune.extensions.togglePlayPause
 import moe.rukamori.archivetune.innertube.models.WatchEndpoint
 import moe.rukamori.archivetune.models.MediaMetadata
@@ -404,7 +405,7 @@ fun StatsScreen(
                             playerConnection?.playQueue(
                                 ListQueue(
                                     title = context.getString(R.string.most_played_songs),
-                                    items = mostPlayedSongs.map { it.toMediaMetadata().toMediaItem() }.shuffled(),
+                                    items = mostPlayedSongs.lazyMediaItems { metadataOf(it.toMediaMetadata()) }.shuffled(),
                                 ),
                             )
                         },

@@ -7,6 +7,9 @@
 
 package moe.rukamori.archivetune.extensions
 
+import app.vibra.playback.lazyMediaItems
+import app.vibra.playback.metadataOf
+
 import moe.rukamori.archivetune.innertube.models.WatchEndpoint
 import moe.rukamori.archivetune.models.MediaMetadata
 import moe.rukamori.archivetune.models.PersistQueue
@@ -98,7 +101,7 @@ fun Queue.toPersistQueue(
 fun PersistQueue.toQueue(): Queue =
     ListQueue(
         title = title,
-        items = items.map { it.toMediaItem() },
+        items = items.lazyMediaItems { metadataOf(it) },
         startIndex = mediaItemIndex,
         position = position,
     )
@@ -108,7 +111,7 @@ fun PersistQueue.toContinuationQueue(): Queue =
         is QueueType.LIST -> {
             ListQueue(
                 title = title,
-                items = items.map { it.toMediaItem() },
+                items = items.lazyMediaItems { metadataOf(it) },
                 startIndex = mediaItemIndex,
                 position = position,
             )
@@ -117,7 +120,7 @@ fun PersistQueue.toContinuationQueue(): Queue =
         is QueueType.YOUTUBE -> {
             val data =
                 queueData as? QueueData.YouTubeData
-                    ?: return ListQueue(title, items.map { it.toMediaItem() }, mediaItemIndex, position)
+                    ?: return ListQueue(title, items.lazyMediaItems { metadataOf(it) }, mediaItemIndex, position)
             YouTubeQueue(
                 endpoint =
                     WatchEndpoint(
@@ -132,7 +135,7 @@ fun PersistQueue.toContinuationQueue(): Queue =
         is QueueType.YOUTUBE_ALBUM_RADIO -> {
             val data =
                 queueData as? QueueData.YouTubeAlbumRadioData
-                    ?: return ListQueue(title, items.map { it.toMediaItem() }, mediaItemIndex, position)
+                    ?: return ListQueue(title, items.lazyMediaItems { metadataOf(it) }, mediaItemIndex, position)
             YouTubeAlbumRadio(
                 playlistId = data.playlistId,
                 albumSongCount = data.albumSongCount,
@@ -144,7 +147,7 @@ fun PersistQueue.toContinuationQueue(): Queue =
         is QueueType.LOCAL_ALBUM_RADIO -> {
             ListQueue(
                 title = title,
-                items = items.map { it.toMediaItem() },
+                items = items.lazyMediaItems { metadataOf(it) },
                 startIndex = mediaItemIndex,
                 position = position,
             )

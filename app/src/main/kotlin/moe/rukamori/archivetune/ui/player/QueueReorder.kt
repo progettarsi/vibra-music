@@ -17,8 +17,8 @@ import moe.rukamori.archivetune.extensions.move
 import moe.rukamori.archivetune.playback.PlayerConnection
 
 /**
- * Stable, Bundle-saveable list key for a queue entry. `Timeline.Window.uid` itself is an
- * opaque object that lazy lists cannot save, so it is folded with the media id into a Long.
+ * Stable, Bundle-saveable list key for a queue entry. `Timeline.Window.uid` itself is an opaque
+ * object that lazy lists cannot save, so it is folded with the media id into a Long.
  */
 internal val Timeline.Window.queueItemKey: Long
     get() =
@@ -26,22 +26,17 @@ internal val Timeline.Window.queueItemKey: Long
             (mediaItem.mediaId.hashCode().toLong() and UInt.MAX_VALUE.toLong())
 
 /**
- * An in-flight queue drag. The destination is stored relative to a neighbour's uid (not
- * an index) so it stays valid if the timeline changes while the finger is down.
+ * An in-flight queue drag. The destination is stored relative to a neighbour's uid (not an index)
+ * so it stays valid if the timeline changes while the finger is down.
  */
 @Immutable
-internal data class QueueDragInfo(
-    val draggedItemUid: Any,
-    val destination: QueueDragDestination,
-)
+internal data class QueueDragInfo(val draggedItemUid: Any, val destination: QueueDragDestination)
 
 @Immutable
 internal sealed interface QueueDragDestination {
     data object Start : QueueDragDestination
 
-    data class After(
-        val itemUid: Any,
-    ) : QueueDragDestination
+    data class After(val itemUid: Any) : QueueDragDestination
 }
 
 /** Resolves the destination to an index in the *current* [queueWindows]. */
@@ -62,9 +57,7 @@ internal fun QueueDragDestination.resolveIndex(
         }
     }
 
-/**
- * Builds the destination for an item dropped at [toIndex] of the locally reordered list.
- */
+/** Builds the destination for an item dropped at [toIndex] of the locally reordered list. */
 internal fun queueDragDestinationFor(
     reorderedWindows: List<Timeline.Window>,
     toIndex: Int,
@@ -76,9 +69,9 @@ internal fun queueDragDestinationFor(
     }
 
 /**
- * Applies a completed drag to the real player. Without shuffle the timeline itself is
- * reordered; with shuffle the visible order *is* the shuffle order, so a new shuffle
- * order is installed instead (the underlying timeline is left untouched).
+ * Applies a completed drag to the real player. Without shuffle the timeline itself is reordered;
+ * with shuffle the visible order *is* the shuffle order, so a new shuffle order is installed
+ * instead (the underlying timeline is left untouched).
  *
  * @return true when the player was changed.
  */
@@ -88,9 +81,12 @@ internal fun PlayerConnection.commitQueueDrag(
 ): Boolean {
     val sourceIndex = queueWindows.indexOfFirst { it.uid == drag.draggedItemUid }
     val destinationIndex = drag.destination.resolveIndex(queueWindows, sourceIndex)
-    if (sourceIndex == -1 || destinationIndex == null || sourceIndex == destinationIndex) return false
+    if (sourceIndex == -1 || destinationIndex == null || sourceIndex == destinationIndex)
+        return false
 
-    if (!player.shuffleModeEnabled) {
+    if (player is app.vibra.playback.ProgressivePlayer) {
+        player.moveMediaItem(sourceIndex, destinationIndex)
+    } else if (!player.shuffleModeEnabled) {
         player.moveMediaItem(sourceIndex, destinationIndex)
     } else {
         localPlayer.setShuffleOrder(
@@ -101,8 +97,34 @@ internal fun PlayerConnection.commitQueueDrag(
                     .move(sourceIndex, destinationIndex)
                     .toIntArray(),
                 System.currentTimeMillis(),
-            ),
+            )
         )
     }
+    return true
+}
+
+internal fun logicalDragDestinationFor(
+    rows: List<app.vibra.playback.QueueEntry>,
+    index: Int,
+): QueueDragDestination =
+    if (index == 0) QueueDragDestination.Start else QueueDragDestination.After(rows[index - 1].uid)
+
+internal fun PlayerConnection.commitLogicalDrag(
+    rows: List<app.vibra.playback.QueueEntry>,
+    drag: QueueDragInfo,
+): Boolean {
+    val logical = player as? app.vibra.playback.ProgressivePlayer ?: return false
+    val from = logical.queue.indexOf(drag.draggedItemUid as? Long ?: return false)
+    val to =
+        when (val destination = drag.destination) {
+            QueueDragDestination.Start -> 0
+            is QueueDragDestination.After -> {
+                val anchor = logical.queue.indexOf(destination.itemUid as? Long ?: return false)
+                if (anchor < 0) return false
+                if (from < anchor) anchor else anchor + 1
+            }
+        }
+    if (from < 0 || to !in 0 until logical.mediaItemCount || from == to) return false
+    logical.moveMediaItem(from, to)
     return true
 }

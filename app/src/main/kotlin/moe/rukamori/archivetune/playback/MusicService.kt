@@ -8,6 +8,11 @@
 @file:Suppress("DEPRECATION")
 
 package moe.rukamori.archivetune.playback
+import app.vibra.playback.ProgressivePlayer
+import app.vibra.playback.QueuePersistenceDisk
+import app.vibra.playback.QueuePersistenceWriter
+import app.vibra.playback.QueueContentV2
+
 
 import android.app.ActivityManager
 import android.app.Notification
@@ -121,7 +126,6 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.plus
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -224,6 +228,7 @@ import moe.rukamori.archivetune.playback.queues.asUserQueued
 import moe.rukamori.archivetune.playback.queues.isUserQueued
 import moe.rukamori.archivetune.playback.queues.userQueueInsertion
 import moe.rukamori.archivetune.playback.stream.AudioStreamRequest
+import moe.rukamori.archivetune.playback.stream.PlaybackHttpClient
 import moe.rukamori.archivetune.playback.stream.ResolveAudioStreamUseCase
 import moe.rukamori.archivetune.playback.stream.ResolvedAudioStream
 import moe.rukamori.archivetune.playback.stream.StreamPurpose
@@ -361,6 +366,7 @@ class MusicService :
         get() = boundClientCount > 0
     private var isPlaybackServiceStarted = false
     private var idleStopJob: Job? = null
+    private var stopAfterSaveJob: Job? = null
     private lateinit var mediaNotificationProvider: ArchiveTuneMediaNotificationProvider
 
     private lateinit var connectivityManager: ConnectivityManager
@@ -379,7 +385,6 @@ class MusicService :
     private val mediaOkHttpClient: OkHttpClient by lazy {
         OkHttpClient
             .Builder()
-            .proxy(YouTube.streamOkHttpProxy)
             .followRedirects(true)
             .followSslRedirects(true)
             .connectTimeout(30, TimeUnit.SECONDS)
@@ -460,7 +465,6 @@ class MusicService :
     @Volatile
     private var isHydratingRestoredQueue = false
     private val restoredQueueHydrationGeneration = AtomicLong(0L)
-    private var restoredQueueBackfillJob: Job? = null
 
     @Volatile
     private var suppressAutoPlayback = false
@@ -548,6 +552,7 @@ class MusicService :
     private data class CrossfadeTarget(
         val index: Int,
         val mediaId: String,
+        val occurrenceUid: Long? = null,
     )
 
     private data class PlaybackRecoverySnapshot(
@@ -824,6 +829,8 @@ class MusicService :
     }
 
     private fun cancelIdleStop() {
+        stopAfterSaveJob?.cancel()
+        stopAfterSaveJob = null
         idleStopJob?.cancel()
         idleStopJob = null
     }
@@ -837,6 +844,15 @@ class MusicService :
     }
 
     private fun stopForegroundAndSelf() {
+        stopAfterSaveJob?.cancel()
+        stopAfterSaveJob = scope.launch {
+            checkpointPlayback()
+            QueuePersistenceWriter.get(filesDir).flush()
+            stopForegroundAndSelfImmediately()
+        }
+    }
+
+    private fun stopForegroundAndSelfImmediately() {
         cancelIdleStop()
         isPlaybackServiceStarted = false
         runCatching {
@@ -939,9 +955,7 @@ class MusicService :
                                     ?: castMimeTypeCache.get(mediaItem.mediaId)
                         },
                 ).apply {
-                    addListener(this@MusicService)
                     sleepTimer = SleepTimer(scope, this, onExpire = this@MusicService::pauseFromSleepTimer)
-                    addListener(sleepTimer)
                 }
         sponsorBlockPlaybackController.attach(player, scope)
         playerInitialized.value = true
@@ -987,13 +1001,37 @@ class MusicService :
         lastAudioOutputDeviceSignature = currentAudioOutputDeviceSignature()
         audioOutputResolver.refresh()
 
+        player = ProgressivePlayer(player, castPlaybackRepository::playbackWindow)
+        player.addListener(this@MusicService)
+        player.addListener(sleepTimer)
         mediaLibrarySessionCallback.apply {
+            awaitQueueRestored = { queueRestoreCompleted.first { it } }
+            prepareLargeQueue = { items, index, position ->
+                queueRestoreCompleted.first { it }
+                withContext(Dispatchers.Main.immediate) {
+                    cancelQueueLoad()
+                    cancelRestoredQueueHydration()
+                    cancelCrossfade(resetVolume = true, resetPauseAtEnd = true)
+                    currentQueue = ListQueue(items = items)
+                    queueTitle = null
+                    val logical = player as ProgressivePlayer
+                    val shuffled = logical.shuffleModeEnabled
+                    logical.load(items, index, position.takeUnless { it == C.TIME_UNSET } ?: 0L, shuffle = shuffled)
+                    logical.awaitBackendUpdate()
+                    val bounded = logical.sessionPlayer
+                    androidx.media3.session.MediaSession.MediaItemsWithStartPosition(
+                        List(bounded.mediaItemCount) { bounded.getMediaItemAt(it) },
+                        bounded.currentMediaItemIndex,
+                        bounded.currentPosition,
+                    )
+                }
+            }
             toggleLike = ::toggleLike
             toggleStartRadio = ::toggleStartRadio
             toggleLibrary = ::toggleLibrary
             carMediaButtonPreferences = ::buildAndroidAutoButtons
         }
-        val mediaSessionBuilder = MediaLibrarySession.Builder(this, player, mediaLibrarySessionCallback)
+        val mediaSessionBuilder = MediaLibrarySession.Builder(this, (player as ProgressivePlayer).sessionPlayer, mediaLibrarySessionCallback)
             .setBitmapLoader(CoilBitmapLoader(this, scope))
         if (BuildConfig.DEVICE != "automotive") {
             mediaSessionBuilder.setSessionActivity(
@@ -1286,9 +1324,40 @@ class MusicService :
                 }
             }
 
+        val startupRestoreGeneration = queueLoadGeneration
         scope.launch(Dispatchers.IO) {
             runCatching {
                 playerInitialized.first { it }
+                val diskV2 = QueuePersistenceDisk(filesDir)
+                val savedV2 = diskV2.read()
+                if (startupRestoreGeneration != queueLoadGeneration) return@runCatching
+                if (savedV2 != null) {
+                    isRestoringPersistentState = true
+                    val hideExplicit = dataStore.get(HideExplicitKey, false)
+                    val hideVideo = dataStore.get(HideVideoKey, false)
+                    val blocked = loadBlockedArtistIds()
+                    var retainedCurrent = true
+                    try {
+                        withContext(Dispatchers.Main) {
+                            if (startupRestoreGeneration != queueLoadGeneration) return@withContext
+                            retainedCurrent = (player as ProgressivePlayer).restore(savedV2.content.content, savedV2.checkpoint.currentUid,
+                                savedV2.checkpoint.player?.currentPosition ?: 0L) { metadata ->
+                                (!hideExplicit || !metadata.explicit) && (!hideVideo || !metadata.isMusicVideo) &&
+                                    metadata.artists.none { it.id in blocked }
+                            }
+                            if (startupRestoreGeneration != queueLoadGeneration) return@withContext
+                            currentQueue = savedV2.content.continuation.toContinuationQueue()
+                            queueTitle = savedV2.content.continuation.title
+                            currentMediaMetadata.value = player.currentMetadata
+                        }
+                        savedV2.checkpoint.player?.let { restorePersistentPlayerState(if (retainedCurrent) it else it.copy(currentPosition = 0L), true, startupRestoreGeneration) }
+                    } finally {
+                        isRestoringPersistentState = false
+                        withContext(Dispatchers.Main) { (player as ProgressivePlayer).awaitBackendUpdate(); queueRestoreCompleted.value = true }
+                    }
+                    return@launch
+                }
+                if (diskV2.isCleared()) { withContext(Dispatchers.Main) { (player as ProgressivePlayer).awaitBackendUpdate(); queueRestoreCompleted.value = true }; return@launch }
                 val persistedQueue = readPersistentObject<PersistQueue>(PERSISTENT_QUEUE_FILE)
                 val persistedPlayerState = readPersistentObject<PersistPlayerState>(PERSISTENT_PLAYER_STATE_FILE)
 
@@ -1299,11 +1368,11 @@ class MusicService :
                 var restoredQueue = false
                 try {
                     persistedQueue?.let { queue ->
-                        restorePersistentQueue(queue)
+                        restorePersistentQueue(queue, startupRestoreGeneration)
                         restoredQueue = true
                     }
                     persistedPlayerState?.let { playerState ->
-                        restorePersistentPlayerState(playerState, restoredQueue)
+                        restorePersistentPlayerState(playerState, restoredQueue, startupRestoreGeneration)
                     }
                 } finally {
                     isRestoringPersistentState = false
@@ -1317,13 +1386,14 @@ class MusicService :
                 clearPersistedQueueFiles()
             }
             withContext(Dispatchers.Main) {
+                (player as ProgressivePlayer).awaitBackendUpdate()
                 queueRestoreCompleted.value = true
             }
         }
 
         scope.launch {
             while (isActive) {
-                delay(if (player.isPlaying) 10.seconds else 30.seconds)
+                delay(if (player.isPlaying) 2.seconds else 30.seconds)
                 if (player.mediaItemCount > 0) {
                     saveQueueToDisk()
                 }
@@ -1346,8 +1416,6 @@ class MusicService :
 
     private fun cancelRestoredQueueHydration() {
         restoredQueueHydrationGeneration.incrementAndGet()
-        restoredQueueBackfillJob?.cancel()
-        restoredQueueBackfillJob = null
         isHydratingRestoredQueue = false
     }
 
@@ -1375,32 +1443,19 @@ class MusicService :
     private fun removeBlockedArtistItems(updatedBlockedArtistIds: Set<String>) {
         if (updatedBlockedArtistIds.isEmpty() || player.mediaItemCount == 0) return
 
-        removeQueueItems { item -> item.hasBlockedArtist(updatedBlockedArtistIds) }
+        removeQueueItems { metadata -> metadata.artists.any { it.id in updatedBlockedArtistIds } }
     }
 
     private fun removeMusicVideoItems() {
-        removeQueueItems { item -> item.metadata?.isMusicVideo == true }
+        removeQueueItems { it.isMusicVideo }
     }
 
-    private inline fun removeQueueItems(shouldRemove: (MediaItem) -> Boolean) {
-        if (player.mediaItemCount == 0) return
-
-        var blockedRangeEnd = C.INDEX_UNSET
-        for (index in player.mediaItemCount - 1 downTo 0) {
-            val item = player.getMediaItemAt(index)
-            if (shouldRemove(item)) {
-                autoAddedMediaIds.remove(item.mediaId)
-                if (blockedRangeEnd == C.INDEX_UNSET) {
-                    blockedRangeEnd = index + 1
-                }
-            } else if (blockedRangeEnd != C.INDEX_UNSET) {
-                player.removeMediaItems(index + 1, blockedRangeEnd)
-                blockedRangeEnd = C.INDEX_UNSET
-            }
-        }
-        if (blockedRangeEnd != C.INDEX_UNSET) {
-            player.removeMediaItems(0, blockedRangeEnd)
-        }
+    private inline fun removeQueueItems(shouldRemove: (moe.rukamori.archivetune.models.MediaMetadata) -> Boolean) {
+        val logical = player as ProgressivePlayer
+        val removed = logical.queue.rows.filter { shouldRemove(it.metadata) }
+        if (removed.isEmpty()) return
+        removed.forEach { autoAddedMediaIds.remove(it.metadata.id) }
+        logical.removeOccurrences(removed.mapTo(mutableSetOf()) { it.uid })
         if (player.mediaItemCount == 0) {
             cancelInfiniteQueueBootstrap()
             currentQueue = EmptyQueue
@@ -1408,7 +1463,7 @@ class MusicService :
         }
     }
 
-    private suspend fun restorePersistentQueue(persistedQueue: PersistQueue) {
+    private suspend fun restorePersistentQueue(persistedQueue: PersistQueue, expectedQueueGeneration: Int) {
         cancelRestoredQueueHydration()
         val hydrationGeneration = restoredQueueHydrationGeneration.incrementAndGet()
         isHydratingRestoredQueue = true
@@ -1423,61 +1478,18 @@ class MusicService :
                 .filterPlaybackContent(hideExplicit, hideVideo)
 
         withContext(Dispatchers.Main) {
-            if (hydrationGeneration != restoredQueueHydrationGeneration.get()) return@withContext
-            currentQueue = continuationQueue
-            queueTitle = initialStatus.title
-
-            val items = initialStatus.items
-            if (items.isEmpty()) {
-                if (hydrationGeneration == restoredQueueHydrationGeneration.get()) {
-                    isHydratingRestoredQueue = false
-                }
+            if (hydrationGeneration != restoredQueueHydrationGeneration.get() || expectedQueueGeneration != queueLoadGeneration) {
+                if (hydrationGeneration == restoredQueueHydrationGeneration.get()) isHydratingRestoredQueue = false
                 return@withContext
             }
-
-            val fullIndex = initialStatus.mediaItemIndex.coerceIn(0, items.lastIndex)
-            val windowStart = (fullIndex - 20).coerceAtLeast(0)
-            val windowEnd = (fullIndex + 50).coerceAtMost(items.size)
-
-            val initialChunk = items.subList(windowStart, windowEnd)
-            val relativeIndex = (fullIndex - windowStart).coerceIn(0, initialChunk.lastIndex)
-
-            player.setMediaItems(
-                initialChunk,
-                relativeIndex,
-                initialStatus.position,
-            )
-            player.prepare()
-            player.playWhenReady = false
-            currentMediaMetadata.value = player.currentMetadata
-            updateNotification()
-
-            if (items.size > initialChunk.size) {
-                restoredQueueBackfillJob =
-                    scope.launch(SilentHandler) {
-                        try {
-                            delay(2000)
-                            if (!isActive || player.mediaItemCount == 0) return@launch
-                            if (windowStart > 0) {
-                                player.addMediaItems(0, items.subList(0, windowStart))
-                            }
-                            if (windowEnd < items.size) {
-                                player.addMediaItems(items.subList(windowEnd, items.size))
-                            }
-                        } finally {
-                            if (hydrationGeneration == restoredQueueHydrationGeneration.get()) {
-                                isHydratingRestoredQueue = false
-                                restoredQueueBackfillJob = null
-                                if (isActive && player.mediaItemCount > 0) {
-                                    saveQueueToDisk()
-                                }
-                            }
-                        }
-                    }
-            } else {
-                if (hydrationGeneration == restoredQueueHydrationGeneration.get()) {
-                    isHydratingRestoredQueue = false
-                }
+            currentQueue = continuationQueue
+            queueTitle = initialStatus.title
+            try {
+                (player as ProgressivePlayer).load(initialStatus.items, initialStatus.mediaItemIndex, initialStatus.position, false)
+                currentMediaMetadata.value = player.currentMetadata
+                updateNotification()
+            } finally {
+                if (hydrationGeneration == restoredQueueHydrationGeneration.get()) isHydratingRestoredQueue = false
             }
         }
     }
@@ -1485,8 +1497,10 @@ class MusicService :
     private suspend fun restorePersistentPlayerState(
         playerState: PersistPlayerState,
         restoredQueue: Boolean,
+        expectedQueueGeneration: Int,
     ) {
         withContext(Dispatchers.Main) {
+            if (expectedQueueGeneration != queueLoadGeneration) return@withContext
             player.repeatMode = playerState.repeatMode
             player.shuffleModeEnabled = playerState.shuffleModeEnabled
             playerVolume.value = playerState.volume.coerceIn(0f, 1f)
@@ -1896,6 +1910,7 @@ class MusicService :
         return CrossfadeTarget(
             index = targetIndex,
             mediaId = targetItem.mediaId,
+            occurrenceUid = (player as? ProgressivePlayer)?.queue?.rows?.getOrNull(targetIndex)?.uid,
         )
     }
 
@@ -2328,12 +2343,16 @@ class MusicService :
     }
 
     private fun resolveCrossfadeTargetIndex(target: CrossfadeTarget): Int {
+        target.occurrenceUid?.let { uid -> return (player as? ProgressivePlayer)?.queue?.indexOf(uid) ?: C.INDEX_UNSET }
         if (target.index in 0 until player.mediaItemCount &&
             player.getMediaItemAt(target.index).mediaId == target.mediaId
         ) {
             return target.index
         }
 
+        (player as? ProgressivePlayer)?.let { logical ->
+            return logical.queue.rows.indexOfFirst { it.metadata.id == target.mediaId }
+        }
         for (index in 0 until player.mediaItemCount) {
             if (player.getMediaItemAt(index).mediaId == target.mediaId) {
                 return index
@@ -3020,9 +3039,7 @@ class MusicService :
                     }
             if (generation != queueLoadGeneration) return@launch
             if (preloadItem != null) {
-                player.setMediaItem(preloadItem)
-                player.prepare()
-                player.playWhenReady = playWhenReady
+                (player as ProgressivePlayer).load(listOf(preloadItem), 0, 0L, playWhenReady)
             }
             var initialStatus =
                 withContext(Dispatchers.IO) {
@@ -3055,30 +3072,12 @@ class MusicService :
             }
             if (initialStatus.items.isEmpty()) return@launch
             if (preloadItem != null) {
-                val preloadMediaId = preloadItem.mediaId.trim()
-                val insertionIndex =
-                    initialStatus.mediaItemIndex.coerceIn(0, initialStatus.items.size)
-                val itemsBeforeCurrent =
-                    initialStatus.items
-                        .subList(0, insertionIndex)
-                        .filterNot { preloadMediaId.isNotEmpty() && it.mediaId.trim() == preloadMediaId }
-                val itemsAfterCurrent =
-                    initialStatus.items
-                        .subList(insertionIndex, initialStatus.items.size)
-                        .filterNot { preloadMediaId.isNotEmpty() && it.mediaId.trim() == preloadMediaId }
-
-                player.addMediaItems(0, itemsBeforeCurrent)
-                player.addMediaItems(itemsAfterCurrent)
-                if (player.shuffleModeEnabled) {
-                    applyCurrentFirstShuffleOrder()
-                }
+                (player as ProgressivePlayer).expandAroundCurrent(initialStatus.items, initialStatus.mediaItemIndex)
             } else {
                 val items = initialStatus.items
                 val index = initialStatus.mediaItemIndex
 
-                player.setMediaItems(items, index, initialStatus.position)
-                player.prepare()
-                player.playWhenReady = playWhenReady
+                (player as ProgressivePlayer).load(items, index, initialStatus.position, playWhenReady)
                 if (player.shuffleModeEnabled) {
                     applyCurrentFirstShuffleOrder()
                 }
@@ -3104,6 +3103,7 @@ class MusicService :
     }
 
     private fun applyCurrentFirstShuffleOrder() {
+        if (player is ProgressivePlayer) return
         val count = player.mediaItemCount
         if (count <= 1) return
         val currentIndex = player.currentMediaItemIndex.coerceIn(0, count - 1)
@@ -3215,8 +3215,7 @@ class MusicService :
                                 .filterPlaybackContent(hideExplicit, hideVideo)
                         }
                     val knownIds =
-                        (0 until player.mediaItemCount)
-                            .mapTo(mutableSetOf()) { player.getMediaItemAt(it).mediaId }
+                        (player as ProgressivePlayer).queue.rows.mapTo(mutableSetOf()) { it.metadata.id }
                     val newItems = status.items.filter { knownIds.add(it.mediaId) }.toMutableList()
                     var loadedPageCount = 1
 
@@ -3297,6 +3296,10 @@ class MusicService :
 
     // Vibra: finds the position in play order before the timeline changes (see UserQueue).
     private fun insertUserQueue(items: List<MediaItem>, playNext: Boolean) {
+        (player as? ProgressivePlayer)?.let { logical ->
+            logical.insertUser(items.filterBlockedArtists(blockedArtistIds).filterVideo(hideMusicVideos), playNext)
+            return
+        }
         val allowedItems = items.filterBlockedArtists(blockedArtistIds).filterVideo(hideMusicVideos)
             .map { it.asUserQueued() }
         if (allowedItems.isEmpty()) return
@@ -3314,6 +3317,13 @@ class MusicService :
         player.prepare()
     }
 
+    internal fun removeQueueEntries(entries: List<app.vibra.playback.QueueEntry>): QueueRemoval? {
+        val logical = player as? ProgressivePlayer ?: return null
+        return logical.removeOccurrences(entries.mapTo(mutableSetOf()) { it.uid })?.let {
+            QueueRemoval.logical(logical, it).also { removal -> pendingQueueRemoval = removal }
+        }
+    }
+
     internal fun removeQueueItems(windows: List<Timeline.Window>): QueueRemoval? {
         return QueueRemoval.remove(queueEditPlayer(), windows).also { pendingQueueRemoval = it }
     }
@@ -3328,14 +3338,14 @@ class MusicService :
         if (pendingQueueRemoval === removal) pendingQueueRemoval = null
     }
 
-    private fun queueEditPlayer(): Player =
-        if (player.deviceInfo.playbackType == androidx.media3.common.DeviceInfo.PLAYBACK_TYPE_LOCAL) {
-            localPlayer
-        } else {
-            player
-        }
+    private fun queueEditPlayer(): Player = player
 
     fun moveQueueItemToNext(mediaItemIndex: Int) {
+        (player as? ProgressivePlayer)?.let { logical ->
+            if (mediaItemIndex in 0 until logical.mediaItemCount && mediaItemIndex != logical.currentMediaItemIndex)
+                logical.moveMediaItem(mediaItemIndex, (logical.currentMediaItemIndex + 1).coerceAtMost(logical.mediaItemCount - 1))
+            return
+        }
         val currentIndex = player.currentMediaItemIndex
         if (
             player.mediaItemCount < 2 ||
@@ -4649,9 +4659,15 @@ class MusicService :
         if (!playbackAttempts.isCurrent(attemptId, mediaId) || player.currentMediaItem?.mediaId != mediaId) return
         var cause: Throwable? = error
         var contentRestricted = false
+        var rejectedResponse: HttpDataSource.InvalidResponseCodeException? = null
         while (cause != null) {
             if (cause is YTPlayerUtils.LoginRequiredForPlaybackException) contentRestricted = true
+            if (cause is HttpDataSource.InvalidResponseCodeException && cause.responseCode == 403) rejectedResponse = cause
             cause = cause.cause
+        }
+        rejectedResponse?.let {
+            resolveAudioStream.reportRejectedStream(it.dataSpec.uri.toString())
+            resolveAudioStream.invalidateSession()
         }
         if (!local && !downloaded && !contentRestricted && isNetworkCurrentlyConnected() &&
             error.errorCode < PlaybackException.ERROR_CODE_DRM_UNSPECIFIED
@@ -4659,6 +4675,9 @@ class MusicService :
             val next = playbackAttempts.advance(attemptId, mediaId,
                 YouTube.currentPlaybackAuthState().hasLoginCookie, SystemClock.elapsedRealtime())
             if (next != null) {
+                if (next.stage == app.vibra.playback.PlaybackStage.REFRESHED && rejectedResponse == null) {
+                    resolveAudioStream.invalidateSession()
+                }
                 // Never splice a new provider/representation into previously cached native bytes.
                 cacheBypassMediaIds.add(mediaId)
                 nextStreamPreloader.cancel()
@@ -4770,7 +4789,7 @@ class MusicService :
     }
 
     private fun createResolvedUpstreamDataSourceFactory(): DataSource.Factory {
-        val httpFactory = OkHttpDataSource.Factory(mediaOkHttpClient)
+        val httpFactory = OkHttpDataSource.Factory(PlaybackHttpClient(this, mediaOkHttpClient))
         val chunkedFactory = DataSource.Factory {
             ChunkedDataSource(httpFactory.createDataSource(), CHUNK_LENGTH)
         }
@@ -5422,57 +5441,7 @@ class MusicService :
 
     private fun clearPersistedQueueFiles() {
         persistentSaveGeneration.incrementAndGet()
-        synchronized(persistentStateLock) {
-            listOf(
-                PERSISTENT_QUEUE_FILE,
-                PERSISTENT_PLAYER_STATE_FILE,
-                PERSISTENT_AUTOMIX_FILE,
-            ).forEach { fileName ->
-                val persistentFile = filesDir.resolve(fileName)
-                val tempFile = filesDir.resolve("$fileName.tmp")
-                runCatching {
-                    if (persistentFile.exists() && !persistentFile.delete()) {
-                        Timber.tag(TAG).w("Failed to delete persistent file: $fileName")
-                    }
-                    if (tempFile.exists() && !tempFile.delete()) {
-                        Timber.tag(TAG).w("Failed to delete temporary persistent file: $fileName")
-                    }
-                }.onFailure {
-                    Timber.tag(TAG).w(it, "Failed to clear persistent file: $fileName")
-                }
-            }
-        }
-    }
-
-    private fun writePersistentObject(
-        fileName: String,
-        payload: Serializable,
-    ) {
-        val persistentFile = filesDir.resolve(fileName)
-        val tempFile = filesDir.resolve("$fileName.tmp")
-
-        synchronized(persistentStateLock) {
-            runCatching {
-                FileOutputStream(tempFile).use { fos ->
-                    ObjectOutputStream(fos).use { output ->
-                        output.writeObject(payload)
-                        output.flush()
-                    }
-                }
-
-                if (!tempFile.renameTo(persistentFile)) {
-                    if (persistentFile.exists() && !persistentFile.delete()) {
-                        error("Could not replace $fileName")
-                    }
-                    if (!tempFile.renameTo(persistentFile)) {
-                        error("Could not atomically move $fileName")
-                    }
-                }
-            }.onFailure {
-                runCatching { tempFile.delete() }
-                reportException(it)
-            }
-        }
+        QueuePersistenceWriter.get(filesDir).clear()
     }
 
     private fun MediaItem.toPersistableMetadata(): moe.rukamori.archivetune.models.MediaMetadata? {
@@ -5543,51 +5512,22 @@ class MusicService :
         )
     }
 
-    private suspend fun saveQueueToDisk() {
-        val saveGeneration = persistentSaveGeneration.get()
-        val snapshot =
-            withContext(Dispatchers.Main.immediate) {
-                if (
-                    saveGeneration != persistentSaveGeneration.get() ||
-                    isRestoringPersistentState ||
-                    isHydratingRestoredQueue
-                ) {
-                    return@withContext null
-                }
-
-                val mediaItemsSnapshot = player.mediaItems.mapNotNull { it.toPersistableMetadata() }
-                if (mediaItemsSnapshot.isEmpty()) return@withContext null
-
-                val currentMediaItemIndex = player.currentMediaItemIndex
-                val currentPosition = player.currentPosition
-                val persistQueue =
-                    currentQueue.toPersistQueue(
-                        title = queueTitle,
-                        items = mediaItemsSnapshot,
-                        mediaItemIndex = currentMediaItemIndex,
-                        position = currentPosition,
-                    )
-                val persistPlayerState =
-                    PersistPlayerState(
-                        playWhenReady = player.playWhenReady,
-                        repeatMode = player.repeatMode,
-                        shuffleModeEnabled = player.shuffleModeEnabled,
-                        volume = playerVolume.value,
-                        currentPosition = currentPosition,
-                        currentMediaItemIndex = currentMediaItemIndex,
-                        playbackState = player.playbackState,
-                    )
-
-                persistQueue to persistPlayerState
-            } ?: return
-
-        withContext(Dispatchers.IO) {
-            if (saveGeneration != persistentSaveGeneration.get()) return@withContext
-            writePersistentObject(PERSISTENT_QUEUE_FILE, snapshot.first)
-            if (saveGeneration != persistentSaveGeneration.get()) return@withContext
-            writePersistentObject(PERSISTENT_PLAYER_STATE_FILE, snapshot.second)
+    private fun checkpointPlayback() {
+        if (!::player.isInitialized || !queueRestoreCompleted.value || isRestoringPersistentState || isHydratingRestoredQueue) return
+        val logical = player as? ProgressivePlayer ?: return
+        if (logical.isPreparingSource) return
+        if (logical.mediaItemCount == 0) {
+            QueuePersistenceWriter.get(filesDir).clear()
+            return
         }
+        val state = PersistPlayerState(player.playWhenReady, player.repeatMode, player.shuffleModeEnabled,
+            playerVolume.value, player.currentPosition, player.currentMediaItemIndex, player.playbackState)
+        val continuation = currentQueue.toPersistQueue(queueTitle, emptyList(), 0, 0L)
+        QueuePersistenceWriter.get(filesDir).submit(QueueContentV2(content = logical.queue.content, continuation = continuation),
+            logical.queue.currentUid, state)
     }
+
+    private suspend fun saveQueueToDisk() = withContext(Dispatchers.Main.immediate) { checkpointPlayback() }
 
     override fun onDestroy() {
         app.vibra.update.VibraUpdates.onPlaybackChanged(false) // Vibra
@@ -5620,18 +5560,13 @@ class MusicService :
         }
         try {
             if (player.mediaItemCount > 0) {
-                runBlocking {
-                    saveQueueToDisk()
-                }
+                checkpointPlayback()
             }
         } catch (_: Exception) {
         }
         mediaLibrarySessionCallback.release()
         try {
             mediaSession.release()
-        } catch (_: Exception) {
-        }
-        try {
         } catch (_: Exception) {
         }
         try {
@@ -5684,7 +5619,7 @@ class MusicService :
             }
 
             if (player.mediaItemCount > 0) {
-                runBlocking { saveQueueToDisk() }
+                checkpointPlayback()
             }
         } catch (_: Exception) {
         }

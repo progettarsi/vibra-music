@@ -9,6 +9,9 @@
 
 package moe.rukamori.archivetune.ui.screens.playlist
 
+import app.vibra.playback.lazyMediaItems
+import app.vibra.playback.metadataOf
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -70,7 +73,6 @@ import moe.rukamori.archivetune.constants.HideExplicitKey
 import moe.rukamori.archivetune.constants.SongSortDescendingKey
 import moe.rukamori.archivetune.constants.SongSortType
 import moe.rukamori.archivetune.constants.SongSortTypeKey
-import moe.rukamori.archivetune.extensions.toMediaItem
 import moe.rukamori.archivetune.extensions.togglePlayPause
 import moe.rukamori.archivetune.playback.queues.ListQueue
 import moe.rukamori.archivetune.ui.component.EmptyPlaceholder
@@ -258,7 +260,7 @@ fun CachePlaylistScreen(
                                 playerConnection.playQueue(
                                     ListQueue(
                                         title = "Cache Songs",
-                                        items = filteredSongs.shuffled().map { it.item.toMediaItem() },
+                                        items = filteredSongs.shuffled().lazyMediaItems { metadataOf(it.item) },
                                     ),
                                 )
                             },
@@ -266,7 +268,7 @@ fun CachePlaylistScreen(
                                 playerConnection.playQueue(
                                     ListQueue(
                                         title = "Cache Songs",
-                                        items = filteredSongs.map { it.item.toMediaItem() },
+                                        items = filteredSongs.lazyMediaItems { metadataOf(it.item) },
                                     ),
                                 )
                             },
@@ -338,7 +340,7 @@ fun CachePlaylistScreen(
                                                 playerConnection.playQueue(
                                                     ListQueue(
                                                         title = "Cache Songs",
-                                                        items = cachedSongs.map { it.toMediaItem() },
+                                                        items = cachedSongs.lazyMediaItems { metadataOf(it) },
                                                         startIndex = cachedSongs.indexOfFirst { it.id == songWrapper.item.id },
                                                     ),
                                                 )

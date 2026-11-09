@@ -7,6 +7,8 @@
 
 package moe.rukamori.archivetune.ui.screens.library
 
+import app.vibra.playback.lazyMediaItems
+import app.vibra.playback.metadataOf
 // Vibra: independent radii follow the global rounding style.
 import app.vibra.ui.theme.adaptiveRoundedCornerShape
 
@@ -79,16 +81,11 @@ import androidx.core.graphics.ColorUtils
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
-import androidx.palette.graphics.Palette
 import app.vibra.ui.components.VibraDropdownMenu
 import coil3.imageLoader
-import coil3.request.ImageRequest
-import coil3.request.allowHardware
-import coil3.toBitmap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import moe.rukamori.archivetune.LocalDatabase
 import moe.rukamori.archivetune.LocalSyncUtils
 import moe.rukamori.archivetune.LocalPlayerAwareWindowInsets
@@ -106,7 +103,6 @@ import moe.rukamori.archivetune.constants.PlaylistSortTypeKey
 import moe.rukamori.archivetune.constants.PureBlackKey
 import moe.rukamori.archivetune.db.entities.Playlist
 import moe.rukamori.archivetune.extensions.move
-import moe.rukamori.archivetune.extensions.toMediaItem
 import moe.rukamori.archivetune.innertube.models.PlaylistItem
 import moe.rukamori.archivetune.innertube.models.WatchEndpoint
 import moe.rukamori.archivetune.playback.queues.ListQueue
@@ -546,7 +542,7 @@ fun LibraryPlaylistsScreen(
                             contentType = "library_empty_state",
                         ) {
                             LibraryEmptyState(
-                                iconRes = R.drawable.playlist_add,
+                                iconRes = R.drawable.add,
                                 actionLabelRes = R.string.create_playlist,
                                 onAction = createPlaylist,
                             )
@@ -576,7 +572,7 @@ fun LibraryPlaylistsScreen(
                                     coroutineScope.launch {
                                         database.playlistSongs(playlist.id).firstOrNull()?.let { songs ->
                                             if (songs.isNotEmpty()) {
-                                                conn.playQueue(ListQueue(items = songs.map { it.song.toMediaItem() }))
+                                                conn.playQueue(ListQueue(items = songs.lazyMediaItems { metadataOf(it.song) }))
                                             }
                                         }
                                     }
@@ -603,7 +599,7 @@ fun LibraryPlaylistsScreen(
                     if (listPlaylists.isEmpty()) {
                         item(key = "playlists_empty", contentType = "library_empty_state") {
                             LibraryEmptyState(
-                                iconRes = R.drawable.playlist_add,
+                                iconRes = R.drawable.add,
                                 actionLabelRes = R.string.create_playlist,
                                 onAction = createPlaylist,
                             )
@@ -676,7 +672,7 @@ fun LibraryPlaylistsScreen(
                                         coroutineScope.launch {
                                             database.playlistSongs(playlist.id).firstOrNull()?.let { songs ->
                                                 if (songs.isNotEmpty()) {
-                                                    conn.playQueue(ListQueue(items = songs.map { it.song.toMediaItem() }))
+                                                    conn.playQueue(ListQueue(items = songs.lazyMediaItems { metadataOf(it.song) }))
                                                 }
                                             }
                                         }
@@ -759,35 +755,13 @@ fun rememberArtworkGradient(
     fallbackColor: Color = MaterialTheme.colorScheme.surfaceVariant,
 ): List<Color> {
     val context = LocalContext.current
-    var colors by remember(thumbnailUrl) { mutableStateOf(listOf(fallbackColor, fallbackColor.copy(alpha = 0.5f))) }
+    var colors by remember(thumbnailUrl, fallbackColor) { mutableStateOf(listOf(fallbackColor, fallbackColor.copy(alpha = 0.5f))) }
 
-    LaunchedEffect(thumbnailUrl) {
+    LaunchedEffect(thumbnailUrl, fallbackColor) {
         if (thumbnailUrl == null) return@LaunchedEffect
-        val request =
-            ImageRequest
-                .Builder(context)
-                .data(thumbnailUrl)
-                .size(PlayerColorExtractor.Config.IMAGE_SIZE, PlayerColorExtractor.Config.IMAGE_SIZE)
-                .allowHardware(false)
-                .build()
-
-        val result =
-            runCatching {
-                context.imageLoader.execute(request)
-            }.getOrNull()
-
-        if (result != null) {
-            val bitmap = result.image?.toBitmap()
-            if (bitmap != null) {
-                val palette =
-                    withContext(Dispatchers.Default) {
-                        Palette
-                            .from(bitmap)
-                            .maximumColorCount(PlayerColorExtractor.Config.MAX_COLOR_COUNT)
-                            .resizeBitmapArea(PlayerColorExtractor.Config.BITMAP_AREA)
-                            .generate()
-                    }
-
+        val palette = app.vibra.performance.ArtworkPalettes.load(context, thumbnailUrl)
+        if (palette != null) {
+            run {
                 val extractedColors =
                     PlayerColorExtractor.extractGradientColors(
                         palette = palette,

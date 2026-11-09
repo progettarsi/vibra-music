@@ -8,7 +8,9 @@
 package moe.rukamori.archivetune.playback.queues
 
 import androidx.media3.common.MediaItem
-import moe.rukamori.archivetune.extensions.ExtraIsMusicVideo
+import app.vibra.playback.MetadataMediaItems
+import app.vibra.playback.metadataAt
+import app.vibra.playback.filterMetadata
 import moe.rukamori.archivetune.extensions.metadata
 import moe.rukamori.archivetune.models.MediaMetadata
 
@@ -31,14 +33,14 @@ interface Queue {
     ) {
         fun filterExplicit(enabled: Boolean = true) =
             if (enabled) {
-                filterItems { it.metadata?.explicit != true }
+                filterMetadataItems { !it.explicit }
             } else {
                 this
             }
 
         fun filterVideo(enabled: Boolean = true) =
             if (enabled) {
-                filterItems { it.mediaMetadata.extras?.getBoolean(ExtraIsMusicVideo, false) != true }
+                filterMetadataItems { !it.isMusicVideo }
             } else {
                 this
             }
@@ -47,52 +49,36 @@ interface Queue {
             if (blockedArtistIds.isEmpty()) {
                 this
             } else {
-                filterItems { !it.hasBlockedArtist(blockedArtistIds) }
+                filterMetadataItems { metadata -> metadata.artists.none { it.id in blockedArtistIds } }
             }
 
-        private inline fun filterItems(keep: (MediaItem) -> Boolean): Status {
+        private fun filterMetadataItems(keep: (MediaMetadata) -> Boolean): Status {
             if (items.isEmpty()) return this
-
-            val currentIndex = mediaItemIndex.coerceIn(items.indices)
-            var filteredIndex = 0
-            val filteredItems =
-                buildList(items.size) {
-                    items.forEachIndexed { index, item ->
-                        if (keep(item)) {
-                            if (index < currentIndex) {
-                                filteredIndex++
-                            }
-                            add(item)
-                        }
-                    }
-                }
-
-            if (filteredItems.isEmpty()) {
-                return copy(items = emptyList(), mediaItemIndex = 0)
+            val selected = mediaItemIndex.coerceIn(items.indices)
+            val allowed = items.indices.filter { items.metadataAt(it)?.let(keep) != false }
+            if (allowed.size == items.size) return this
+            val source = items
+            val filtered = object : MetadataMediaItems() {
+                override val sourceIdentity: Any = this
+                override val size get() = allowed.size
+                override fun metadataAt(index: Int) = source.metadataAt(allowed[index])!!
             }
-
-            return copy(
-                items = filteredItems,
-                mediaItemIndex = filteredIndex.coerceIn(filteredItems.indices),
-            )
+            return copy(items = filtered, mediaItemIndex = allowed.count { it < selected }.coerceAtMost((allowed.size - 1).coerceAtLeast(0)))
         }
+
     }
 }
 
 fun List<MediaItem>.filterExplicit(enabled: Boolean = true) =
     if (enabled) {
-        filterNot {
-            it.metadata?.explicit == true
-        }
+        filterMetadata { !it.explicit }
     } else {
         this
     }
 
 fun List<MediaItem>.filterVideo(enabled: Boolean = true) =
     if (enabled) {
-        filterNot {
-            it.mediaMetadata.extras?.getBoolean(ExtraIsMusicVideo, false) == true
-        }
+        filterMetadata { !it.isMusicVideo }
     } else {
         this
     }
@@ -101,7 +87,7 @@ fun List<MediaItem>.filterBlockedArtists(blockedArtistIds: Set<String>) =
     if (blockedArtistIds.isEmpty()) {
         this
     } else {
-        filterNot { it.hasBlockedArtist(blockedArtistIds) }
+        filterMetadata { metadata -> metadata.artists.none { it.id in blockedArtistIds } }
     }
 
 fun MediaItem.hasBlockedArtist(blockedArtistIds: Set<String>): Boolean =

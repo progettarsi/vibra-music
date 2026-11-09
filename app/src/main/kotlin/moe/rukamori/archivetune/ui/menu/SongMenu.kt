@@ -388,7 +388,7 @@ fun SongMenu(
             id = MenuActionId.Playlist,
             icon = {
               Icon(
-                painter = painterResource(R.drawable.playlist_add),
+                painter = painterResource(R.drawable.add_box),
                 contentDescription = null,
                 modifier = Modifier.size(24.dp),
               )
@@ -722,7 +722,7 @@ fun SongMenu(
             headlineContent = { Text(text = stringResource(R.string.change_song_source)) },
             supportingContent = { Text(text = stringResource(R.string.change_song_source_desc)) },
             leadingContent = {
-              Icon(painter = painterResource(R.drawable.sync), contentDescription = null)
+              Icon(painter = painterResource(R.drawable.swap_horiz), contentDescription = null)
             },
             modifier =
               Modifier.clickable {

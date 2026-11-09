@@ -45,8 +45,14 @@
     <string name="vibra_liked_songs_count">Liked songs · %1$d</string>
     <string name="vibra_library_empty">Your library is empty for now. Like songs, save albums or create a playlist and they will show up here, arranged around what you play most.</string>
     <string name="vibra_listening_summary">Listening</string>
-    <string name="vibra_minutes_this_week">minutes this week</string>
-    <string name="vibra_songs_this_week">different songs this week</string>
+    <plurals name="vibra_minutes_this_week">
+        <item quantity="one">minute this week</item>
+        <item quantity="other">minutes this week</item>
+    </plurals>
+    <plurals name="vibra_songs_this_week">
+        <item quantity="one">different song this week</item>
+        <item quantity="other">different songs this week</item>
+    </plurals>
     <string name="vibra_edit_profile">Edit profile</string>
     <string name="vibra_no_favourite_yet">Play some music to find out</string>
     <string name="vibra_profile_shape">Shape</string>
@@ -235,4 +241,20 @@
     <string name="vibra_media_info_on_phone">On this phone</string>
     <string name="vibra_media_info_local_title">Numbers and description unavailable</string>
     <string name="vibra_media_info_local_body">This track is a file on your phone, so it has no online views or description.</string>
+
+    <string name="vibra_lyrics_select_verse">Select verse</string>
+    <string name="vibra_lyrics_card_preview">Lyrics card preview. %1$s</string>
+    <string name="vibra_lyrics_card_too_long">This excerpt is too long for this format. Try 9:16 or select fewer verses.</string>
+    <string name="vibra_lyrics_portrait_too_long">This excerpt is too long. Select fewer verses.</string>
+    <string name="vibra_lyrics_card_failed">Couldn’t create the preview.</string>
+    <string name="vibra_lyrics_retry">Retry</string>
+    <string name="vibra_lyrics_save">Save</string>
+    <string name="vibra_lyrics_share">Share</string>
+    <string name="vibra_lyrics_export_working">Preparing image…</string>
+    <string name="vibra_lyrics_saved">Image saved to Pictures/VIBRA.</string>
+    <string name="vibra_lyrics_document_saved">Image saved.</string>
+    <string name="vibra_lyrics_save_failed">Couldn’t save the image. Try again.</string>
+    <string name="vibra_lyrics_share_failed">Couldn’t open sharing. Try again.</string>
+    <string name="vibra_lyrics_story_format">Story 9:16</string>
+    <string name="vibra_lyrics_square_format">Square 1:1</string>
 </resources>

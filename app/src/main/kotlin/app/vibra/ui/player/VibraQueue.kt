@@ -11,7 +11,6 @@ import app.vibra.ui.theme.adaptiveRoundedCornerShape
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import app.vibra.ui.motion.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -34,20 +33,18 @@ import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
-import androidx.compose.material3.Text
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
+import androidx.compose.material3.Text
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
-import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -68,7 +65,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.media3.common.Timeline
+import app.vibra.playback.QueueEntry
 import app.vibra.ui.components.RowDurationText
 import app.vibra.ui.components.RowSubtitleText
 import app.vibra.ui.components.SmallArtworkPx
@@ -79,41 +76,38 @@ import app.vibra.ui.haptics.rememberVibraHaptics
 import app.vibra.ui.motion.Liquid
 import app.vibra.ui.motion.LiquidSheetState
 import app.vibra.ui.motion.LiquidSpeed
+import app.vibra.ui.motion.combinedClickable
 import app.vibra.ui.motion.reorderWobble
 import app.vibra.ui.theme.VibraDimens
 import app.vibra.ui.theme.VibraShapes
 import kotlinx.coroutines.launch
 import moe.rukamori.archivetune.R
 import moe.rukamori.archivetune.extensions.metadata
-import moe.rukamori.archivetune.extensions.move
 import moe.rukamori.archivetune.playback.PlayerConnection
-import moe.rukamori.archivetune.playback.queues.isUserQueued
 import moe.rukamori.archivetune.ui.player.QueueDragInfo
-import moe.rukamori.archivetune.ui.player.commitQueueDrag
-import moe.rukamori.archivetune.ui.player.queueDragDestinationFor
-import moe.rukamori.archivetune.ui.player.queueItemKey
+import moe.rukamori.archivetune.ui.player.commitLogicalDrag
+import moe.rukamori.archivetune.ui.player.logicalDragDestinationFor
 import moe.rukamori.archivetune.utils.makeTimeString
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 
 /**
  * The queue (Figma "queueOpen" list, "Canzone" rows on surface-container cards).
+ * - tap ............... jump to that track
+ * - long-press cover .. pick the row up and drag it (haptic on grab and on every slot crossed); the
+ *   other rows wobble lightly (Advanced setting)
+ * - swipe left ........ remove, with an Undo snackbar
+ * - pull down at top .. a further strong pull drags the whole sheet down and closes it
+ * - header ............ close (✕) only, no grabber (shuffle is in the player)
  *
- *  - tap ............... jump to that track
- *  - long-press cover .. pick the row up and drag it (haptic on grab and on every slot
- *                        crossed); the other rows wobble lightly (Advanced setting)
- *  - swipe left ........ remove, with an Undo snackbar
- *  - pull down at top .. a further strong pull drags the whole sheet down and closes it
- *  - header ............ close (✕) only, no grabber (shuffle is in the player)
+ * Sections (Spotify's model, see the engine's UserQueue): after the current track come the songs
+ * the user queued by hand ("Queued", played first, in the order chosen: Play next puts a song at
+ * the top of it, Add to queue at its end), then the rest of what is playing ("Next from
+ * <playlist>"). Each section starts with a small label, so the hand-made queue reads as its own
+ * short list without boxing it in.
  *
- * Sections (Spotify's model, see the engine's UserQueue): after the current track come the
- * songs the user queued by hand ("Queued", played first, in the order chosen: Play next puts
- * a song at the top of it, Add to queue at its end), then the rest of what is playing
- * ("Next from <playlist>"). Each section starts with a small label, so the hand-made queue
- * reads as its own short list without boxing it in.
- *
- * Mutations go straight to the Media3 player through PlayerConnection, which also
- * persists the queue; the list is a projection of `queueWindows`.
+ * Mutations go straight to the Media3 player through PlayerConnection, which also persists the
+ * queue; the list is a projection of the logical queue.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -127,24 +121,25 @@ fun VibraQueuePanel(
     val haptics = rememberVibraHaptics()
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
-    val queueWindows by connection.queueWindows.collectAsStateWithLifecycle()
+    val queueWindows by connection.queueRows.collectAsStateWithLifecycle()
     val currentIndex by connection.currentWindowIndex.collectAsStateWithLifecycle()
     val queueTitle by connection.queueTitle.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
     val pullToClose = remember(queueSheet) { PullToCloseConnection(queueSheet) }
 
     // Local mirror so a drag can reorder instantly; the player is updated on drop.
-    val visibleWindows = remember { mutableStateListOf<Timeline.Window>() }
+    var visibleWindows by remember { mutableStateOf<List<QueueEntry>>(emptyList()) }
     var drag by remember { mutableStateOf<QueueDragInfo?>(null) }
 
     val reorderState =
         rememberReorderableLazyListState(lazyListState = listState) { from, to ->
-            val fromIndex = visibleWindows.indexOfFirst { it.queueItemKey == from.key }
-            val toIndex = visibleWindows.indexOfFirst { it.queueItemKey == to.key }
+            val fromIndex = visibleWindows.indexOfFirst { it.uid == from.key }
+            val toIndex = visibleWindows.indexOfFirst { it.uid == to.key }
             if (fromIndex == -1 || toIndex == -1) return@rememberReorderableLazyListState
             val draggedUid = drag?.draggedItemUid ?: visibleWindows[fromIndex].uid
-            visibleWindows.move(fromIndex, toIndex)
-            drag = QueueDragInfo(draggedUid, queueDragDestinationFor(visibleWindows, toIndex))
+            visibleWindows =
+                visibleWindows.toMutableList().apply { add(toIndex, removeAt(fromIndex)) }
+            drag = QueueDragInfo(draggedUid, logicalDragDestinationFor(visibleWindows, toIndex))
             haptics.tick()
         }
 
@@ -154,23 +149,21 @@ fun VibraQueuePanel(
         if (reorderState.isAnyItemDragging) return@LaunchedEffect
         drag?.let { completed ->
             drag = null
-            if (connection.commitQueueDrag(queueWindows, completed)) {
+            if (connection.commitLogicalDrag(queueWindows, completed)) {
                 haptics.gestureEnd()
                 return@LaunchedEffect
             }
         }
-        Snapshot.withMutableSnapshot {
-            visibleWindows.clear()
-            visibleWindows.addAll(queueWindows)
-        }
+        visibleWindows = queueWindows
     }
 
     // The current track is brought into view while the queue is closed (on every track change and
     // once it has slid away), so opening it never lays the list out again on its first frame.
     LaunchedEffect(queueSheet, listState) {
-        snapshotFlow { currentIndex to queueSheet.isOpenOrOpening }.collect { (index, open) ->
-            if (!open && index >= 0) listState.scrollToItem((index - 1).coerceAtLeast(0))
-        }
+        snapshotFlow { currentIndex to queueSheet.isOpenOrOpening }
+            .collect { (index, open) ->
+                if (!open && index >= 0) listState.scrollToItem((index - 1).coerceAtLeast(0))
+            }
     }
 
     // The queue is a sheet laid *over* the player (which recedes behind it), starting just
@@ -188,10 +181,7 @@ fun VibraQueuePanel(
             QueueHeader(onClose = queueSheet::collapse)
             LazyColumn(
                 state = listState,
-                modifier =
-                    Modifier
-                        .weight(1f)
-                        .nestedScroll(pullToClose),
+                modifier = Modifier.weight(1f).nestedScroll(pullToClose),
                 contentPadding =
                     PaddingValues(
                         start = VibraDimens.Gutter,
@@ -210,53 +200,84 @@ fun VibraQueuePanel(
                         -1
                     } else {
                         var end = currentRow + 1
-                        while (end < visibleWindows.size && visibleWindows[end].mediaItem.isUserQueued()) end++
+                        while (
+                            end < visibleWindows.size && visibleWindows[end].metadata.userQueued
+                        ) end++
                         end
                     }
-                visibleWindows.forEachIndexed { index, window ->
-                    if (currentRow >= 0 && index == currentRow + 1 && userEnd > currentRow + 1) {
-                        item(key = SectionQueued, contentType = SectionQueued) { QueueSection(stringResource(R.string.vibra_queue_queued)) }
+                // Keep section headers as their own lazy items, without registering every row
+                // eagerly.
+                val sections =
+                    buildMap<Int, String> {
+                        if (currentRow >= 0 && userEnd > currentRow + 1)
+                            put(currentRow + 1, SectionQueued)
+                        if (currentRow >= 0 && userEnd < visibleWindows.size)
+                            put(userEnd + size, SectionContext)
                     }
-                    if (currentRow >= 0 && index == userEnd && userEnd < visibleWindows.size) {
-                        item(key = SectionContext, contentType = SectionContext) {
-                            QueueSection(queueTitle?.takeIf { it.isNotBlank() }?.let { stringResource(R.string.vibra_queue_next_from, it) } ?: stringResource(R.string.vibra_queue_next))
-                        }
-                    }
-                    item(key = window.queueItemKey, contentType = "row") {
-                        ReorderableItem(reorderState, key = window.queueItemKey) { isDragging ->
-                            QueueRow(
-                                window = window,
-                                isCurrent = window.uid == currentUid,
-                                isDragging = isDragging,
-                                modifier = Modifier.reorderWobble(active = reorderState.isAnyItemDragging && !isDragging, seed = index),
-                                onClick = {
-                                    haptics.press()
-                                    connection.player.seekToDefaultPosition(window.firstPeriodIndex)
-                                    connection.player.playWhenReady = true
-                                },
-                                onRemove = {
-                                    val removal = connection.removeQueueItems(listOf(window)) ?: return@QueueRow
-                                    haptics.confirm()
-                                    scope.launch {
-                                        val title = window.mediaItem.metadata?.title.orEmpty()
-                                        val result =
-                                            snackbarHostState.showSnackbar(
-                                                message = resources.getString(R.string.vibra_removed_from_queue, title),
-                                                actionLabel = resources.getString(R.string.undo),
-                                                duration = SnackbarDuration.Short,
-                                            )
-                                        if (result == SnackbarResult.ActionPerformed) {
-                                            connection.restoreQueueItems(removal)
-                                        } else {
-                                            connection.discardQueueRemoval(removal)
-                                        }
-                                    }
-                                },
-                                dragHandleModifier =
-                                    Modifier.longPressDraggableHandle(
-                                        onDragStarted = { haptics.longPress() },
-                                    ),
+                fun rowIndex(displayIndex: Int) =
+                    displayIndex - sections.keys.count { it < displayIndex }
+                items(
+                    count = visibleWindows.size + sections.size,
+                    key = { index -> sections[index] ?: visibleWindows[rowIndex(index)].uid },
+                    contentType = { index -> sections[index] ?: "row" },
+                ) { displayIndex ->
+                    when (sections[displayIndex]) {
+                        SectionQueued -> QueueSection(stringResource(R.string.vibra_queue_queued))
+                        SectionContext ->
+                            QueueSection(
+                                queueTitle
+                                    ?.takeIf { it.isNotBlank() }
+                                    ?.let { stringResource(R.string.vibra_queue_next_from, it) }
+                                    ?: stringResource(R.string.vibra_queue_next)
                             )
+                        else -> {
+                            val index = rowIndex(displayIndex)
+                            val window = visibleWindows[index]
+                            ReorderableItem(reorderState, key = window.uid) { isDragging ->
+                                QueueRow(
+                                    window = window,
+                                    isCurrent = window.uid == currentUid,
+                                    isDragging = isDragging,
+                                    modifier =
+                                        Modifier.reorderWobble(
+                                            active = reorderState.isAnyItemDragging && !isDragging,
+                                            seed = index,
+                                        ),
+                                    onClick = {
+                                        haptics.press()
+                                        connection.seekToEntry(window.uid)
+                                    },
+                                    onRemove = {
+                                        val removal =
+                                            connection.removeQueueEntries(listOf(window))
+                                                ?: return@QueueRow
+                                        haptics.confirm()
+                                        scope.launch {
+                                            val title = window.metadata.title
+                                            val result =
+                                                snackbarHostState.showSnackbar(
+                                                    message =
+                                                        resources.getString(
+                                                            R.string.vibra_removed_from_queue,
+                                                            title,
+                                                        ),
+                                                    actionLabel =
+                                                        resources.getString(R.string.undo),
+                                                    duration = SnackbarDuration.Short,
+                                                )
+                                            if (result == SnackbarResult.ActionPerformed) {
+                                                connection.restoreQueueItems(removal)
+                                            } else {
+                                                connection.discardQueueRemoval(removal)
+                                            }
+                                        }
+                                    },
+                                    dragHandleModifier =
+                                        Modifier.longPressDraggableHandle(
+                                            onDragStarted = { haptics.longPress() }
+                                        ),
+                                )
+                            }
                         }
                     }
                 }
@@ -266,8 +287,7 @@ fun VibraQueuePanel(
         // (Figma queueOpen fades the list out towards the "From:" bar).
         Box(
             modifier =
-                Modifier
-                    .align(Alignment.BottomCenter)
+                Modifier.align(Alignment.BottomCenter)
                     .fillMaxWidth()
                     .navigationBarsPadding()
                     .height(VibraDimens.DockHeight + 72.dp)
@@ -276,23 +296,21 @@ fun VibraQueuePanel(
                             0f to Color.Transparent,
                             0.55f to sheetColor.copy(alpha = 0.92f),
                             1f to sheetColor,
-                        ),
-                    ),
+                        )
+                    )
         )
         // The gradient stops at the navigation bar; fill the bar area itself.
         Box(
             modifier =
-                Modifier
-                    .align(Alignment.BottomCenter)
+                Modifier.align(Alignment.BottomCenter)
                     .fillMaxWidth()
                     .windowInsetsBottomHeight(WindowInsets.navigationBars)
-                    .background(sheetColor),
+                    .background(sheetColor)
         )
         SnackbarHost(
             hostState = snackbarHostState,
             modifier =
-                Modifier
-                    .align(Alignment.BottomCenter)
+                Modifier.align(Alignment.BottomCenter)
                     .navigationBarsPadding()
                     .padding(bottom = VibraDimens.DockHeight + 40.dp),
         )
@@ -308,7 +326,10 @@ private fun QueueSection(text: String) {
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
-        modifier = Modifier.fillMaxWidth().padding(start = 4.dp, top = 14.dp, bottom = 2.dp).semantics { heading() },
+        modifier =
+            Modifier.fillMaxWidth().padding(start = 4.dp, top = 14.dp, bottom = 2.dp).semantics {
+                heading()
+            },
     )
 }
 
@@ -320,10 +341,14 @@ private const val SectionContext = "section_context"
 private fun QueueHeader(onClose: () -> Unit) {
     Row(
         modifier =
-            Modifier
-                .fillMaxWidth()
+            Modifier.fillMaxWidth()
                 // Clear of the sheet's rounded top corners.
-                .padding(start = VibraDimens.Gutter - 6.dp, end = VibraDimens.Gutter - 6.dp, top = 16.dp, bottom = 4.dp),
+                .padding(
+                    start = VibraDimens.Gutter - 6.dp,
+                    end = VibraDimens.Gutter - 6.dp,
+                    top = 16.dp,
+                    bottom = 4.dp,
+                ),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         VibraGlyphButton(
@@ -336,21 +361,18 @@ private fun QueueHeader(onClose: () -> Unit) {
 }
 
 /**
- * Lets the list hand an overscroll at its top to the sheet: once the list cannot scroll
- * further up, pulling down moves the whole queue down (with some resistance, so it takes
- * a deliberate pull), and releasing settles it open or closed by position and speed.
- * Scrolling back up first lifts the sheet back into place.
+ * Lets the list hand an overscroll at its top to the sheet: once the list cannot scroll further up,
+ * pulling down moves the whole queue down (with some resistance, so it takes a deliberate pull),
+ * and releasing settles it open or closed by position and speed. Scrolling back up first lifts the
+ * sheet back into place.
  */
-private class PullToCloseConnection(
-    private val sheet: LiquidSheetState,
-) : NestedScrollConnection {
-    private val pulled: Boolean get() = sheet.progress < 0.999f
+private class PullToCloseConnection(private val sheet: LiquidSheetState) : NestedScrollConnection {
+    private val pulled: Boolean
+        get() = sheet.progress < 0.999f
 
-    override fun onPreScroll(
-        available: Offset,
-        source: NestedScrollSource,
-    ): Offset {
-        if (source != NestedScrollSource.UserInput || available.y >= 0f || !pulled) return Offset.Zero
+    override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+        if (source != NestedScrollSource.UserInput || available.y >= 0f || !pulled)
+            return Offset.Zero
         sheet.dragBy(available.y)
         return Offset(0f, available.y)
     }
@@ -380,7 +402,7 @@ private val QueueSheetCorner = 32.dp
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun QueueRow(
-    window: Timeline.Window,
+    window: QueueEntry,
     isCurrent: Boolean,
     isDragging: Boolean,
     onClick: () -> Unit,
@@ -388,7 +410,7 @@ private fun QueueRow(
     modifier: Modifier = Modifier,
     dragHandleModifier: Modifier = Modifier,
 ) {
-    val metadata = window.mediaItem.metadata ?: return
+    val metadata = window.metadata
     val dismissState =
         rememberSwipeToDismissBoxState(
             confirmValueChange = { value ->
@@ -398,14 +420,15 @@ private fun QueueRow(
                 } else {
                     false
                 }
-            },
+            }
         )
     val reorderLabel = stringResource(R.string.vibra_reorder)
-    val lift by animateFloatAsState(
-        targetValue = if (isDragging) 1f else 0f,
-        animationSpec = Liquid.spatial(LiquidSpeed.Fast),
-        label = "queueRowLift",
-    )
+    val lift by
+        animateFloatAsState(
+            targetValue = if (isDragging) 1f else 0f,
+            animationSpec = Liquid.spatial(LiquidSpeed.Fast),
+            label = "queueRowLift",
+        )
 
     val rowShape = VibraShapes.Row
     SwipeToDismissBox(
@@ -419,8 +442,7 @@ private fun QueueRow(
             if (dismissState.dismissDirection != SwipeToDismissBoxValue.Settled) {
                 Box(
                     modifier =
-                        Modifier
-                            .fillMaxSize()
+                        Modifier.fillMaxSize()
                             .clip(VibraShapes.Row)
                             .background(MaterialTheme.colorScheme.errorContainer)
                             .padding(end = 24.dp),
@@ -445,14 +467,15 @@ private fun QueueRow(
                     shape = VibraShapes.RowThumbnail,
                     sizePx = SmallArtworkPx,
                     modifier =
-                        dragHandleModifier
-                            .fillMaxSize()
-                            .semantics { contentDescription = reorderLabel },
+                        dragHandleModifier.fillMaxSize().semantics {
+                            contentDescription = reorderLabel
+                        },
                 )
             },
             subtitle = { RowSubtitleText(metadata.artists.joinToString { it.name }) },
             trailing = {
-                if (metadata.duration > 0) RowDurationText(makeTimeString(metadata.duration * 1000L))
+                if (metadata.duration > 0)
+                    RowDurationText(makeTimeString(metadata.duration * 1000L))
             },
             bounceOnTap = true,
             interactionModifier = Modifier.combinedClickable(onClick = onClick),

@@ -17,7 +17,6 @@ import moe.rukamori.archivetune.innertube.utils.hasCompleteYouTubeLoginCookies
 import moe.rukamori.archivetune.morideobfuscator.youtubei.YoutubeiAudioQuality
 import moe.rukamori.archivetune.morideobfuscator.youtubei.YoutubeiException
 import moe.rukamori.archivetune.morideobfuscator.youtubei.YoutubeiFailureKind
-import moe.rukamori.archivetune.morideobfuscator.youtubei.YoutubeiNetworkConfiguration
 import moe.rukamori.archivetune.morideobfuscator.youtubei.YoutubeiResolutionPriority
 import moe.rukamori.archivetune.morideobfuscator.youtubei.YoutubeiResolver
 import moe.rukamori.archivetune.morideobfuscator.youtubei.YoutubeiStreamRequest
@@ -40,14 +39,13 @@ class YoutubeiStreamRepository
                 context = context,
                 diagnostics = { message -> Timber.tag("YoutubeiResolver").d(message) },
             ) {
-                YoutubeiNetworkConfiguration(
+                playbackNetworkConfiguration(context).copy(
                     proxy = YouTube.proxy,
-                    proxyUsername = YouTube.proxyUsername,
-                    proxyPassword = YouTube.proxyPassword,
-                    dns = YouTube.dns,
                     interceptors = listOf(NetworkGatekeeper),
                 )
             }
+
+        private val gvsPoTokenBindings = GvsPoTokenPreferences()
 
         override suspend fun resolve(request: AudioStreamRequest): ResolvedAudioStream =
             resolve(
@@ -181,13 +179,26 @@ class YoutubeiStreamRepository
                     throw failure
                 }
 
-            val streamUrl = resolved.url.toHttpUrlOrNull()
+            // Vibra: retain the preferred binding per account without logging either token.
+            val sessionPoToken = authState.poTokenGvsSession
+            val resolvedUrl = resolved.url.toHttpUrlOrNull()
+            val sessionBoundUrl = resolvedUrl?.takeIf { url ->
+                gvsPoTokenBindings.preferred(authState.streamCacheFingerprint) == GvsPoTokenBinding.SESSION &&
+                    !sessionPoToken.isNullOrBlank() && !url.queryParameter("pot").isNullOrBlank() &&
+                    url.queryParameter("pot") != sessionPoToken
+            }?.newBuilder()?.setQueryParameter("pot", sessionPoToken)?.build()
+            val streamUrl = sessionBoundUrl ?: resolvedUrl
             val streamToken = streamUrl?.queryParameter("pot")
+            val gvsPoTokenBinding = when {
+                streamToken.isNullOrBlank() -> null
+                streamToken == sessionPoToken -> GvsPoTokenBinding.SESSION
+                else -> GvsPoTokenBinding.VIDEO
+            }
             val tokenBinding =
                 when {
                     streamToken.isNullOrBlank() -> "missing"
+                    streamToken == sessionPoToken -> "session"
                     streamToken == authState.poTokenGvs && authState.poTokenGvsVideoId == request.mediaId -> "video"
-                    streamToken == authState.poTokenGvsSession -> "session"
                     else -> "other"
                 }
             Timber.tag("YoutubeiResolver").d(
@@ -218,7 +229,7 @@ class YoutubeiStreamRepository
                 )
             }
             return ResolvedAudioStream(
-                url = resolved.url,
+                url = sessionBoundUrl?.toString() ?: resolved.url,
                 requestHeaders = resolved.requestHeaders,
                 formatId = resolved.formatId,
                 mimeType = resolved.mimeType,
@@ -236,7 +247,14 @@ class YoutubeiStreamRepository
                 loudnessDb = resolved.loudnessDb,
                 perceptualLoudnessDb = resolved.perceptualLoudnessDb,
                 playbackTrackingUrl = resolved.playbackTrackingUrl,
+                gvsPoTokenBinding = gvsPoTokenBinding,
             )
+        }
+
+        internal fun reportRejectedGvsPoToken(authFingerprint: String, binding: GvsPoTokenBinding) {
+            gvsPoTokenBindings.reject(authFingerprint, binding)
+            Timber.tag("YoutubeiResolver").w("Stream rejected %s-bound PO token; preferring %s-bound token",
+                binding, gvsPoTokenBindings.preferred(authFingerprint))
         }
 
         suspend fun preWarm() {
@@ -297,4 +315,17 @@ class YoutubeiStreamRepository
 internal enum class StreamResolutionPriority {
     FOREGROUND,
     BACKGROUND,
+}
+
+// Vibra: duplicate failures for an old binding must not undo a newer preference.
+internal class GvsPoTokenPreferences {
+    private val bindings = java.util.concurrent.ConcurrentHashMap<String, GvsPoTokenBinding>()
+    fun preferred(fingerprint: String) = bindings[fingerprint] ?: GvsPoTokenBinding.VIDEO
+    fun reject(fingerprint: String, rejected: GvsPoTokenBinding) {
+        bindings.compute(fingerprint) { _, current ->
+            if ((current ?: GvsPoTokenBinding.VIDEO) == rejected) {
+                if (rejected == GvsPoTokenBinding.VIDEO) GvsPoTokenBinding.SESSION else GvsPoTokenBinding.VIDEO
+            } else current
+        }
+    }
 }

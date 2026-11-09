@@ -15,6 +15,7 @@
 package moe.rukamori.archivetune.ui.component
 
 import app.vibra.ui.motion.expansionElement
+import app.vibra.ui.shell.LocalPageFlight
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.compose.foundation.horizontalScroll
@@ -26,9 +27,11 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -99,8 +102,13 @@ public fun MediaDetailHero(
     // row would only repeat that menu. Screens without one (Spotify) keep them in the row.
     extraActionsInRow: Boolean = false,
     playlistId: String? = null,
+    isLoading: Boolean = false,
 ) {
     val menuState = LocalMenuState.current
+    val flight = LocalPageFlight.current
+    val openingPreview = flight?.openingMediaPreview()
+    val retainedArtwork = openingPreview?.let { preview -> remember(preview) { mutableStateOf(preview.painter) } }
+    val artworkSizePx = if (isLoading) openingPreview?.sizePx ?: MediaDetailHeroArtworkSizePx else MediaDetailHeroArtworkSizePx
     // Albums keep a rounded square (Figma 33:203); collections get the expressive pentagon
     // used by the playlist screen's "Shape Set".
     val coverShape: Shape = if (playlistId != null) app.vibra.ui.components.rememberPlaylistCoverShape(playlistId) else if (fallbackIcon == R.drawable.album) VibraShapes.AlbumCover else VibraShapes.Pentagon
@@ -121,12 +129,22 @@ public fun MediaDetailHero(
                     .aspectRatio(1f),
             contentAlignment = Alignment.Center,
         ) {
-            ArtworkGlow(url = thumbnailUrl, modifier = Modifier.fillMaxSize())
+            ArtworkGlow(
+                url = thumbnailUrl,
+                modifier = Modifier.fillMaxSize(),
+                visibility = {
+                    val progress = flight?.progress() ?: 1f
+                    ((progress - 0.70f) / 0.26f).coerceIn(0f, 1f)
+                },
+            )
             VibraArtwork(
                 url = thumbnailUrl,
                 shape = coverShape,
                 fallbackIcon = fallbackIcon,
-                sizePx = MediaDetailHeroArtworkSizePx,
+                sizePx = artworkSizePx,
+                placeholderSizePx = openingPreview?.takeIf { it.thumbnailUrl == thumbnailUrl && it.sizePx != artworkSizePx }?.sizePx,
+                primaryArtwork = true,
+                retainedPainter = retainedArtwork,
                 contentDescription = title,
                 modifier = Modifier.fillMaxSize(),
             )
@@ -148,8 +166,8 @@ public fun MediaDetailHero(
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 modifier =
-                    Modifier.expansionElement(title, "title")
-                        .padding(top = 16.dp)
+                    Modifier.padding(top = 16.dp)
+                        .expansionElement(title, "title", primary = true)
                         .semantics { heading() },
             )
 
@@ -189,7 +207,9 @@ public fun MediaDetailHero(
                 )
             }
 
-            MediaDetailPrimaryActions(
+            if (isLoading) {
+                Spacer(Modifier.height(MediaDetailActionSize + 28.dp))
+            } else MediaDetailPrimaryActions(
                 isAdded = isAdded,
                 contentColor = MaterialTheme.colorScheme.onPrimary,
                 contrastingColor = MaterialTheme.colorScheme.primary,

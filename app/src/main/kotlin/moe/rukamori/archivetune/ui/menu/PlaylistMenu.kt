@@ -9,6 +9,9 @@
 
 package moe.rukamori.archivetune.ui.menu
 
+import app.vibra.playback.lazyMediaItems
+import app.vibra.playback.metadataOf
+
 import android.content.Intent
 import android.content.res.Configuration
 import android.widget.Toast
@@ -467,7 +470,7 @@ public fun PlaylistMenu(
         },
         text = playNextText,
         onClick = {
-          coroutineScope.launch { playerConnection.playNext(songs.map { it.toMediaItem() }) }
+          coroutineScope.launch { playerConnection.playNext(songs.lazyMediaItems { metadataOf(it) }) }
           onDismiss()
         },
       ),
@@ -479,7 +482,7 @@ public fun PlaylistMenu(
         text = addToQueueText,
         onClick = {
           onDismiss()
-          playerConnection.addToQueue(songs.map { it.toMediaItem() })
+          playerConnection.addToQueue(songs.lazyMediaItems { metadataOf(it) })
         },
       ),
       playlist.playlist.browseId?.let { browseId ->

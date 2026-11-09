@@ -8,6 +8,8 @@
 package moe.rukamori.archivetune.db
 
 import app.vibra.library.PlaylistEdit
+import app.vibra.performance.sortedByArtistKey
+
 import androidx.room.Dao
 import androidx.room.Delete
 import androidx.room.Insert
@@ -260,11 +262,7 @@ interface DatabaseDao {
             ).map { songs ->
                 val collator = Collator.getInstance(Locale.getDefault())
                 collator.strength = Collator.PRIMARY
-                songs.sortedWith(
-                    compareBy(collator) { song ->
-                        song.artists.joinToString("") { artist -> artist.name }
-                    },
-                )
+                songs.sortedByArtistKey(collator) { song -> song.artists.joinToString("") { artist -> artist.name } }
             }
         }
 
@@ -328,6 +326,10 @@ interface DatabaseDao {
     fun likedSongsByCreateDateAsc(): Flow<List<Song>>
 
     @Transaction
+    @Query("SELECT * FROM song WHERE liked ORDER BY likedDate DESC, rowId DESC LIMIT :limit")
+    fun likedSongsPreview(limit: Int = 8): Flow<List<Song>>
+
+    @Transaction
     @Query("SELECT * FROM song WHERE liked ORDER BY title")
     fun likedSongsByNameAsc(): Flow<List<Song>>
 
@@ -375,11 +377,7 @@ interface DatabaseDao {
             ).map { songs ->
                 val collator = Collator.getInstance(Locale.getDefault())
                 collator.strength = Collator.PRIMARY
-                songs.sortedWith(
-                    compareBy(collator) { song ->
-                        song.artists.joinToString("") { artist -> artist.name }
-                    },
-                )
+                songs.sortedByArtistKey(collator) { song -> song.artists.joinToString("") { artist -> artist.name } }
             }
         }
 
@@ -1035,6 +1033,30 @@ interface DatabaseDao {
     @Transaction
     @SuppressWarnings(RoomWarnings.QUERY_MISMATCH)
     @Query(
+        """
+        SELECT artist.*,
+               (SELECT COUNT(1)
+                FROM library_song_artist_map
+                         JOIN song ON library_song_artist_map.songId = song.id
+                WHERE artistId = artist.id
+                  AND (song.inLibrary IS NOT NULL OR song.isLocal = 1)) AS songCount
+        FROM artist
+                 LEFT JOIN(SELECT artistId, SUM(totalPlayTime) AS totalPlayTime
+                      FROM library_song_artist_map
+                               JOIN song
+                                    ON library_song_artist_map.songId = song.id
+                      GROUP BY artistId
+                      ORDER BY totalPlayTime)
+                     ON artist.id = artistId
+        WHERE songCount > 0
+        ORDER BY COALESCE(totalPlayTime, 0) DESC, artist.rowId DESC LIMIT :limit
+    """,
+    )
+    fun artistsPreview(limit: Int = 8): Flow<List<Artist>>
+
+    @Transaction
+    @SuppressWarnings(RoomWarnings.QUERY_MISMATCH)
+    @Query(
         "SELECT *, (SELECT COUNT(1) FROM library_song_artist_map JOIN song ON library_song_artist_map.songId = song.id WHERE artistId = artist.id AND (song.inLibrary IS NOT NULL OR song.isLocal = 1)) AS songCount FROM artist WHERE bookmarkedAt IS NOT NULL ORDER BY bookmarkedAt",
     )
     fun artistsBookmarkedByCreateDateAsc(): Flow<List<Artist>>
@@ -1163,6 +1185,21 @@ interface DatabaseDao {
 
     @Transaction
     @SuppressWarnings(RoomWarnings.QUERY_MISMATCH)
+    @Query(
+        """
+        SELECT album.*
+        FROM album
+                 JOIN song
+                      ON song.albumId = album.id
+        WHERE EXISTS(SELECT * FROM song WHERE song.albumId = album.id AND (song.inLibrary IS NOT NULL OR song.isLocal = 1))
+        GROUP BY album.id
+        ORDER BY SUM(song.totalPlayTime) DESC, album.rowId DESC LIMIT :limit
+    """,
+    )
+    fun albumsPreview(limit: Int = 8): Flow<List<Album>>
+
+    @Transaction
+    @SuppressWarnings(RoomWarnings.QUERY_MISMATCH)
     @Query("SELECT * FROM album WHERE bookmarkedAt IS NOT NULL ORDER BY rowId")
     fun albumsLikedByCreateDateAsc(): Flow<List<Album>>
 
@@ -1221,7 +1258,7 @@ interface DatabaseDao {
             albumsByCreateDateAsc().map { albums ->
                 val collator = Collator.getInstance(Locale.getDefault())
                 collator.strength = Collator.PRIMARY
-                albums.sortedWith(compareBy(collator) { album -> album.artists.joinToString("") { artist -> artist.name } })
+                albums.sortedByArtistKey(collator) { album -> album.artists.joinToString("") { artist -> artist.name } }
             }
         }
 
@@ -1264,7 +1301,7 @@ interface DatabaseDao {
             albumsLikedByCreateDateAsc().map { albums ->
                 val collator = Collator.getInstance(Locale.getDefault())
                 collator.strength = Collator.PRIMARY
-                albums.sortedWith(compareBy(collator) { album -> album.artists.joinToString("") { artist -> artist.name } })
+                albums.sortedByArtistKey(collator) { album -> album.artists.joinToString("") { artist -> artist.name } }
             }
         }
 
@@ -1354,7 +1391,7 @@ interface DatabaseDao {
                 albumsByRowId(ids).map { albums ->
                     val collator = Collator.getInstance(java.util.Locale.getDefault())
                     collator.strength = Collator.PRIMARY
-                    albums.sortedWith(compareBy(collator) { album -> album.artists.joinToString("") { artist -> artist.name } })
+                    albums.sortedByArtistKey(collator) { album -> album.artists.joinToString("") { artist -> artist.name } }
                 }
             }
 

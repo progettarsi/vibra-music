@@ -9,6 +9,9 @@
 
 package moe.rukamori.archivetune.ui.screens.playlist
 
+import app.vibra.playback.lazyMediaItems
+import app.vibra.playback.metadataOf
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -76,7 +79,6 @@ import moe.rukamori.archivetune.constants.AutoPlaylistSongSortDescendingKey
 import moe.rukamori.archivetune.constants.AutoPlaylistSongSortType
 import moe.rukamori.archivetune.constants.AutoPlaylistSongSortTypeKey
 import moe.rukamori.archivetune.constants.YtmSyncKey
-import moe.rukamori.archivetune.extensions.toMediaItem
 import moe.rukamori.archivetune.extensions.togglePlayPause
 import moe.rukamori.archivetune.playback.queues.ListQueue
 import moe.rukamori.archivetune.ui.component.DefaultDialog
@@ -331,7 +333,7 @@ fun AutoPlaylistScreen(
                                 playerConnection.playQueue(
                                     ListQueue(
                                         title = playlist,
-                                        items = songs.shuffled().map { it.toMediaItem() },
+                                        items = songs.shuffled().lazyMediaItems { metadataOf(it) },
                                     ),
                                 )
                             },
@@ -339,7 +341,7 @@ fun AutoPlaylistScreen(
                                 playerConnection.playQueue(
                                     ListQueue(
                                         title = playlist,
-                                        items = songs.map { it.toMediaItem() },
+                                        items = songs.lazyMediaItems { metadataOf(it) },
                                     ),
                                 )
                             },
@@ -481,7 +483,7 @@ fun AutoPlaylistScreen(
                                                 playerConnection.playQueue(
                                                     ListQueue(
                                                         title = playlist,
-                                                        items = visibleSongs.map { it.toMediaItem() },
+                                                        items = visibleSongs.lazyMediaItems { metadataOf(it) },
                                                         startIndex = index,
                                                     ),
                                                 )

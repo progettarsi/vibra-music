@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import app.vibra.ui.motion.VibraFilledTonalButton as FilledTonalButton
@@ -61,12 +62,20 @@ inline fun <reified T : Enum<T>> SortHeader(
         label = "SortHeaderDirection",
     )
 
+    // Sorting is a setting, not an action: a neutral surface, so it never reads as a fourth
+    // button next to Play / Shuffle.
+    val neutralColors =
+        ButtonDefaults.filledTonalButtonColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+        )
     Box(modifier = modifier.padding(vertical = 8.dp)) {
         if (showSortDirection) {
             SplitButtonLayout(
                 leadingButton = {
                     SplitButtonDefaults.TonalLeadingButton(
                         onClick = { menuExpanded = true },
+                        colors = neutralColors,
                         modifier = Modifier.heightIn(min = SplitButtonDefaults.MediumContainerHeight),
                     ) {
                         Text(
@@ -80,6 +89,7 @@ inline fun <reified T : Enum<T>> SortHeader(
                     SplitButtonDefaults.TonalTrailingButton(
                         checked = sortDescending,
                         onCheckedChange = onSortDescendingChange,
+                        colors = neutralColors,
                         modifier =
                             Modifier
                                 .heightIn(min = SplitButtonDefaults.MediumContainerHeight)
@@ -106,6 +116,7 @@ inline fun <reified T : Enum<T>> SortHeader(
         } else {
             FilledTonalButton(
                 onClick = { menuExpanded = true },
+                colors = neutralColors,
                 modifier = Modifier.heightIn(min = SplitButtonDefaults.MediumContainerHeight),
             ) {
                 Text(

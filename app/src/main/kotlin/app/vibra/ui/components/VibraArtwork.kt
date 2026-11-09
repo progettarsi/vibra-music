@@ -7,6 +7,7 @@ package app.vibra.ui.components
 
 import app.vibra.ui.motion.expansionElement
 import app.vibra.ui.motion.ExpansionArtworkContent
+import app.vibra.ui.shell.LocalPageFlight
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -15,6 +16,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -23,13 +26,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import coil3.compose.AsyncImage
 import coil3.compose.LocalPlatformContext
 import coil3.request.ImageRequest
+import coil3.request.crossfade
 import moe.rukamori.archivetune.R
+import moe.rukamori.archivetune.ui.utils.YtimgResizePolicy
 import moe.rukamori.archivetune.ui.utils.resize
 
 /**
@@ -43,6 +50,8 @@ import moe.rukamori.archivetune.ui.utils.resize
  * @param placeholderSizePx decode size of a smaller copy of the same cover that is probably
  *        already in memory (e.g. [SmallArtworkPx] from the mini-player): it is shown at once
  *        while the large one loads, so a cover that grows never blinks empty.
+ * @param containerColor colour shown inside the artwork shape while the image loads.
+ * @param retainedPainter last visible cover for this item, also used while a replacement loads.
  * @param onLoaded called once the requested image (not the placeholder) is drawn.
  */
 @Composable
@@ -54,24 +63,49 @@ fun VibraArtwork(
     sizePx: Int = 544,
     placeholderSizePx: Int? = null,
     @DrawableRes fallbackIcon: Int = R.drawable.music_note,
+    containerColor: Color = Color.Transparent,
+    primaryArtwork: Boolean = false,
+    ytimgResizePolicy: YtimgResizePolicy = YtimgResizePolicy.AllowAnyAspect,
+    retainedPainter: MutableState<Painter?>? = null,
     onLoaded: (() -> Unit)? = null,
 ) {
     val context = LocalPlatformContext.current
-    var failed by remember(url) { mutableStateOf(false) }
-    Box(modifier = modifier.expansionElement(url, "artwork", url?.let { ExpansionArtworkContent(it, shape) }).clip(shape), contentAlignment = Alignment.Center) {
-        if (url.isNullOrBlank() || failed) {
+    val previous = retainedPainter?.value
+    val transferPainter = LocalPageFlight.current?.let { remember(url, sizePx) { mutableStateOf<Painter?>(previous) } }
+    var failed by remember(url, sizePx) { mutableStateOf(false) }
+    if (retainedPainter != null && url.isNullOrBlank()) {
+        LaunchedEffect(retainedPainter) { retainedPainter.value = null }
+    }
+    Box(
+        modifier =
+            modifier
+                .expansionElement(
+                    url, "artwork",
+                    url?.let { ExpansionArtworkContent(it, shape, sizePx, containerColor, contentDescription, transferPainter) },
+                    primary = primaryArtwork,
+                )
+                .clip(shape)
+                .background(containerColor),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (url.isNullOrBlank() || (failed && previous == null)) {
             ArtworkPlaceholder(fallbackIcon)
         } else {
             val model =
-                remember(url, sizePx, placeholderSizePx) {
-                    val resized = url.resize(sizePx, sizePx)
-                    if (placeholderSizePx == null) {
+                remember(context, url, sizePx, placeholderSizePx, ytimgResizePolicy, retainedPainter) {
+                    val resized = url.resize(sizePx, sizePx, ytimgResizePolicy = ytimgResizePolicy)
+                    if (placeholderSizePx == null && retainedPainter == null) {
                         resized
                     } else {
                         ImageRequest
                             .Builder(context)
                             .data(resized)
-                            .placeholderMemoryCacheKey(url.resize(placeholderSizePx, placeholderSizePx))
+                            .apply {
+                                if (placeholderSizePx != null) {
+                                    placeholderMemoryCacheKey(url.resize(placeholderSizePx, placeholderSizePx, ytimgResizePolicy = ytimgResizePolicy))
+                                }
+                                if (retainedPainter != null) crossfade(false)
+                            }
                             .build()
                     }
                 }
@@ -79,8 +113,14 @@ fun VibraArtwork(
                 model = model,
                 contentDescription = contentDescription,
                 contentScale = ContentScale.Crop,
+                placeholder = previous,
+                error = previous,
                 onError = { failed = true },
-                onSuccess = onLoaded?.let { callback -> { callback() } },
+                onSuccess = { result ->
+                    transferPainter?.value = result.painter
+                    if (retainedPainter != null) retainedPainter.value = result.painter
+                    onLoaded?.invoke()
+                },
                 modifier = Modifier.fillMaxSize(),
             )
         }

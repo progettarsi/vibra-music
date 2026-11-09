@@ -30,6 +30,9 @@ interface CastPlaybackRepository {
         mediaItemResolver: CastMediaItemResolver,
     ): Player
 
+    /** A bounded contiguous backend projection; local playback keeps the requested window. */
+    fun playbackWindow(items: List<MediaItem>, currentIndex: Int): List<MediaItem> = items
+
     fun disconnect()
 
     fun setVolume(volume: Float)

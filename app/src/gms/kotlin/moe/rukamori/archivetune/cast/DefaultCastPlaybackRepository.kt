@@ -9,6 +9,10 @@
 
 package moe.rukamori.archivetune.cast
 
+import android.os.Bundle
+import app.vibra.playback.ProgressivePlayer
+import app.vibra.playback.boundedWindowRange
+import org.json.JSONObject
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
@@ -90,6 +94,7 @@ class DefaultCastPlaybackRepository(
         )
     private var castContext: CastContext? = null
     private var listenerRegistered = false
+    private var queueConverter: GmsCastMediaItemConverter? = null
 
     override val screenState: StateFlow<CastScreenState> = mutableScreenState
 
@@ -109,6 +114,7 @@ class DefaultCastPlaybackRepository(
                 mediaItemResolver = mediaItemResolver,
                 localMediaServer = localMediaServer,
             )
+        queueConverter = converter
         val remotePlayer =
             RemoteCastPlayer
                 .Builder(context.applicationContext)
@@ -120,6 +126,16 @@ class DefaultCastPlaybackRepository(
             .setRemotePlayer(remotePlayer)
             .setTransferCallback(SafeCastTransferCallback(localPlayer, converter))
             .build()
+    }
+
+    override fun playbackWindow(items: List<MediaItem>, currentIndex: Int): List<MediaItem> {
+        val converter = queueConverter ?: return items
+        if (castContext?.sessionManager?.currentCastSession?.isConnected != true || items.isEmpty()) return items
+        val range = boundedWindowRange(items.size, currentIndex, MaxCastTransferItems,
+            MaxCastTransferPayloadBytes, CastTransferMessageOverheadBytes) { index ->
+            converter.estimatedSerializedCastItemBytes(items[index])
+        }
+        return items.subList(range.first, range.last + 1)
     }
 
     override fun disconnect() {
@@ -309,7 +325,9 @@ private class SafeCastTransferCallback(
                     it.localConfiguration != null &&
                         mediaItem.mediaId.isNotBlank() &&
                         mediaItem.mediaId != MediaItem.DEFAULT_MEDIA_ID &&
-                        it.mediaId == mediaItem.mediaId
+                        it.mediaId == mediaItem.mediaId &&
+                        (mediaItem.mediaMetadata.extras?.getLong(ProgressivePlayer.ENTRY_UID, -1L)?.takeIf { id -> id != -1L }
+                            ?.let { id -> it.mediaMetadata.extras?.getLong(ProgressivePlayer.ENTRY_UID, -1L) == id } != false)
                 }
                     ?: localItems.getOrNull(sourceIndex)?.takeIf {
                         it.localConfiguration != null &&
@@ -338,7 +356,8 @@ private class SafeCastTransferCallback(
             }
         val matchingTransferWindow =
             transferWindow?.takeIf {
-                it.originalItemCount == localItems.size &&
+                localItems.none { item -> item.mediaMetadata.extras?.containsKey(ProgressivePlayer.ENTRY_UID) == true } &&
+                    it.originalItemCount == localItems.size &&
                     it.startIndex in 0..localItems.size &&
                     it.endIndexExclusive in it.startIndex..localItems.size
             }
@@ -412,24 +431,38 @@ private class GmsCastMediaItemConverter(
 
     override fun toMediaQueueItem(mediaItem: MediaItem): MediaQueueItem {
         val castMediaItem = mediaItem.withCompactCastMetadata().resolveForReceiver()
-        return delegate.toMediaQueueItem(castMediaItem)
+        return withOccurrence(delegate.toMediaQueueItem(castMediaItem), mediaItem)
     }
 
     fun estimatedSerializedCastItemBytes(mediaItem: MediaItem): Int =
         delegate
             .toMediaQueueItem(mediaItem.withCompactCastMetadata())
+            .let { withOccurrence(it, mediaItem) }
             .toJson()
             .toString()
             .toByteArray(Charsets.UTF_8)
             .size + CastMediaItemResolutionOverheadBytes
 
-    override fun toMediaItem(mediaQueueItem: MediaQueueItem): MediaItem =
-        try {
+    private fun withOccurrence(item: MediaQueueItem, source: MediaItem): MediaQueueItem {
+        val uid = source.mediaMetadata.extras?.getLong(ProgressivePlayer.ENTRY_UID, -1L) ?: -1L
+        if (uid == -1L) return item
+        val custom = item.customData?.let { JSONObject(it.toString()) } ?: JSONObject()
+        // A decimal string preserves the full Long through the receiver's JavaScript JSON.
+        custom.put(ProgressivePlayer.ENTRY_UID, uid.toString())
+        return MediaQueueItem.Builder(item).setCustomData(custom).build()
+    }
+
+    override fun toMediaItem(mediaQueueItem: MediaQueueItem): MediaItem {
+        val item = try {
             delegate.toMediaItem(mediaQueueItem)
         } catch (error: RuntimeException) {
             Timber.tag("Cast").w(error, "Falling back to manual Cast media item conversion")
             mediaQueueItem.toFallbackMediaItem()
         }
+        val uid = mediaQueueItem.customData?.optString(ProgressivePlayer.ENTRY_UID)?.toLongOrNull() ?: return item
+        val extras = Bundle(item.mediaMetadata.extras ?: Bundle()).apply { putLong(ProgressivePlayer.ENTRY_UID, uid) }
+        return item.buildUpon().setMediaMetadata(item.mediaMetadata.buildUpon().setExtras(extras).build()).build()
+    }
 
     private fun MediaItem.withCompactCastMetadata(): MediaItem {
         val metadata = mediaMetadata

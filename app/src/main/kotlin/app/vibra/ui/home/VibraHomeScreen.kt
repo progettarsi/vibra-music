@@ -287,10 +287,10 @@ private fun VibraLogo(
 private const val LogoKey = "logo"
 
 /** Space above the logo, inside its row. */
-private val LogoTopGap = 8.dp
+private val LogoTopGap = 2.dp
 
 /** The logo's row: gap above, the wave, gap below. */
-private val LogoRowHeight = LogoTopGap + 35.dp + 12.dp
+private val LogoRowHeight = LogoTopGap + 35.dp + 18.dp
 
 /** Turns the home pipeline's data into relevance-weighted blocks. */
 @Composable

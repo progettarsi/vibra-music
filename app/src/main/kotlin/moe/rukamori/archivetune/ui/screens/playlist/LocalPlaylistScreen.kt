@@ -9,6 +9,9 @@
 
 package moe.rukamori.archivetune.ui.screens.playlist
 
+import app.vibra.playback.lazyMediaItems
+import app.vibra.playback.metadataOf
+
 import android.annotation.SuppressLint
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -102,7 +105,6 @@ import moe.rukamori.archivetune.constants.PlaylistSongSortType
 import moe.rukamori.archivetune.constants.SwipeToSongKey
 import moe.rukamori.archivetune.db.entities.PlaylistSong
 import moe.rukamori.archivetune.extensions.move
-import moe.rukamori.archivetune.extensions.toMediaItem
 import moe.rukamori.archivetune.extensions.togglePlayPause
 import moe.rukamori.archivetune.innertube.YouTube
 import moe.rukamori.archivetune.innertube.models.WatchEndpoint
@@ -120,6 +122,7 @@ import moe.rukamori.archivetune.ui.component.IconButton
 import moe.rukamori.archivetune.ui.component.LocalMenuState
 import moe.rukamori.archivetune.ui.component.MediaDetailAction
 import moe.rukamori.archivetune.ui.component.MediaDetailHero
+import app.vibra.ui.shell.LocalPageFlight
 import moe.rukamori.archivetune.ui.component.MediaDetailIconAction
 import moe.rukamori.archivetune.ui.component.SongListItem
 import moe.rukamori.archivetune.ui.component.SortHeader
@@ -526,6 +529,7 @@ fun LocalPlaylistScreen(
     }
 
     val surfaceColor = MaterialTheme.colorScheme.surface
+    val openingPreview = LocalPageFlight.current?.openingMediaPreview()
 
     val transparentAppBar by remember {
         derivedStateOf {
@@ -582,6 +586,193 @@ fun LocalPlaylistScreen(
                     }
                 }
             }
+            val headerPlaylist = playlist?.takeUnless { it.songCount == 0 && it.playlist.remoteSongCount == 0 }
+            if (!isSearching && (headerPlaylist != null || playlist == null && openingPreview != null)) {
+                item(key = "header") {
+                    val metadata = headerPlaylist?.let { loaded ->
+                        val songCount =
+                            if (
+                                loaded.songCount == 0 &&
+                                loaded.playlist.remoteSongCount != null
+                            ) {
+                                loaded.playlist.remoteSongCount
+                            } else {
+                                loaded.songCount
+                            }
+                        listOfNotNull(
+                            pluralStringResource(
+                                R.plurals.n_song,
+                                songCount,
+                                songCount,
+                            ),
+                            playlistLength
+                                .takeIf { it > 0 }
+                                ?.let { makeTimeString(it * 1000L) },
+                        ).joinToString(MediaDetailMetadataSeparator)
+                    }
+                    val isBookmarked = headerPlaylist?.playlist?.bookmarkedAt != null
+
+                    MediaDetailHero(
+                        playlistId = viewModel.playlistId,
+                        title = headerPlaylist?.playlist?.name ?: requireNotNull(openingPreview).title,
+                        thumbnailUrl =
+                            if (headerPlaylist != null) headerPlaylist.playlist.thumbnailUrl ?: headerPlaylist.thumbnails.firstOrNull()
+                            else openingPreview?.thumbnailUrl,
+                        isLoading = headerPlaylist == null,
+                        fallbackIcon = R.drawable.queue_music,
+                        systemBarsTopPadding = systemBarsTopPadding,
+                        metadata = metadata,
+                        isAdded = isBookmarked,
+                        addContentDescription = R.string.add_to_library,
+                        removeContentDescription = R.string.remove_from_library,
+                        onShuffle =
+                            if (headerPlaylist == null || songs.isEmpty()) {
+                                null
+                            } else {
+                                {
+                                    playerConnection.playQueue(
+                                        ListQueue(
+                                            title = headerPlaylist.playlist.name,
+                                            items =
+                                                songs
+                                                    .shuffled()
+                                                    .lazyMediaItems { metadataOf(it.song) },
+                                        ),
+                                    )
+                                }
+                            },
+                        onPlay =
+                            if (headerPlaylist == null || songs.isEmpty()) {
+                                null
+                            } else {
+                                {
+                                    playerConnection.playQueue(
+                                        ListQueue(
+                                            title = headerPlaylist.playlist.name,
+                                            items = songs.lazyMediaItems { metadataOf(it.song) },
+                                        ),
+                                    )
+                                }
+                            },
+                        onToggleAdd = headerPlaylist?.let { loaded -> { libraryActions.togglePlaylist(loaded.playlist) } },
+                        additionalPrimaryActions = { contentColor ->
+                            val loaded = headerPlaylist ?: return@MediaDetailHero
+                            if (editable) {
+                                MediaDetailIconAction(
+                                    icon = R.drawable.delete,
+                                    contentDescription = R.string.delete,
+                                    contentColor = contentColor,
+                                    onClick = { showDeletePlaylistDialog = true },
+                                    isDestructive = true,
+                                )
+                            }
+
+                            if (songs.isNotEmpty()) {
+                                MediaDetailAction(
+                                    contentDescription =
+                                        if (downloadState == HeaderDownloadState.Completed) {
+                                            R.string.remove_download
+                                        } else {
+                                            R.string.download
+                                        },
+                                    contentColor = contentColor,
+                                    onClick = {
+                                        when (downloadState) {
+                                            HeaderDownloadState.Completed -> {
+                                                showRemoveDownloadDialog = true
+                                            }
+                                            is HeaderDownloadState.Partial -> {
+                                                sendRemoveDownloads(
+                                                    context = context,
+                                                    songIds = songs.map { it.song.id },
+                                                    downloads = downloads,
+                                                )
+                                            }
+                                            HeaderDownloadState.None -> {
+                                                sendAddMissingDownloads(
+                                                    context = context,
+                                                    songs =
+                                                        songs.map {
+                                                            HeaderDownloadItem(
+                                                                id = it.song.id,
+                                                                title = it.song.song.title,
+                                                            )
+                                                        },
+                                                    downloads = downloads,
+                                                )
+                                            }
+                                        }
+                                    },
+                                ) {
+                                    when (val state = downloadState) {
+                                        HeaderDownloadState.Completed -> {
+                                            Icon(
+                                                painter = painterResource(R.drawable.offline),
+                                                contentDescription = null,
+                                                modifier = Modifier.size(22.dp),
+                                            )
+                                        }
+                                        is HeaderDownloadState.Partial -> {
+                                            HeaderDownloadProgressIndicator(
+                                                progress = state.progress,
+                                                paused = state.paused,
+                                                icon = R.drawable.download,
+                                            )
+                                        }
+                                        HeaderDownloadState.None -> {
+                                            Icon(
+                                                painter = painterResource(R.drawable.download),
+                                                contentDescription = null,
+                                                modifier = Modifier.size(22.dp),
+                                            )
+                                        }
+                                    }
+                                }
+
+                                MediaDetailIconAction(
+                                    icon = R.drawable.radio,
+                                    contentDescription = R.string.start_radio,
+                                    contentColor = contentColor,
+                                    onClick = {
+                                        val browseId = loaded.playlist.browseId
+                                        if (browseId != null) {
+                                            playerConnection.playQueue(
+                                                YouTubeQueue(
+                                                    WatchEndpoint(
+                                                        playlistId = "RDAMPL$browseId",
+                                                        params =
+                                                            loaded.playlist
+                                                                .radioEndpointParams,
+                                                    ),
+                                                ),
+                                            )
+                                        } else {
+                                            playerConnection.playQueue(
+                                                LocalMixQueue(
+                                                    database = database,
+                                                    playlistId = loaded.id,
+                                                    maxMixSize = 50,
+                                                ),
+                                            )
+                                        }
+                                    },
+                                )
+                            }
+
+                            if (editable) {
+                                MediaDetailIconAction(
+                                    icon = R.drawable.edit,
+                                    contentDescription = R.string.edit_playlist,
+                                    contentColor = contentColor,
+                                    onClick = { showEditDialog = true },
+                                )
+                            }
+                        },
+                        modifier = Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null),
+                    )
+                }
+            }
+
             playlist?.let { playlist ->
                 if (playlist.songCount == 0 && playlist.playlist.remoteSongCount == 0) {
                     item {
@@ -591,191 +782,6 @@ fun LocalPlaylistScreen(
                         )
                     }
                 } else {
-                    if (!isSearching) {
-                        item(key = "header") {
-                            val songCount =
-                                if (
-                                    playlist.songCount == 0 &&
-                                    playlist.playlist.remoteSongCount != null
-                                ) {
-                                    playlist.playlist.remoteSongCount
-                                } else {
-                                    playlist.songCount
-                                }
-                            val metadata =
-                                listOfNotNull(
-                                    pluralStringResource(
-                                        R.plurals.n_song,
-                                        songCount,
-                                        songCount,
-                                    ),
-                                    playlistLength
-                                        .takeIf { it > 0 }
-                                        ?.let { makeTimeString(it * 1000L) },
-                                ).joinToString(MediaDetailMetadataSeparator)
-                            val isBookmarked = playlist.playlist.bookmarkedAt != null
-
-                            MediaDetailHero(
-                                playlistId = playlist.id,
-                                title = playlist.playlist.name,
-                                thumbnailUrl =
-                                    playlist.playlist.thumbnailUrl
-                                        ?: playlist.thumbnails.firstOrNull(),
-                                fallbackIcon = R.drawable.queue_music,
-                                systemBarsTopPadding = systemBarsTopPadding,
-                                metadata = metadata,
-                                isAdded = isBookmarked,
-                                addContentDescription = R.string.add_to_library,
-                                removeContentDescription = R.string.remove_from_library,
-                                onShuffle =
-                                    if (songs.isEmpty()) {
-                                        null
-                                    } else {
-                                        {
-                                            playerConnection.playQueue(
-                                                ListQueue(
-                                                    title = playlist.playlist.name,
-                                                    items =
-                                                        songs
-                                                            .shuffled()
-                                                            .map { it.song.toMediaItem() },
-                                                ),
-                                            )
-                                        }
-                                    },
-                                onPlay =
-                                    if (songs.isEmpty()) {
-                                        null
-                                    } else {
-                                        {
-                                            playerConnection.playQueue(
-                                                ListQueue(
-                                                    title = playlist.playlist.name,
-                                                    items = songs.map { it.song.toMediaItem() },
-                                                ),
-                                            )
-                                        }
-                                    },
-                                onToggleAdd = {
-                                    libraryActions.togglePlaylist(playlist.playlist)
-                                },
-                                additionalPrimaryActions = { contentColor ->
-                                    if (editable) {
-                                        MediaDetailIconAction(
-                                            icon = R.drawable.delete,
-                                            contentDescription = R.string.delete,
-                                            contentColor = contentColor,
-                                            onClick = { showDeletePlaylistDialog = true },
-                                            isDestructive = true,
-                                        )
-                                    }
-
-                                    if (songs.isNotEmpty()) {
-                                        MediaDetailAction(
-                                            contentDescription =
-                                                if (downloadState == HeaderDownloadState.Completed) {
-                                                    R.string.remove_download
-                                                } else {
-                                                    R.string.download
-                                                },
-                                            contentColor = contentColor,
-                                            onClick = {
-                                                when (downloadState) {
-                                                    HeaderDownloadState.Completed -> {
-                                                        showRemoveDownloadDialog = true
-                                                    }
-                                                    is HeaderDownloadState.Partial -> {
-                                                        sendRemoveDownloads(
-                                                            context = context,
-                                                            songIds = songs.map { it.song.id },
-                                                            downloads = downloads,
-                                                        )
-                                                    }
-                                                    HeaderDownloadState.None -> {
-                                                        sendAddMissingDownloads(
-                                                            context = context,
-                                                            songs =
-                                                                songs.map {
-                                                                    HeaderDownloadItem(
-                                                                        id = it.song.id,
-                                                                        title = it.song.song.title,
-                                                                    )
-                                                                },
-                                                            downloads = downloads,
-                                                        )
-                                                    }
-                                                }
-                                            },
-                                        ) {
-                                            when (val state = downloadState) {
-                                                HeaderDownloadState.Completed -> {
-                                                    Icon(
-                                                        painter = painterResource(R.drawable.offline),
-                                                        contentDescription = null,
-                                                        modifier = Modifier.size(22.dp),
-                                                    )
-                                                }
-                                                is HeaderDownloadState.Partial -> {
-                                                    HeaderDownloadProgressIndicator(
-                                                        progress = state.progress,
-                                                        paused = state.paused,
-                                                        icon = R.drawable.download,
-                                                    )
-                                                }
-                                                HeaderDownloadState.None -> {
-                                                    Icon(
-                                                        painter = painterResource(R.drawable.download),
-                                                        contentDescription = null,
-                                                        modifier = Modifier.size(22.dp),
-                                                    )
-                                                }
-                                            }
-                                        }
-
-                                        MediaDetailIconAction(
-                                            icon = R.drawable.radio,
-                                            contentDescription = R.string.start_radio,
-                                            contentColor = contentColor,
-                                            onClick = {
-                                                val browseId = playlist.playlist.browseId
-                                                if (browseId != null) {
-                                                    playerConnection.playQueue(
-                                                        YouTubeQueue(
-                                                            WatchEndpoint(
-                                                                playlistId = "RDAMPL$browseId",
-                                                                params =
-                                                                    playlist.playlist
-                                                                        .radioEndpointParams,
-                                                            ),
-                                                        ),
-                                                    )
-                                                } else {
-                                                    playerConnection.playQueue(
-                                                        LocalMixQueue(
-                                                            database = database,
-                                                            playlistId = playlist.id,
-                                                            maxMixSize = 50,
-                                                        ),
-                                                    )
-                                                }
-                                            },
-                                        )
-                                    }
-
-                                    if (editable) {
-                                        MediaDetailIconAction(
-                                            icon = R.drawable.edit,
-                                            contentDescription = R.string.edit_playlist,
-                                            contentColor = contentColor,
-                                            onClick = { showEditDialog = true },
-                                        )
-                                    }
-                                },
-                                modifier = Modifier.animateItem(),
-                            )
-                        }
-                    }
-
                     if (!isSearching) {
                         // Sort Header
                         item(key = "sort_header") {
@@ -860,7 +866,7 @@ fun LocalPlaylistScreen(
                                                     playerConnection.playQueue(
                                                         ListQueue(
                                                             title = playlist!!.playlist.name,
-                                                            items = songs.map { it.song.toMediaItem() },
+                                                            items = songs.lazyMediaItems { metadataOf(it.song) },
                                                             startIndex = songs.indexOfFirst { it.map.id == song.map.id },
                                                         ),
                                                     )
@@ -1015,7 +1021,7 @@ fun LocalPlaylistScreen(
                                                         playerConnection.playQueue(
                                                             ListQueue(
                                                                 title = playlist!!.playlist.name,
-                                                                items = songs.map { it.song.toMediaItem() },
+                                                                items = songs.lazyMediaItems { metadataOf(it.song) },
                                                                 startIndex = index,
                                                             ),
                                                         )

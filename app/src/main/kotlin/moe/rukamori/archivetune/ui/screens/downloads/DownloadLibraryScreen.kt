@@ -9,6 +9,9 @@
 
 package moe.rukamori.archivetune.ui.screens.downloads
 
+import app.vibra.playback.lazyMediaItems
+import app.vibra.playback.metadataOf
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Spring
@@ -99,7 +102,6 @@ import moe.rukamori.archivetune.R
 import moe.rukamori.archivetune.downloads.DownloadEntryUiModel
 import moe.rukamori.archivetune.downloads.DownloadMediaType
 import moe.rukamori.archivetune.downloads.DownloadSectionUiModel
-import moe.rukamori.archivetune.extensions.toMediaItem
 import moe.rukamori.archivetune.playback.queues.ListQueue
 import moe.rukamori.archivetune.ui.component.EmptyPlaceholder
 import moe.rukamori.archivetune.ui.utils.backToMain
@@ -137,7 +139,7 @@ fun DownloadLibraryScreen(
                     playerConnection?.playQueue(
                         ListQueue(
                             title = event.metadata.title,
-                            items = event.queue.map { metadata -> metadata.toMediaItem() },
+                            items = event.queue.lazyMediaItems { metadata -> metadataOf(metadata) },
                             startIndex = event.startIndex,
                         ),
                     )

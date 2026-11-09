@@ -7,6 +7,9 @@
 
 package moe.rukamori.archivetune.viewmodels
 
+import app.vibra.playback.lazyMediaItems
+import app.vibra.playback.metadataOf
+
 import android.content.Context
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
@@ -25,7 +28,6 @@ import moe.rukamori.archivetune.constants.HideExplicitKey
 import moe.rukamori.archivetune.constants.HideVideoKey
 import moe.rukamori.archivetune.db.MusicDatabase
 import moe.rukamori.archivetune.extensions.filterBlockedArtists
-import moe.rukamori.archivetune.extensions.toMediaItem
 import moe.rukamori.archivetune.innertube.YouTube
 import moe.rukamori.archivetune.innertube.models.AlbumItem
 import moe.rukamori.archivetune.innertube.models.PlaylistItem
@@ -115,7 +117,7 @@ class YouTubeBrowseViewModel
                     if (songs.isEmpty()) {
                         unavailable()
                     } else {
-                        player.playQueue(ListQueue(title = page.title, items = songs.map { it.toMediaItem() }))
+                        player.playQueue(ListQueue(title = page.title, items = songs.lazyMediaItems { metadataOf(it) }))
                     }
                 } catch (e: CancellationException) {
                     throw e

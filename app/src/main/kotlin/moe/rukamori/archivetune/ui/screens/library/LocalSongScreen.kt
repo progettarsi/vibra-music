@@ -7,6 +7,8 @@
 
 package moe.rukamori.archivetune.ui.screens.library
 
+import app.vibra.playback.lazyMediaItems
+import app.vibra.playback.metadataOf
 // Vibra: independent radii follow the global rounding style.
 import app.vibra.ui.theme.adaptiveRoundedCornerShape
 
@@ -113,7 +115,6 @@ import moe.rukamori.archivetune.constants.LocalSongsIncludedFoldersKey
 import moe.rukamori.archivetune.constants.LocalSongsMinDurationSecondsKey
 import moe.rukamori.archivetune.constants.LocalSongsSortDescendingKey
 import moe.rukamori.archivetune.constants.LocalSongsSortTypeKey
-import moe.rukamori.archivetune.extensions.toMediaItem
 import moe.rukamori.archivetune.extensions.togglePlayPause
 import moe.rukamori.archivetune.localmedia.LocalSongScanConfig
 import moe.rukamori.archivetune.playback.queues.ListQueue
@@ -291,7 +292,7 @@ fun LocalSongScreen(
         }
     }
 
-    val queueItems = remember(visibleSongs) { visibleSongs.map { it.toMediaItem() } }
+    val queueItems = remember(visibleSongs) { visibleSongs.lazyMediaItems { metadataOf(it) } }
 
     if (showScanSheet) {
         LocalSongScanSheet(

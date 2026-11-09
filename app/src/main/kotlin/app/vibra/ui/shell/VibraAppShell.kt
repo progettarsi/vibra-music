@@ -241,6 +241,9 @@ fun VibraAppShell(
             )
         }
 
+        // The flight belongs to the page and stays below search, the dock and the player.
+        app.vibra.ui.motion.ExpansionOverlay(pageMotion.expansion, offset = { shellOffset })
+
         // ── Search overlay: rises from the dock while the search pill is open ──────────
         AnimatedVisibility(
             visible = dock.mode == DockMode.Search,
@@ -325,7 +328,6 @@ fun VibraAppShell(
         }
 
         // ── Profile picture in flight (above pages and dock, below the player) ───────────
-        app.vibra.ui.motion.ExpansionOverlay(pageMotion.expansion, offset = { shellOffset })
         AvatarFlightOverlay(flight = avatarFlight, shellOffset = { shellOffset })
 
         // ── Full player (on top of everything while open) ─────────────────────────────
@@ -348,7 +350,7 @@ fun VibraAppShell(
 }
 
 /**
- * Gradient behind the dock: transparent at the top, ~85 % background at the bottom edge,
+ * Gradient behind the dock: transparent at the top, ~95 % background at the bottom edge,
  * covering the navigation bar, the dock and [DockScrimReach] above it.
  */
 @Composable
@@ -362,14 +364,15 @@ private fun DockScrim(color: Color) {
                 .background(
                     Brush.verticalGradient(
                         0f to color.copy(alpha = 0f),
-                        0.45f to color.copy(alpha = 0.55f),
-                        1f to color.copy(alpha = 0.88f),
+                        // Dense enough that text scrolling under the dock is hidden, not half-read.
+                        0.4f to color.copy(alpha = 0.7f),
+                        1f to color.copy(alpha = 0.96f),
                     ),
                 ),
     )
 }
 
-private val DockScrimReach = 40.dp
+private val DockScrimReach = 56.dp
 
 /**
  * The engine navigation graph with Vibra's routes. The NavHost plays no transition itself:

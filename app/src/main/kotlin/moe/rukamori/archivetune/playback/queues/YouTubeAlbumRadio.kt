@@ -7,10 +7,12 @@
 
 package moe.rukamori.archivetune.playback.queues
 
+import app.vibra.playback.lazyMediaItems
+import app.vibra.playback.metadataOf
+
 import androidx.media3.common.MediaItem
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.withContext
-import moe.rukamori.archivetune.extensions.toMediaItem
 import moe.rukamori.archivetune.innertube.YouTube
 import moe.rukamori.archivetune.innertube.models.WatchEndpoint
 import moe.rukamori.archivetune.models.MediaMetadata
@@ -53,7 +55,7 @@ class YouTubeAlbumRadio(
                         .album
                         ?.name
                         .orEmpty(),
-                items = albumSongs.map { it.toMediaItem() },
+                items = albumSongs.lazyMediaItems { metadataOf(it) },
                 mediaItemIndex = 0,
             )
         }
@@ -66,9 +68,9 @@ class YouTubeAlbumRadio(
             continuation = nextResult.continuation
             if (!firstTimeLoaded) {
                 firstTimeLoaded = true
-                nextResult.items.subList(albumSongCount, nextResult.items.size).map { it.toMediaItem() }
+                nextResult.items.subList(albumSongCount, nextResult.items.size).lazyMediaItems { metadataOf(it) }
             } else {
-                nextResult.items.map { it.toMediaItem() }
+                nextResult.items.lazyMediaItems { metadataOf(it) }
             }
         }
 }

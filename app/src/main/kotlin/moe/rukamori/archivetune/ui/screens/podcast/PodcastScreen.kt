@@ -7,6 +7,9 @@
 
 package moe.rukamori.archivetune.ui.screens.podcast
 
+import app.vibra.playback.lazyMediaItems
+import app.vibra.playback.metadataOf
+
 import androidx.activity.compose.BackHandler
 import app.vibra.ui.components.VibraLoadingIndicator
 import app.vibra.ui.motion.clickable
@@ -71,7 +74,6 @@ import moe.rukamori.archivetune.LocalPlayerAwareWindowInsets
 import moe.rukamori.archivetune.LocalPlayerConnection
 import moe.rukamori.archivetune.R
 import moe.rukamori.archivetune.constants.AppBarHeight
-import moe.rukamori.archivetune.extensions.toMediaItem
 import moe.rukamori.archivetune.playback.queues.ListQueue
 import moe.rukamori.archivetune.podcast.PodcastAction
 import moe.rukamori.archivetune.podcast.PodcastEpisodeUiModel
@@ -114,7 +116,7 @@ fun PodcastScreen(
                     playerConnection?.playQueue(
                         ListQueue(
                             title = event.request.title,
-                            items = event.request.items.map { metadata -> metadata.toMediaItem() },
+                            items = event.request.items.lazyMediaItems { metadata -> metadataOf(metadata) },
                             startIndex = event.request.startIndex,
                         ),
                     )

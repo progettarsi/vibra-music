@@ -7,6 +7,8 @@
 
 package moe.rukamori.archivetune.ui.screens.library
 
+import app.vibra.playback.lazyMediaItems
+import app.vibra.playback.metadataOf
 // Vibra: independent radii follow the global rounding style.
 import app.vibra.ui.theme.adaptiveRoundedCornerShape
 
@@ -209,7 +211,7 @@ fun LibraryMixScreen(
                             remember(album.tracks, playerConnection) {
                                 {
                                     playerConnection.playQueue(
-                                        ListQueue(items = album.tracks.map { it.toMediaItem() }),
+                                        ListQueue(items = album.tracks.lazyMediaItems { metadataOf(it) }),
                                     )
                                 }
                             }
@@ -217,7 +219,7 @@ fun LibraryMixScreen(
                             remember(album.tracks, playerConnection) {
                                 {
                                     playerConnection.playQueue(
-                                        ListQueue(items = album.tracks.shuffled().map { it.toMediaItem() }),
+                                        ListQueue(items = album.tracks.shuffled().lazyMediaItems { metadataOf(it) }),
                                     )
                                 }
                             }
@@ -407,7 +409,7 @@ fun LibraryMixScreen(
                         onPlayMix = { mix ->
                             playerConnection.playQueue(
                                 ListQueue(
-                                    items = mix.tracks.map { it.toMediaItem() },
+                                    items = mix.tracks.lazyMediaItems { metadataOf(it) },
                                 ),
                             )
                         },
@@ -532,7 +534,7 @@ fun LibraryMixScreen(
                                                                     database.playlistSongs(playlist.id).firstOrNull()?.let { songs ->
                                                                         if (songs.isNotEmpty()) {
                                                                             conn.playQueue(
-                                                                                ListQueue(items = songs.map { it.song.toMediaItem() }),
+                                                                                ListQueue(items = songs.lazyMediaItems { metadataOf(it.song) }),
                                                                             )
                                                                         }
                                                                     }

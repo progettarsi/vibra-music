@@ -29,6 +29,10 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import moe.rukamori.archivetune.innertube.YouTube
+import moe.rukamori.archivetune.morideobfuscator.youtubei.YoutubeiNetworkConfiguration
+import moe.rukamori.archivetune.playback.stream.PlaybackHttpClient
+import moe.rukamori.archivetune.playback.stream.playbackNetworkConfiguration
 import okhttp3.Call
 import okhttp3.Callback
 import okhttp3.Headers.Companion.toHeaders
@@ -40,6 +44,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import timber.log.Timber
 import java.io.IOException
+import java.net.ConnectException
 import java.net.SocketTimeoutException
 import java.time.Instant
 import java.time.temporal.ChronoUnit
@@ -92,11 +97,7 @@ object BotGuardTokenGenerator {
     /** Maximum number of cached player tokens. */
     private const val PLAYER_TOKEN_CACHE_SIZE = 200
 
-    private val httpClient =
-        OkHttpClient
-            .Builder()
-            .callTimeout(20, TimeUnit.SECONDS)
-            .build()
+    private lateinit var httpClient: Call.Factory
 
     // ── state ────────────────────────────────────────────────────────
     private var appContext: Context? = null
@@ -106,6 +107,8 @@ object BotGuardTokenGenerator {
     private val mutex = Mutex()
     private var engine: BotGuardEngine? = null
     private var engineSessionId: String? = null
+    private var engineNetwork: YoutubeiNetworkConfiguration? = null
+    private var engineCookie: String? = null
     private var cachedSessionToken: String? = null
     private var engineReady = false
 
@@ -124,6 +127,10 @@ object BotGuardTokenGenerator {
     /** Call once from `Application.onCreate()`. */
     fun initialize(context: Context) {
         appContext = context.applicationContext
+        httpClient = PlaybackHttpClient(
+            context.applicationContext,
+            OkHttpClient.Builder().callTimeout(20, TimeUnit.SECONDS).build(),
+        )
         Timber.tag(TAG).d("Initialized")
     }
 
@@ -275,6 +282,9 @@ object BotGuardTokenGenerator {
                 sessionId = sessionId,
             )
         val playerTok = eng.mint(videoId)
+        if (!isEngineReadyForSession(sessionId)) {
+            throw ConnectException("Playback network or account changed during token generation")
+        }
         return PoTokenResult(playerToken = playerTok, sessionToken = sessionTok)
     }
 
@@ -366,10 +376,14 @@ object BotGuardTokenGenerator {
             }
             engine = null
             engineSessionId = null
+            engineNetwork = null
+            engineCookie = null
             cachedSessionToken = null
             engineReady = false
             playerTokenCache.clear()
 
+            val network = playbackNetworkConfiguration(ctx)
+            val cookie = YouTube.currentPlaybackAuthState().cookie
             val newEngine = BotGuardEngine.create(ctx)
             val newSessionToken =
                 try {
@@ -382,6 +396,8 @@ object BotGuardTokenGenerator {
                 }
             engine = newEngine
             engineSessionId = sessionId
+            engineNetwork = network
+            engineCookie = cookie
             cachedSessionToken = newSessionToken
             engineReady = true
         }
@@ -395,6 +411,8 @@ object BotGuardTokenGenerator {
     private fun isEngineReadyForSession(sessionId: String): Boolean =
         engineReady &&
             engineSessionId == sessionId &&
+            engineNetwork == appContext?.let(::playbackNetworkConfiguration) &&
+            engineCookie == YouTube.currentPlaybackAuthState().cookie &&
             cachedSessionToken != null &&
             engine?.isExpired == false
 
@@ -404,6 +422,8 @@ object BotGuardTokenGenerator {
         }
         engine = null
         engineSessionId = null
+        engineNetwork = null
+        engineCookie = null
         cachedSessionToken = null
         engineReady = false
     }

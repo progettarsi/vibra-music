@@ -39,6 +39,7 @@ fun Player.toggleRepeatMode() {
 }
 
 fun Player.getQueueWindows(): List<Timeline.Window> {
+    if (this is app.vibra.playback.ProgressivePlayer) return queueWindows()
     val timeline = currentTimeline
     if (timeline.isEmpty) {
         return emptyList()
@@ -76,6 +77,7 @@ fun Player.getQueueWindows(): List<Timeline.Window> {
 }
 
 fun Player.getCurrentQueueIndex(): Int {
+    if (this is app.vibra.playback.ProgressivePlayer) return currentMediaItemIndex
     if (currentTimeline.isEmpty) {
         return -1
     }

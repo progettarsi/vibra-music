@@ -11,6 +11,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import app.vibra.ui.motion.clickable
+import app.vibra.ui.motion.expansionElement
 import app.vibra.ui.motion.interactiveSurface
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -60,6 +61,7 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -161,8 +163,8 @@ fun VibraProfileScreen(
             if (weekSongs.isNotEmpty()) {
                 add(VibraBlock(key = "summary_pair", relevance = 0.6f, minSize = BlockSize.Medium) { _, modifier ->
                     Row(modifier = modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        StatTile(statsTitle, weekMinutes.toString(), stringResource(R.string.vibra_minutes_this_week), openStats, Modifier.weight(1f))
-                        StatTile(stringResource(R.string.songs), weekSongs.size.toString(), stringResource(R.string.vibra_songs_this_week), openStats, Modifier.weight(1f))
+                        StatTile(statsTitle, weekMinutes.toString(), pluralStringResource(R.plurals.vibra_minutes_this_week, weekMinutes), openStats, Modifier.weight(1f))
+                        StatTile(stringResource(R.string.songs), weekSongs.size.toString(), pluralStringResource(R.plurals.vibra_songs_this_week, weekSongs.size), openStats, Modifier.weight(1f))
                     }
                 })
             }
@@ -335,15 +337,24 @@ private fun FavouriteArtistBlock(
 ) {
     VibraCard(modifier = modifier, onClick = onClick) {
         Row(modifier = Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(modifier = Modifier.size(104.dp).clip(VibraShapes.Star).background(MaterialTheme.colorScheme.primaryContainer)) {
-                if (artworkUrl != null) {
-                    VibraArtwork(url = artworkUrl, shape = androidx.compose.ui.graphics.RectangleShape, sizePx = 320, modifier = Modifier.fillMaxSize())
-                } else {
+            if (artworkUrl != null) {
+                VibraArtwork(
+                    url = artworkUrl,
+                    shape = VibraShapes.Star,
+                    sizePx = 320,
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    modifier = Modifier.size(104.dp),
+                )
+            } else {
+                Box(
+                    modifier = Modifier.size(104.dp).background(MaterialTheme.colorScheme.primaryContainer, VibraShapes.Star),
+                    contentAlignment = Alignment.Center,
+                ) {
                     Icon(
                         painterResource(R.drawable.star),
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier.align(Alignment.Center).size(36.dp),
+                        modifier = Modifier.size(36.dp),
                     )
                 }
             }
@@ -364,6 +375,7 @@ private fun FavouriteArtistBlock(
                     color = if (artistName != null) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.expansionElement(artistName, "title"),
                 )
                 if (listenedMs > 0) {
                     val minutes = (listenedMs / 60_000.0).roundToInt()
@@ -434,13 +446,18 @@ private fun ProfileEditSheet(
                                 .size(56.dp)
                                 .interactiveSurface(
                                     shape = option.polygon.toShape(),
-                                    containerColor = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHighest,
+                                    // Outline, not a container tone: unselected shapes must stay readable
+                                    // (3:1) on the sheet, not just the selected one.
+                                    containerColor = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
                                     role = Role.RadioButton,
                                     onClick = {
                                         haptics.tick()
                                         style.setShape(option)
                                     },
-                                ).semantics { contentDescription = label },
+                                ).semantics {
+                                    contentDescription = label
+                                    this.selected = selected
+                                },
                     )
                 }
             }

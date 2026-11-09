@@ -98,12 +98,14 @@ import moe.rukamori.archivetune.extensions.togglePlayPause
 import moe.rukamori.archivetune.innertube.models.SongItem
 import moe.rukamori.archivetune.innertube.models.WatchEndpoint
 import moe.rukamori.archivetune.models.toMediaMetadata
+import moe.rukamori.archivetune.playback.queues.YouTubePlaylistShuffleQueue
 import moe.rukamori.archivetune.playback.queues.YouTubeQueue
 import moe.rukamori.archivetune.ui.component.ExpressivePullToRefreshBox
 import moe.rukamori.archivetune.ui.component.IconButton
 import moe.rukamori.archivetune.ui.component.LocalMenuState
 import moe.rukamori.archivetune.ui.component.MediaDetailAction
 import moe.rukamori.archivetune.ui.component.MediaDetailHero
+import app.vibra.ui.shell.LocalPageFlight
 import moe.rukamori.archivetune.ui.component.MediaDetailIconAction
 import moe.rukamori.archivetune.ui.component.MediaDetailStatePanel
 import moe.rukamori.archivetune.ui.component.YouTubeListItem
@@ -159,6 +161,7 @@ fun OnlinePlaylistScreen(
 
     // System bars padding
     val systemBarsTopPadding = WindowInsets.systemBars.asPaddingValues().calculateTopPadding()
+    val openingPreview = LocalPageFlight.current?.openingMediaPreview()
 
     val lazyListState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
@@ -266,10 +269,172 @@ fun OnlinePlaylistScreen(
                 ),
         ) {
             playlist.let { playlist ->
+                val headerPlaylist = playlist.takeUnless { isLoading }
+                if (!isSearching && (headerPlaylist != null || isLoading && openingPreview != null)) {
+                    item(key = "header") {
+                        val author =
+                            headerPlaylist?.author?.let { artist ->
+                                remember(artist) {
+                                    buildAnnotatedString {
+                                        if (artist.id != null) {
+                                            withLink(
+                                                LinkAnnotation.Clickable(artist.id!!) {
+                                                    navController.navigateToArtist(artist.id)
+                                                },
+                                            ) {
+                                                append(artist.name)
+                                            }
+                                        } else {
+                                            append(artist.name)
+                                        }
+                                    }
+                                }
+                            }
+                        val isBookmarked = dbPlaylist?.playlist?.bookmarkedAt != null
+                        val fallbackPlaySong = songs.firstOrNull()
+
+                        MediaDetailHero(
+                            title = headerPlaylist?.title ?: requireNotNull(openingPreview).title,
+                            thumbnailUrl = if (headerPlaylist != null) headerPlaylist.thumbnail else openingPreview?.thumbnailUrl,
+                            isLoading = headerPlaylist == null,
+                            fallbackIcon = R.drawable.queue_music,
+                            systemBarsTopPadding = systemBarsTopPadding,
+                            subtitle = author,
+                            metadata = headerPlaylist?.songCountText,
+                            description = headerPlaylist?.description,
+                            isAdded = isBookmarked,
+                            addContentDescription = R.string.add_to_library,
+                            removeContentDescription = R.string.remove_from_library,
+                            onShuffle =
+                                headerPlaylist?.shuffleEndpoint?.let { shuffleEndpoint ->
+                                    {
+                                        playerConnection.playQueue(
+                                            YouTubePlaylistShuffleQueue.create(headerPlaylist.id, shuffleEndpoint),
+                                        )
+                                    }
+                                },
+                            onPlay =
+                                headerPlaylist?.playEndpoint?.let { playEndpoint ->
+                                    {
+                                        playerConnection.playQueue(
+                                            YouTubeQueue.playlist(playEndpoint),
+                                        )
+                                    }
+                                } ?: headerPlaylist?.let { loaded ->
+                                    fallbackPlaySong?.let { firstSong ->
+                                        {
+                                            playerConnection.playQueue(
+                                                YouTubeQueue.playlist(
+                                                    endpoint =
+                                                        firstSong.toPlaylistPlaybackEndpoint(
+                                                            playlistId = loaded.id,
+                                                            playlistPlayParams = null,
+                                                        ),
+                                                    preloadItem = firstSong.toMediaMetadata(),
+                                                ),
+                                            )
+                                        }
+                                    }
+                                },
+                            onToggleAdd = headerPlaylist?.takeUnless { it.id == "LM" }?.let { loaded ->
+                                { libraryActions.togglePlaylist(loaded, songs) }
+                            },
+                            additionalPrimaryActions = { contentColor ->
+                                if (songs.isNotEmpty()) {
+                                    MediaDetailAction(
+                                        contentDescription =
+                                            if (downloadState == HeaderDownloadState.Completed) {
+                                                R.string.remove_download
+                                            } else {
+                                                R.string.download
+                                            },
+                                        contentColor = contentColor,
+                                        onClick = {
+                                            when (downloadState) {
+                                                HeaderDownloadState.Completed -> {
+                                                    sendRemoveDownloads(
+                                                        context = context,
+                                                        songIds = songs.map { it.id },
+                                                    )
+                                                }
+
+                                                is HeaderDownloadState.Partial -> {
+                                                    sendRemoveDownloads(
+                                                        context = context,
+                                                        songIds = songs.map { it.id },
+                                                        downloads = downloads,
+                                                    )
+                                                }
+
+                                                HeaderDownloadState.None -> {
+                                                    sendAddMissingDownloads(
+                                                        context = context,
+                                                        songs =
+                                                            songs.map { song ->
+                                                                HeaderDownloadItem(
+                                                                    id = song.id,
+                                                                    title = song.title,
+                                                                )
+                                                            },
+                                                        downloads = downloads,
+                                                    )
+                                                    navController.navigate(
+                                                        "auto_playlist/downloaded?tab=progress",
+                                                    )
+                                                }
+                                            }
+                                        },
+                                    ) {
+                                        when (val state = downloadState) {
+                                            HeaderDownloadState.Completed -> {
+                                                Icon(
+                                                    painter = painterResource(R.drawable.offline),
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(22.dp),
+                                                )
+                                            }
+
+                                            is HeaderDownloadState.Partial -> {
+                                                HeaderDownloadProgressIndicator(
+                                                    progress = state.progress,
+                                                    paused = state.paused,
+                                                    icon = R.drawable.download,
+                                                )
+                                            }
+
+                                            HeaderDownloadState.None -> {
+                                                Icon(
+                                                    painter = painterResource(R.drawable.download),
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(22.dp),
+                                                )
+                                            }
+                                    }
+                                }
+                            }
+
+                                headerPlaylist?.radioEndpoint?.let { radioEndpoint ->
+                                    MediaDetailIconAction(
+                                        icon = R.drawable.radio,
+                                        contentDescription = R.string.start_radio,
+                                        contentColor = contentColor,
+                                        onClick = {
+                                            playerConnection.playQueue(
+                                                YouTubeQueue(radioEndpoint),
+                                            )
+                                        },
+                                    )
+                                }
+                            },
+                            modifier = Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null),
+                        )
+                    }
+                }
+
                 if (isLoading) {
                     item(key = "shimmer") {
                         ShimmerHost {
-                            Box(
+                            if (openingPreview == null || isSearching) Box(
                                 modifier =
                                     Modifier
                                         .fillMaxWidth()
@@ -336,169 +501,6 @@ fun OnlinePlaylistScreen(
                         }
                     }
                 } else if (playlist != null) {
-                    if (!isSearching) {
-                        item(key = "header") {
-                            val author =
-                                playlist.author?.let { artist ->
-                                    remember(artist) {
-                                        buildAnnotatedString {
-                                            if (artist.id != null) {
-                                                withLink(
-                                                    LinkAnnotation.Clickable(artist.id!!) {
-                                                        navController.navigateToArtist(artist.id)
-                                                    },
-                                                ) {
-                                                    append(artist.name)
-                                                }
-                                            } else {
-                                                append(artist.name)
-                                            }
-                                        }
-                                    }
-                                }
-                            val isBookmarked = dbPlaylist?.playlist?.bookmarkedAt != null
-                            val fallbackPlaySong = songs.firstOrNull()
-
-                            MediaDetailHero(
-                                title = playlist.title,
-                                thumbnailUrl = playlist.thumbnail,
-                                fallbackIcon = R.drawable.queue_music,
-                                systemBarsTopPadding = systemBarsTopPadding,
-                                subtitle = author,
-                                metadata = playlist.songCountText,
-                                description = playlist.description,
-                                isAdded = isBookmarked,
-                                addContentDescription = R.string.add_to_library,
-                                removeContentDescription = R.string.remove_from_library,
-                                onShuffle =
-                                    playlist.shuffleEndpoint?.let { shuffleEndpoint ->
-                                        {
-                                            playerConnection.playQueue(
-                                                YouTubeQueue.playlist(shuffleEndpoint),
-                                            )
-                                        }
-                                    },
-                                onPlay =
-                                    playlist.playEndpoint?.let { playEndpoint ->
-                                        {
-                                            playerConnection.playQueue(
-                                                YouTubeQueue.playlist(playEndpoint),
-                                            )
-                                        }
-                                    } ?: fallbackPlaySong?.let { firstSong ->
-                                        {
-                                            playerConnection.playQueue(
-                                                YouTubeQueue.playlist(
-                                                    endpoint =
-                                                        firstSong.toPlaylistPlaybackEndpoint(
-                                                            playlistId = playlist.id,
-                                                            playlistPlayParams = null,
-                                                        ),
-                                                    preloadItem = firstSong.toMediaMetadata(),
-                                                ),
-                                            )
-                                        }
-                                    },
-                                onToggleAdd =
-                                    if (playlist.id == "LM") {
-                                        null
-                                    } else {
-                                        {
-                                            libraryActions.togglePlaylist(playlist, songs)
-                                        }
-                                    },
-                                additionalPrimaryActions = { contentColor ->
-                                    if (songs.isNotEmpty()) {
-                                        MediaDetailAction(
-                                            contentDescription =
-                                                if (downloadState == HeaderDownloadState.Completed) {
-                                                    R.string.remove_download
-                                                } else {
-                                                    R.string.download
-                                                },
-                                            contentColor = contentColor,
-                                            onClick = {
-                                                when (downloadState) {
-                                                    HeaderDownloadState.Completed -> {
-                                                        sendRemoveDownloads(
-                                                            context = context,
-                                                            songIds = songs.map { it.id },
-                                                        )
-                                                    }
-
-                                                    is HeaderDownloadState.Partial -> {
-                                                        sendRemoveDownloads(
-                                                            context = context,
-                                                            songIds = songs.map { it.id },
-                                                            downloads = downloads,
-                                                        )
-                                                    }
-
-                                                    HeaderDownloadState.None -> {
-                                                        sendAddMissingDownloads(
-                                                            context = context,
-                                                            songs =
-                                                                songs.map { song ->
-                                                                    HeaderDownloadItem(
-                                                                        id = song.id,
-                                                                        title = song.title,
-                                                                    )
-                                                                },
-                                                            downloads = downloads,
-                                                        )
-                                                        navController.navigate(
-                                                            "auto_playlist/downloaded?tab=progress",
-                                                        )
-                                                    }
-                                                }
-                                            },
-                                        ) {
-                                            when (val state = downloadState) {
-                                                HeaderDownloadState.Completed -> {
-                                                    Icon(
-                                                        painter = painterResource(R.drawable.offline),
-                                                        contentDescription = null,
-                                                        modifier = Modifier.size(22.dp),
-                                                    )
-                                                }
-
-                                                is HeaderDownloadState.Partial -> {
-                                                    HeaderDownloadProgressIndicator(
-                                                        progress = state.progress,
-                                                        paused = state.paused,
-                                                        icon = R.drawable.download,
-                                                    )
-                                                }
-
-                                                HeaderDownloadState.None -> {
-                                                    Icon(
-                                                        painter = painterResource(R.drawable.download),
-                                                        contentDescription = null,
-                                                        modifier = Modifier.size(22.dp),
-                                                    )
-                                                }
-                                        }
-                                    }
-                                }
-
-                                    playlist.radioEndpoint?.let { radioEndpoint ->
-                                        MediaDetailIconAction(
-                                            icon = R.drawable.radio,
-                                            contentDescription = R.string.start_radio,
-                                            contentColor = contentColor,
-                                            onClick = {
-                                                playerConnection.playQueue(
-                                                    YouTubeQueue(radioEndpoint),
-                                                )
-                                            },
-                                        )
-                                    }
-                                },
-                                modifier = Modifier.animateItem(),
-                            )
-                        }
-                    }
-
                     if (songs.isEmpty() && !isLoading && error == null) {
                         item(key = "empty") {
                             MediaDetailStatePanel(

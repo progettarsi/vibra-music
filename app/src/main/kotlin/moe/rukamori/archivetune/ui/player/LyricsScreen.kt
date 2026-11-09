@@ -10,9 +10,11 @@
 package moe.rukamori.archivetune.ui.player
 
 import android.content.res.Configuration
+import android.graphics.Bitmap
 import android.view.HapticFeedbackConstants
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import app.vibra.ui.lyrics.rememberLegacyLyricsCardSaver
 import app.vibra.ui.motion.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -142,6 +144,7 @@ fun LyricsScreen(
 
     val (enableHapticFeedback) = rememberPreference(EnableHapticFeedbackKey, true)
     val lyricsMode = LyricsMode.ENHANCED
+    val saveLegacy = rememberLegacyLyricsCardSaver()
     // Vibra: one fixed design on the cover's colour field, like the player.
     val accent = rememberArtworkAccent(mediaMetadata.thumbnailUrl)
 
@@ -310,6 +313,8 @@ fun LyricsScreen(
                 ) {
                     LyricsPane(
                         lyricsMode = lyricsMode,
+                        saveLegacy = saveLegacy,
+                        exportTint = accent.color,
                         lyricsState = lyricsRenderState,
                         paneActive = paneActive,
                         sliderPositionProvider = { sliderPosition },
@@ -329,6 +334,8 @@ fun LyricsScreen(
             } else {
                 LyricsPane(
                     lyricsMode = lyricsMode,
+                    saveLegacy = saveLegacy,
+                    exportTint = accent.color,
                     lyricsState = lyricsRenderState,
                     paneActive = paneActive,
                     sliderPositionProvider = { sliderPosition },
@@ -421,6 +428,8 @@ private fun LyricsHeaderButton(
 @Composable
 private fun LyricsPane(
     lyricsMode: LyricsMode,
+    saveLegacy: suspend (Bitmap) -> Unit,
+    exportTint: Color,
     lyricsState: LyricsRenderScreenState,
     sliderPositionProvider: () -> Long?,
     lyricsSyncOffset: Int,
@@ -429,13 +438,15 @@ private fun LyricsPane(
 ) {
     LyricsContent(
         lyricsMode = lyricsMode,
+        saveLegacy = saveLegacy,
+        exportTint = exportTint,
         lyricsState = lyricsState,
         sliderPositionProvider = sliderPositionProvider,
         lyricsSyncOffset = lyricsSyncOffset,
         paneActive = paneActive,
-        modifier =
-            modifier
-                .fillMaxSize()
+        modifier = modifier,
+        lyricsListModifier =
+            Modifier
                 .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
                 .drawWithContent {
                     drawContent()
@@ -541,12 +552,15 @@ private const val EdgeFade = 0.1f
 @Composable
 private fun LyricsContent(
     lyricsMode: LyricsMode,
+    saveLegacy: suspend (Bitmap) -> Unit,
+    exportTint: Color,
     lyricsState: LyricsRenderScreenState,
     sliderPositionProvider: () -> Long?,
     lyricsSyncOffset: Int,
     textColor: Color,
     paneActive: Boolean,
     modifier: Modifier = Modifier,
+    lyricsListModifier: Modifier = Modifier,
 ) {
     when (lyricsMode) {
         LyricsMode.V2 -> {
@@ -554,7 +568,7 @@ private fun LyricsContent(
                 lyricsState = lyricsState,
                 sliderPositionProvider = sliderPositionProvider,
                 lyricsSyncOffset = lyricsSyncOffset,
-                modifier = modifier,
+                modifier = modifier.then(lyricsListModifier),
                 textColorOverride = textColor,
             )
         }
@@ -562,9 +576,12 @@ private fun LyricsContent(
         LyricsMode.ENHANCED -> {
             LyricsEnhanced(
                 lyricsState = lyricsState,
+                saveLegacy = saveLegacy,
+                exportTint = exportTint,
                 sliderPositionProvider = sliderPositionProvider,
                 lyricsSyncOffset = lyricsSyncOffset,
                 modifier = modifier,
+                lyricsListModifier = lyricsListModifier,
                 textColorOverride = textColor,
                 paneActive = paneActive,
             )

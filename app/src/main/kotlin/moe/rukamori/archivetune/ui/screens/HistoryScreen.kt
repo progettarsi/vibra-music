@@ -13,6 +13,9 @@
 
 package moe.rukamori.archivetune.ui.screens
 
+import app.vibra.playback.lazyMediaItems
+import app.vibra.playback.metadataOf
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
@@ -379,7 +382,7 @@ fun HistoryScreen(
                                 playerConnection.playQueue(
                                     ListQueue(
                                         title = dateAgoToString(dateAgo),
-                                        items = songsForDate.map { it.song.toMediaItem() },
+                                        items = songsForDate.lazyMediaItems { metadataOf(it.song) },
                                         startIndex = index,
                                     ),
                                 )
@@ -503,7 +506,7 @@ fun HistoryScreen(
                             playerConnection.playQueue(
                                 ListQueue(
                                     title = context.getString(R.string.history),
-                                    items = remoteVisibleSongs.map { it.toMediaItem() }.shuffled(),
+                                    items = remoteVisibleSongs.lazyMediaItems { metadataOf(it) }.shuffled(),
                                 ),
                             )
                         }
@@ -511,7 +514,7 @@ fun HistoryScreen(
                         playerConnection.playQueue(
                             ListQueue(
                                 title = context.getString(R.string.history),
-                                items = localVisibleEvents.map { it.song.toMediaItem() }.shuffled(),
+                                items = localVisibleEvents.lazyMediaItems { metadataOf(it.song) }.shuffled(),
                             ),
                         )
                     }

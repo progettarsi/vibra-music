@@ -7,6 +7,9 @@
 
 package moe.rukamori.archivetune.playback
 
+import app.vibra.playback.ProgressivePlayer
+import app.vibra.playback.LogicalQueue
+import moe.rukamori.archivetune.extensions.toMediaItem
 import androidx.media3.common.C
 import androidx.media3.common.Player
 import androidx.media3.common.Timeline
@@ -19,11 +22,13 @@ internal class QueueRemoval private constructor(
     private val originalWindows: List<Timeline.Window>,
     private val originalShuffleUids: List<Any>,
     private val removedUids: Set<Any>,
+    private val logical: LogicalQueue.Removal? = null,
 ) {
-    val removedItems = originalWindows.filter { it.uid in removedUids }.map { it.mediaItem }
+    val removedItems get() = logical?.let { removal -> removal.original.canonical.filter { it.uid in removal.removed }.map { it.metadata.toMediaItem() } } ?: originalWindows.filter { it.uid in removedUids }.map { it.mediaItem }
 
     fun restore(player: Player): Boolean {
         if (player !== source) return false
+        logical?.let { return (player as? ProgressivePlayer)?.restoreOccurrences(it) == true }
 
         val currentWindows = player.currentTimeline.windows()
         val currentUids = currentWindows.map { it.uid }
@@ -94,7 +99,10 @@ internal class QueueRemoval private constructor(
     }
 
     companion object {
+        fun logical(player: ProgressivePlayer, removal: LogicalQueue.Removal) =
+            QueueRemoval(player, emptyList(), emptyList(), emptySet(), removal)
         fun remove(player: Player, windows: List<Timeline.Window>): QueueRemoval? {
+            if (player is ProgressivePlayer) return player.removeOccurrences(windows.mapNotNull { it.uid as? Long }.toSet())?.let { logical(player, it) }
             val originalWindows = player.currentTimeline.windows()
             val requestedUids = windows.mapTo(HashSet()) { it.uid }
             val removedIndices = originalWindows.indices.filter { originalWindows[it].uid in requestedUids }

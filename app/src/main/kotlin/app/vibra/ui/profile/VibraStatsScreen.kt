@@ -18,6 +18,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import app.vibra.ui.motion.clickable
 import app.vibra.ui.motion.combinedClickable
+import app.vibra.ui.motion.expansionElement
 import app.vibra.ui.motion.interactiveSurface
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -50,7 +51,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -174,9 +174,13 @@ fun VibraStatsScreen(navController: NavController) {
                 item(key = "number_one") {
                     VibraCard(modifier = Modifier.fillMaxWidth(), onClick = { navController.navigateToArtist(top.id) }) {
                         Column(modifier = Modifier.fillMaxWidth().padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                            Box(modifier = Modifier.size(180.dp).clip(VibraShapes.Star).background(MaterialTheme.colorScheme.primaryContainer)) {
-                                VibraArtwork(url = top.thumbnailUrl, shape = RectangleShape, sizePx = 480, modifier = Modifier.fillMaxSize())
-                            }
+                            VibraArtwork(
+                                url = top.thumbnailUrl,
+                                shape = VibraShapes.Star,
+                                sizePx = 480,
+                                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                modifier = Modifier.size(180.dp),
+                            )
                             Row(modifier = Modifier.padding(top = 14.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Icon(painterResource(R.drawable.star), contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
                                 Text(
@@ -188,6 +192,7 @@ fun VibraStatsScreen(navController: NavController) {
                             }
                             Text(
                                 text = top.title,
+                                modifier = Modifier.expansionElement(top.title, "title"),
                                 style = MaterialTheme.typography.headlineMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface,

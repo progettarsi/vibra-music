@@ -241,6 +241,8 @@ fun VibraPrimaryButton(
 ) {
     val haptics = rememberVibraHaptics()
     val colors = ButtonDefaults.buttonColors(containerColor = containerColor, contentColor = contentColor)
+    // A small pill (a card's own Play) scales its label down instead of clipping it.
+    val compact = height < CompactPrimaryHeight
     Button(
         onClick = {
             haptics.press()
@@ -250,7 +252,7 @@ fun VibraPrimaryButton(
         shapes = ButtonDefaults.shapes(),
         // Loading is not "unavailable": the button keeps its colours and shows the wait instead.
         colors = if (loading) colors.copy(disabledContainerColor = containerColor, disabledContentColor = contentColor) else colors,
-        contentPadding = PaddingValues(horizontal = if (text.isEmpty()) 16.dp else 24.dp),
+        contentPadding = PaddingValues(horizontal = if (text.isEmpty() || compact) 16.dp else 24.dp),
         modifier =
             modifier
                 .heightIn(min = height)
@@ -268,15 +270,15 @@ fun VibraPrimaryButton(
             Icon(
                 painter = painterResource(icon),
                 contentDescription = null,
-                modifier = Modifier.size(24.dp),
+                modifier = Modifier.size(if (compact) 20.dp else 24.dp),
             )
         }
         if (text.isNotEmpty()) {
-            Spacer(Modifier.width(12.dp))
+            Spacer(Modifier.width(if (compact) 8.dp else 12.dp))
             // Sized here, inside the pill: a new label resizes the button without clipping its shape.
             Text(
                 text = text,
-                style = MaterialTheme.typography.titleLarge,
+                style = if (compact) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Medium,
                 maxLines = 1,
                 modifier = Modifier.animateContentSize(Liquid.spatial()),
@@ -325,3 +327,4 @@ fun VibraGlyphButton(
     }
 }
 
+private val CompactPrimaryHeight = 48.dp

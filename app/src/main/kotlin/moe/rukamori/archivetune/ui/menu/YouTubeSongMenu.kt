@@ -252,7 +252,7 @@ fun YouTubeSongMenu(song: SongItem, navController: NavController, onDismiss: () 
           id = MenuActionId.Playlist,
           icon = {
             Icon(
-              painter = painterResource(R.drawable.playlist_add),
+              painter = painterResource(R.drawable.add_box),
               contentDescription = null,
               modifier = Modifier.size(24.dp),
             )

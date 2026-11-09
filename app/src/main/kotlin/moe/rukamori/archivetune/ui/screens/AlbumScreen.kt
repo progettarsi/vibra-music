@@ -88,6 +88,7 @@ import moe.rukamori.archivetune.ui.component.IconButton
 import moe.rukamori.archivetune.ui.component.LocalMenuState
 import moe.rukamori.archivetune.ui.component.MediaDetailAction
 import moe.rukamori.archivetune.ui.component.MediaDetailHero
+import app.vibra.ui.shell.LocalPageFlight
 import moe.rukamori.archivetune.ui.component.MediaDetailStatePanel
 import moe.rukamori.archivetune.ui.component.NavigationTitle
 import moe.rukamori.archivetune.ui.component.SongListItem
@@ -182,6 +183,7 @@ fun AlbumScreen(
 
     // State for LazyColumn to track scroll
     val lazyListState = rememberLazyListState()
+    val openingPreview = LocalPageFlight.current?.openingMediaPreview()
 
     val showTopBarTitle by remember {
         derivedStateOf {
@@ -210,12 +212,13 @@ fun AlbumScreen(
         ) {
             val albumWithSongs = albumWithSongs
             val hasSongs = albumWithSongs?.songs?.isNotEmpty() == true
-            if (hasSongs) {
+            if (hasSongs || openingPreview != null && (uiState == AlbumUiState.Loading || uiState == AlbumUiState.Success)) {
                 item(key = "header") {
-                    val artistNames =
-                        remember(albumWithSongs.artists) {
+                    val loadedAlbum = albumWithSongs?.takeIf { hasSongs }
+                    val artistNames = loadedAlbum?.let {
+                        remember(it.artists) {
                             buildAnnotatedString {
-                                albumWithSongs.artists.fastForEachIndexed { index, artist ->
+                                loadedAlbum.artists.fastForEachIndexed { index, artist ->
                                     withLink(
                                         LinkAnnotation.Clickable(artist.id) {
                                             navController.navigateToArtist(artist.id)
@@ -223,16 +226,17 @@ fun AlbumScreen(
                                     ) {
                                         append(artist.name)
                                     }
-                                    if (index != albumWithSongs.artists.lastIndex) {
+                                    if (index != loadedAlbum.artists.lastIndex) {
                                         append(", ")
                                     }
                                 }
                             }
                         }
-                    val totalDuration = albumWithSongs.songs.sumOf { it.song.duration }
-                    val metadata =
+                    }
+                    val metadata = loadedAlbum?.let {
+                        val totalDuration = it.songs.sumOf { song -> song.song.duration }
                         listOfNotNull(
-                            albumWithSongs.album.year?.toString(),
+                            loadedAlbum.album.year?.toString(),
                             pluralStringResource(
                                 R.plurals.n_song,
                                 wrappedSongs.size,
@@ -242,11 +246,13 @@ fun AlbumScreen(
                                 .takeIf { it > 0 }
                                 ?.let { makeTimeString(it * 1000L) },
                         ).joinToString(MediaDetailMetadataSeparator)
-                    val isBookmarked = albumWithSongs.album.bookmarkedAt != null
+                    }
+                    val isBookmarked = loadedAlbum?.album?.bookmarkedAt != null
 
                     MediaDetailHero(
-                        title = albumWithSongs.album.title,
-                        thumbnailUrl = albumWithSongs.album.thumbnailUrl,
+                        title = loadedAlbum?.album?.title ?: requireNotNull(openingPreview).title,
+                        thumbnailUrl = if (loadedAlbum != null) loadedAlbum.album.thumbnailUrl else openingPreview?.thumbnailUrl,
+                        isLoading = loadedAlbum == null,
                         fallbackIcon = R.drawable.album,
                         systemBarsTopPadding = systemBarsTopPadding,
                         subtitle = artistNames,
@@ -255,32 +261,30 @@ fun AlbumScreen(
                         addContentDescription = R.string.add_to_library,
                         removeContentDescription = R.string.remove_from_library,
                         onShuffle =
-                            if (albumWithSongs.songs.isEmpty()) {
+                            if (loadedAlbum == null) {
                                 null
                             } else {
                                 {
                                     playerConnection.playQueue(
                                         LocalAlbumRadio(
-                                            albumWithSongs.copy(
-                                                songs = albumWithSongs.songs.shuffled(),
+                                            loadedAlbum.copy(
+                                                songs = loadedAlbum.songs.shuffled(),
                                             ),
                                         ),
                                     )
                                 }
                             },
                         onPlay =
-                            if (albumWithSongs.songs.isEmpty()) {
+                            if (loadedAlbum == null) {
                                 null
                             } else {
                                 {
-                                    playerConnection.playQueue(LocalAlbumRadio(albumWithSongs))
+                                    playerConnection.playQueue(LocalAlbumRadio(loadedAlbum))
                                 }
                             },
-                        onToggleAdd = {
-                            libraryActions.toggleAlbum(albumWithSongs.album)
-                        },
+                        onToggleAdd = loadedAlbum?.let { { libraryActions.toggleAlbum(it.album) } },
                         additionalPrimaryActions = { contentColor ->
-                            if (!albumWithSongs.album.isLocal && albumWithSongs.songs.any { !it.song.isLocal }) {
+                            if (loadedAlbum != null && !loadedAlbum.album.isLocal && loadedAlbum.songs.any { !it.song.isLocal }) {
                                 MediaDetailAction(
                                     contentDescription =
                                         if (downloadState == HeaderDownloadState.Completed) {
@@ -294,14 +298,14 @@ fun AlbumScreen(
                                             HeaderDownloadState.Completed -> {
                                                 sendRemoveDownloads(
                                                     context = context,
-                                                    songIds = albumWithSongs.songs.map { it.id },
+                                                    songIds = loadedAlbum.songs.map { it.id },
                                                 )
                                             }
 
                                             is HeaderDownloadState.Partial -> {
                                                 sendRemoveDownloads(
                                                     context = context,
-                                                    songIds = albumWithSongs.songs.map { it.id },
+                                                    songIds = loadedAlbum.songs.map { it.id },
                                                     downloads = downloads,
                                                 )
                                             }
@@ -310,7 +314,7 @@ fun AlbumScreen(
                                                 sendAddMissingDownloads(
                                                     context = context,
                                                     songs =
-                                                        albumWithSongs.songs.map {
+                                                        loadedAlbum.songs.map {
                                                             HeaderDownloadItem(
                                                                 id = it.id,
                                                                 title = it.song.title,
@@ -353,7 +357,9 @@ fun AlbumScreen(
                         },
                     )
                 }
+            }
 
+            if (hasSongs) {
                 // Songs Section Header
                 item(key = "songs_header") {
                     NavigationTitle(
@@ -466,7 +472,7 @@ fun AlbumScreen(
                     -> {
                         item(key = "shimmer") {
                             ShimmerHost {
-                                Box(
+                                if (openingPreview == null) Box(
                                     modifier =
                                         Modifier
                                             .fillMaxWidth()

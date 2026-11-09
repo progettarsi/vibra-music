@@ -9,6 +9,8 @@
 
 package moe.rukamori.archivetune.ui.menu
 
+import app.vibra.playback.lazyMediaItems
+import app.vibra.playback.metadataOf
 // Vibra: independent radii follow the global rounding style.
 import app.vibra.ui.theme.adaptiveRoundedCornerShape
 
@@ -73,7 +75,6 @@ import moe.rukamori.archivetune.constants.ListThumbnailSize
 import moe.rukamori.archivetune.constants.ThumbnailCornerRadius
 import moe.rukamori.archivetune.db.entities.PlaylistEntity
 import moe.rukamori.archivetune.db.entities.PlaylistSongMap
-import moe.rukamori.archivetune.extensions.toMediaItem
 import moe.rukamori.archivetune.innertube.YouTube
 import moe.rukamori.archivetune.innertube.models.PlaylistItem
 import moe.rukamori.archivetune.innertube.models.SongItem
@@ -334,7 +335,7 @@ fun YouTubePlaylistMenu(
               },
               text = shuffleText,
               onClick = {
-                playerConnection.playQueue(YouTubeQueue.playlist(shuffleEndpoint))
+                playerConnection.playQueue(moe.rukamori.archivetune.playback.queues.YouTubePlaylistShuffleQueue.create(playlist.id, shuffleEndpoint))
                 onDismiss()
               },
             )
@@ -436,7 +437,7 @@ fun YouTubePlaylistMenu(
                   YouTube.playlist(playlist.id).completed().getOrNull()?.songs.orEmpty()
                 }
               }
-              .let { list -> playerConnection.playNext(list.map { it.toMediaItem() }) }
+              .let { list -> playerConnection.playNext(list.lazyMediaItems { metadataOf(it) }) }
           }
           onDismiss()
         },
@@ -455,7 +456,7 @@ fun YouTubePlaylistMenu(
                   YouTube.playlist(playlist.id).completed().getOrNull()?.songs.orEmpty()
                 }
               }
-              .let { list -> playerConnection.addToQueue(list.map { it.toMediaItem() }) }
+              .let { list -> playerConnection.addToQueue(list.lazyMediaItems { metadataOf(it) }) }
           }
           onDismiss()
         },
@@ -463,7 +464,7 @@ fun YouTubePlaylistMenu(
       NewAction(
         id = MenuActionId.Playlist,
         icon = {
-          Icon(painter = painterResource(R.drawable.playlist_add), contentDescription = null)
+          Icon(painter = painterResource(R.drawable.add_box), contentDescription = null)
         },
         text = addToPlaylistText,
         onClick = { showChoosePlaylistDialog = true },

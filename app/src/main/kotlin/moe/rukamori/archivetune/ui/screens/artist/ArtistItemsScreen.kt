@@ -7,6 +7,9 @@
 
 package moe.rukamori.archivetune.ui.screens.artist
 
+import app.vibra.playback.lazyMediaItems
+import app.vibra.playback.metadataOf
+
 import androidx.compose.foundation.ExperimentalFoundationApi
 import app.vibra.ui.motion.clickable
 import app.vibra.ui.motion.combinedClickable
@@ -44,7 +47,6 @@ import moe.rukamori.archivetune.constants.CONTENT_TYPE_LIST
 import moe.rukamori.archivetune.constants.CONTENT_TYPE_PLAYLIST
 import moe.rukamori.archivetune.constants.CONTENT_TYPE_SONG
 import moe.rukamori.archivetune.constants.GridThumbnailHeight
-import moe.rukamori.archivetune.extensions.toMediaItem
 import moe.rukamori.archivetune.extensions.togglePlayPause
 import moe.rukamori.archivetune.innertube.models.AlbumItem
 import moe.rukamori.archivetune.innertube.models.ArtistItem
@@ -202,7 +204,7 @@ fun ArtistItemsScreen(
                                             playerConnection.playQueue(
                                                 ListQueue(
                                                     title = title,
-                                                    items = songs.map { it.toMediaItem() },
+                                                    items = songs.lazyMediaItems { metadataOf(it) },
                                                     startIndex = songs.indexOfFirst { it.id == item.id }.coerceAtLeast(0),
                                                 ),
                                             )
@@ -359,7 +361,7 @@ fun ArtistItemsScreen(
                         playerConnection.playQueue(
                             ListQueue(
                                 title = title,
-                                items = songs.map { it.toMediaItem() },
+                                items = songs.lazyMediaItems { metadataOf(it) },
                             ),
                         )
                     },
@@ -375,7 +377,7 @@ fun ArtistItemsScreen(
                         playerConnection.playQueue(
                             ListQueue(
                                 title = title,
-                                items = songs.shuffled().map { it.toMediaItem() },
+                                items = songs.shuffled().lazyMediaItems { metadataOf(it) },
                             ),
                         )
                     },
