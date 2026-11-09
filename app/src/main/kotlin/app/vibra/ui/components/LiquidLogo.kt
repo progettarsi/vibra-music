@@ -191,13 +191,11 @@ internal object LiquidLogo {
 
     /**
      * Draws the blobs at [timeMs] (any value: the cycle repeats). [intensity] fades them in
-     * and out; above 1 (a spring overshooting) they swell. With [glow] they are drawn large
-     * and faint, for the halo around the wave.
+     * and out; above 1 (a spring overshooting) they swell.
      */
-    fun DrawScope.drawBlobs(
+    private fun DrawScope.drawBlobs(
         timeMs: Float,
         intensity: Float,
-        glow: Boolean,
     ) {
         if (intensity <= 0f) return
         val data = baked
@@ -205,8 +203,8 @@ internal object LiquidLogo {
         val f = ((timeMs / 1000f * HZ) % steps + steps) % steps
         val i0 = f.toInt().coerceAtMost(steps - 1)
         val u = f - i0
-        val alpha = intensity.coerceIn(0f, 1f) * if (glow) GlowAlpha else 1f
-        val swell = (if (glow) GlowScale else 1f) * (0.75f + 0.25f * intensity)
+        val alpha = intensity.coerceIn(0f, 1f)
+        val swell = 0.75f + 0.25f * intensity
         for (j in 0 until n) {
             val a = (i0 * n + j) * 4
             val b = ((i0 + 1) * n + j) * 4
@@ -235,10 +233,7 @@ internal object LiquidLogo {
         if (intensity <= 0f) return
         clipPath(wave) {
             drawPath(wave, baseBrush, alpha = intensity.coerceIn(0f, 1f))
-            drawBlobs(timeMs, intensity, glow = false)
+            drawBlobs(timeMs, intensity)
         }
     }
-
-    private const val GlowAlpha = 0.32f
-    private const val GlowScale = 1.45f
 }

@@ -75,7 +75,7 @@ import moe.rukamori.archivetune.LocalAnimationsDisabled
  *  - Release: the content leaves the finger on a bouncy spring that keeps the finger's
  *    speed, into the refreshing position (a small dip below it) or, short of the
  *    threshold, back home (a small rise above it). While refreshing the liquid gradient of
- *    the splash surges into the wave and keeps moving, glowing beyond it too. A refresh is
+ *    the splash surges into the wave and keeps moving. A refresh is
  *    shown for at least [MinLiquidMs], so the phases never cut each other short.
  *  - Done: the wave flashes white and slowly returns to its plain colour while the content
  *    springs home overshooting a touch upwards, and a haptic says it is finished.
@@ -288,8 +288,8 @@ class RefreshLogoState(
 /**
  * The VIBRA wave. With a [state] it is the refresh indicator:
  *  1. pulling: the fill drains away to the right behind a soft edge, the logo stays put;
- *  2. refreshing: the liquid gradient of the splash surges in and keeps moving, glowing
- *     beyond the wave as well;
+ *  2. refreshing: the liquid gradient of the splash surges in and keeps moving, inside the
+ *     wave only;
  *  3. done: the wave flashes white, then slowly returns to its plain colour.
  */
 @Composable
@@ -316,8 +316,6 @@ fun VibraLogoMark(
             translate(-LogoViewportX, -LogoViewportY)
         }) {
             with(LiquidLogo) {
-                // Halo first, so the wave sits on top of it.
-                drawBlobs(clock, liquid, glow = true)
                 if (drain <= 0f) {
                     drawPath(logo, color)
                 } else {
