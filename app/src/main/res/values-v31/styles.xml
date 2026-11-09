@@ -1,0 +1,9 @@
+<resources>
+
+    <!-- Android 12+ splash: the logo masks a liquid gradient (drawable/splash_liquid). -->
+    <style name="Theme.ArchiveTune" parent="Base.Theme.ArchiveTune">
+        <item name="android:windowSplashScreenBackground">@color/splash_background</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_liquid</item>
+        <item name="android:windowSplashScreenAnimationDuration">1000</item>
+    </style>
+</resources>
