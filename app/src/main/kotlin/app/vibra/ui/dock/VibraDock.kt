@@ -18,7 +18,6 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
-import app.vibra.ui.motion.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.awaitTouchSlopOrCancellation
@@ -44,7 +43,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
@@ -75,7 +73,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextRange
@@ -97,6 +94,7 @@ import app.vibra.ui.motion.Liquid
 import app.vibra.ui.motion.LiquidScope
 import app.vibra.ui.motion.LiquidSheetState
 import app.vibra.ui.motion.LiquidSpeed
+import app.vibra.ui.motion.interactiveSurface
 import app.vibra.ui.motion.liquidPress
 import app.vibra.ui.player.NowPlaying
 import app.vibra.ui.theme.VibraDimens
@@ -368,8 +366,7 @@ private fun DockLeadingButton(
             Modifier
                 .fillMaxSize()
                 .liquidPress(interactionSource)
-                .clip(CircleShape)
-                .clickable(interactionSource = interactionSource, indication = ripple(), role = Role.Button) {
+                .interactiveSurface(CircleShape, interactionSource = interactionSource) {
                     haptics.press()
                     onClick()
                 }.semantics { contentDescription = description },
@@ -482,8 +479,7 @@ private fun MiniPlayer(
         modifier =
             Modifier
                 .fillMaxSize()
-                .clip(CircleShape)
-                .clickable(role = Role.Button) {
+                .interactiveSurface(CircleShape) {
                     haptics.press()
                     playerSheet.expand()
                 }.semantics { contentDescription = openDescription }
@@ -690,8 +686,7 @@ private fun DockIcon(
             modifier
                 .size(size)
                 .liquidPress(interactionSource, pressedScale = 0.85f)
-                .clip(CircleShape)
-                .clickable(interactionSource = interactionSource, indication = ripple(), role = Role.Button) {
+                .interactiveSurface(CircleShape, interactionSource = interactionSource) {
                     if (hapticOnClick) haptics.press()
                     onClick()
                 }.semantics { contentDescription = description },

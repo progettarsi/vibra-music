@@ -158,13 +158,13 @@ internal fun Modifier.sharedTapBounce(enabled: Boolean): Modifier = composed {
 }
 
 /** How a press of the [tapBounce] element ended (or that it is still going on). */
-private enum class PressOutcome { Lifted, Moved, Held }
+internal enum class PressOutcome { Lifted, Moved, Held }
 
 /**
  * Waits until the finger of [down] lifts ([PressOutcome.Lifted]) or travels past [slop], i.e. a
  * scroll or swipe took over ([PressOutcome.Moved]). A cancelled pointer counts as moved.
  */
-private suspend fun AwaitPointerEventScope.awaitPressEnd(
+internal suspend fun AwaitPointerEventScope.awaitPressEnd(
     down: PointerInputChange,
     slop: Float,
 ): PressOutcome {
@@ -180,7 +180,7 @@ private suspend fun AwaitPointerEventScope.awaitPressEnd(
 internal const val TapSquash = 0.04f
 
 /** Android's tap timeout (ViewConfiguration.getTapTimeout): below it a press is still a "tap". */
-private const val TapTimeoutMillis = 100L
+internal const val TapTimeoutMillis = 100L
 
 
 /** A control with its own animation claims the pointer so its enclosing card stays still. */

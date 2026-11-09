@@ -71,6 +71,8 @@ fun Modifier.combinedClickable(
  * A custom surface that owns its touch feedback: one bounce outside everything it draws, then
  * [shape] as both background and ripple mask, then a bounded ripple that grows to the whole
  * shape. Glow, shadows and outer decorations go before this modifier, so they stay unmasked.
+ * A tile whose visible part is only its artwork passes `indication = null` and draws the press
+ * there with [ArtworkPressHighlight].
  */
 fun Modifier.interactiveSurface(
     shape: Shape,
@@ -79,13 +81,14 @@ fun Modifier.interactiveSurface(
     role: Role? = Role.Button,
     onClickLabel: String? = null,
     interactionSource: MutableInteractionSource? = null,
+    indication: Indication? = ripple(),
     onClick: () -> Unit,
 ): Modifier = composed {
     expandingClick(onClick, containerColor, shape) { click ->
     surfaceLayers(shape, containerColor, enabled)
         .foundationClickable(
             interactionSource = interactionSource,
-            indication = ripple(),
+            indication = indication,
             enabled = enabled,
             onClickLabel = onClickLabel,
             role = role,
@@ -105,13 +108,14 @@ fun Modifier.interactiveLongSurface(
     onClickLabel: String? = null,
     onLongClickLabel: String? = null,
     interactionSource: MutableInteractionSource? = null,
+    indication: Indication? = ripple(),
     onClick: () -> Unit,
 ): Modifier = composed {
     expandingClick(onClick, containerColor, shape) { click ->
     surfaceLayers(shape, containerColor, enabled)
         .foundationCombinedClickable(
             interactionSource = interactionSource,
-            indication = ripple(),
+            indication = indication,
             enabled = enabled,
             onClickLabel = onClickLabel,
             role = role,

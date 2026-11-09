@@ -27,6 +27,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import app.vibra.ui.motion.clickable
 import app.vibra.ui.motion.interactiveSurface
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import app.vibra.ui.motion.artworkPressRelay
+import app.vibra.ui.motion.artworkPressLayer
+import app.vibra.ui.motion.WithoutTileIndication
+import app.vibra.ui.motion.ArtworkPressHighlight
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
@@ -234,44 +239,55 @@ fun GridItem(
     bounceOnTap: Boolean = false,
 ) {
     val bounce = if (bounceOnTap) rememberTapBounce() else null
-    Column(
-        modifier =
-            if (fillMaxWidth) {
-                Modifier
-                    .then(if (bounce != null) Modifier.tapBounce(bounce) else Modifier)
-                    .then(modifier)
-                    .focusable()
-                    .padding(12.dp)
-                    .fillMaxWidth()
-            } else {
-                Modifier
-                    .then(if (bounce != null) Modifier.tapBounce(bounce) else Modifier)
-                    .then(modifier)
-                    .focusable()
-                    .padding(12.dp)
-                    .width(GridThumbnailHeight * thumbnailRatio)
-            },
-    ) {
-        BoxWithConstraints(
-            contentAlignment = Alignment.Center,
+    // The caller's click covers the whole tile, but only the artwork is visible: the highlight is
+    // drawn on the artwork alone, following its exact outline.
+    val press = remember { MutableInteractionSource() }
+    WithoutTileIndication { inner ->
+        Column(
             modifier =
                 if (fillMaxWidth) {
-                    Modifier.fillMaxWidth()
+                    Modifier
+                        .then(if (bounce != null) Modifier.tapBounce(bounce) else Modifier)
+                        .then(modifier)
+                        .artworkPressRelay(press)
+                        .focusable()
+                        .padding(12.dp)
+                        .fillMaxWidth()
                 } else {
-                    Modifier.height(GridThumbnailHeight)
-                }.aspectRatio(thumbnailRatio),
+                    Modifier
+                        .then(if (bounce != null) Modifier.tapBounce(bounce) else Modifier)
+                        .then(modifier)
+                        .artworkPressRelay(press)
+                        .focusable()
+                        .padding(12.dp)
+                        .width(GridThumbnailHeight * thumbnailRatio)
+                },
         ) {
-            thumbnailContent()
-        }
+            inner {
+                BoxWithConstraints(
+                    contentAlignment = Alignment.Center,
+                    modifier =
+                        if (fillMaxWidth) {
+                            Modifier.fillMaxWidth()
+                        } else {
+                            Modifier.height(GridThumbnailHeight)
+                        }.aspectRatio(thumbnailRatio)
+                            .artworkPressLayer(press),
+                ) {
+                    thumbnailContent()
+                    ArtworkPressHighlight(press)
+                }
 
-        Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(6.dp))
 
-        title()
+                title()
 
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            badges()
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    badges()
 
-            subtitle()
+                    subtitle()
+                }
+            }
         }
     }
 }

@@ -13,6 +13,10 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import app.vibra.ui.motion.clickable
 import app.vibra.ui.motion.combinedClickable
+import app.vibra.ui.motion.ArtworkPressHighlight
+import androidx.compose.runtime.remember
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import app.vibra.ui.motion.artworkPressLayer
 import app.vibra.ui.motion.interactiveLongSurface
 import app.vibra.ui.motion.interactiveSurface
 import androidx.compose.foundation.layout.Arrangement
@@ -485,20 +489,30 @@ private fun LabeledCover(
     containerInset: Dp = 10.dp,
 ) {
     val shape = concentricRoundedCornerShape(32.dp, containerInset)
+    // The whole tile is the target, but only the cover is visible: the highlight stays on it.
+    val press = remember { MutableInteractionSource() }
     Column(
         modifier =
             modifier
                 .entryTapBounce(entry)
-                .interactiveLongSurface(shape, entry.onLongClick, role = null, onClick = entry.onClick),
+                .interactiveLongSurface(
+                    shape,
+                    entry.onLongClick,
+                    role = null,
+                    interactionSource = press,
+                    indication = null,
+                    onClick = entry.onClick,
+                ),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Box(modifier = Modifier.fillMaxWidth().aspectRatio(1f)) {
+        Box(modifier = Modifier.fillMaxWidth().aspectRatio(1f).artworkPressLayer(press)) {
             VibraArtwork(
                 url = entry.thumbnailUrl,
                 shape = if (entry.circular) CircleShape else shape,
                 contentDescription = entry.title,
                 modifier = Modifier.matchParentSize(),
             )
+            ArtworkPressHighlight(press)
             if (onPlay != null) {
                 // Not the transport: it stays still while the music plays.
                 CompositionLocalProvider(LocalPlaybackSpin provides null) {
@@ -561,8 +575,7 @@ private fun CoverGrid(
                     Modifier
                         .size(side)
                         .entryTapBounce(entry)
-                        .clip(if (entry.circular) CircleShape else concentricRoundedCornerShape(32.dp, 10.dp))
-                        .combinedClickable(onClick = entry.onClick, onLongClick = entry.onLongClick),
+                        .interactiveLongSurface(if (entry.circular) CircleShape else concentricRoundedCornerShape(32.dp, 10.dp), entry.onLongClick, role = null, onClick = entry.onClick),
             )
             return@BoxWithConstraints
         }
@@ -580,8 +593,7 @@ private fun CoverGrid(
                                 Modifier
                                     .size(cell)
                                     .entryTapBounce(entry)
-                                    .clip(if (entry.circular) CircleShape else concentricRoundedCornerShape(32.dp, 10.dp))
-                                    .combinedClickable(onClick = entry.onClick, onLongClick = entry.onLongClick),
+                                    .interactiveLongSurface(if (entry.circular) CircleShape else concentricRoundedCornerShape(32.dp, 10.dp), entry.onLongClick, role = null, onClick = entry.onClick),
                         )
                     }
                     if (pair.size == 1) Spacer(Modifier.size(cell))
@@ -726,8 +738,7 @@ fun SpotlightBlock(
                     .fillMaxWidth()
                     .aspectRatio(SpotlightAspect)
                     .entryTapBounce(lead)
-                    .clip(concentricRoundedCornerShape(32.dp, 10.dp))
-                    .combinedClickable(onClick = lead.onClick, onLongClick = lead.onLongClick),
+                    .interactiveLongSurface(concentricRoundedCornerShape(32.dp, 10.dp), lead.onLongClick, role = null, onClick = lead.onClick),
         ) {
             VibraArtwork(url = lead.thumbnailUrl, shape = concentricRoundedCornerShape(32.dp, 10.dp), contentDescription = lead.title, modifier = Modifier.fillMaxSize())
             // The title sits on the cover: a dark fade at the bottom keeps it readable.
@@ -774,8 +785,7 @@ fun SpotlightBlock(
                                 .weight(1f)
                                 .aspectRatio(1f)
                                 .entryTapBounce(entry)
-                                .clip(shape)
-                                .combinedClickable(onClick = entry.onClick, onLongClick = entry.onLongClick),
+                                .interactiveLongSurface(shape, entry.onLongClick, role = null, onClick = entry.onClick),
                     )
                 }
                 // Short strips keep the covers' size instead of stretching them.
@@ -804,8 +814,7 @@ fun CoverBlock(
                     .weight(1f)
                     .fillMaxWidth()
                     .entryTapBounce(entry)
-                    .clip(VibraShapes.InnerArtwork)
-                    .combinedClickable(onClick = entry.onClick, onLongClick = entry.onLongClick),
+                    .interactiveLongSurface(VibraShapes.InnerArtwork, entry.onLongClick, role = null, onClick = entry.onClick),
             contentAlignment = Alignment.Center,
         ) {
             VibraArtwork(url = entry.thumbnailUrl, shape = VibraShapes.InnerArtwork, contentDescription = entry.title, modifier = Modifier.fillMaxSize())
@@ -960,9 +969,13 @@ fun PlaylistsBlock(
                 modifier =
                     Modifier
                         .weight(1f)
-                        .clip(concentricRoundedCornerShape(32.dp, 10.dp))
-                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                        .combinedClickable(onClick = first.onClick, onLongClick = first.onLongClick)
+                        .interactiveLongSurface(
+                            concentricRoundedCornerShape(32.dp, 10.dp),
+                            first.onLongClick,
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            role = null,
+                            onClick = first.onClick,
+                        )
                         .padding(12.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
@@ -998,8 +1011,7 @@ fun PlaylistsBlock(
                                             .weight(1f)
                                             .aspectRatio(1f)
                                             .entryTapBounce(entry)
-                                            .clip(concentricRoundedCornerShape(32.dp, 10.dp))
-                                            .combinedClickable(onClick = entry.onClick, onLongClick = entry.onLongClick),
+                                            .interactiveLongSurface(concentricRoundedCornerShape(32.dp, 10.dp), entry.onLongClick, role = null, onClick = entry.onClick),
                                 )
                             }
                         }
