@@ -76,6 +76,11 @@ internal object LiquidLogo {
     /** x, y, vx, vy per blob per recorded step: one cycle at steady state. */
     private val baked: FloatArray by lazy { bake() }
 
+    /** Prepare the simulation off the UI thread before the first animated frame. */
+    fun prepare() {
+        baked
+    }
+
     /** The colours of one liquid: the wave's base gradient and one brush per blob. */
     class Palette internal constructor(
         internal val base: Brush,

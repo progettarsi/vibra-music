@@ -60,12 +60,15 @@ import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import app.vibra.ui.haptics.rememberVibraHaptics
+import app.vibra.ui.motion.Liquid
 import kotlin.math.exp
 import kotlin.math.ln
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import moe.rukamori.archivetune.LocalAnimationsDisabled
 
 /**
@@ -116,22 +119,28 @@ fun VibraPullToRefresh(
     }
     val refreshing by rememberUpdatedState(shown)
 
-    // Liquid fill: surges in on a bouncy spring when the refresh starts (overshoot swells the
-    // blobs) and fades under the flash at the end. Flash: the wave glows white on completion,
+    // Liquid fill eases in without overshooting and fades under the flash at the end.
+    // Flash: the wave glows white on completion,
     // then slowly returns to its plain colour.
     val liquid = remember { Animatable(0f) }
+    // Keep the entrance legible at reduced system scales while still snapping at scale zero.
+    val liquidEntrance = Liquid.container<Float>(minimumDurationScale = 1f)
+    var liquidReady by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        withContext(Dispatchers.Default) { LiquidLogo.prepare() }
+        liquidReady = true
+    }
     val flash = remember { Animatable(0f) }
     var liquidClockMs by remember { mutableFloatStateOf(0f) }
-    LaunchedEffect(shown) {
-        if (shown) {
+    LaunchedEffect(shown, liquidReady, animationsDisabled) {
+        if (shown && liquidReady) {
             flash.snapTo(0f)
             if (animationsDisabled) {
                 liquid.snapTo(1f)
             } else {
-                liquid.snapTo(0f)
-                liquid.animateTo(1f, spring(dampingRatio = SurgeDamping, stiffness = SurgeStiffness))
+                liquid.animateTo(1f, liquidEntrance)
             }
-        } else if (liquid.value > 0f) {
+        } else if (!shown && liquid.value > 0f) {
             if (animationsDisabled) {
                 liquid.snapTo(0f)
                 return@LaunchedEffect
@@ -145,7 +154,7 @@ fun VibraPullToRefresh(
     LaunchedEffect(shown, animationsDisabled) {
         if (animationsDisabled) return@LaunchedEffect
         if (shown) {
-            val start = withFrameNanos { it }
+            val start = withFrameNanos { it } - (liquidClockMs * 1_000_000f).toLong()
             while (true) withFrameNanos { liquidClockMs = (it - start) / 1_000_000f }
         } else {
             val start = withFrameNanos { it } - (liquidClockMs * 1_000_000f).toLong()
@@ -160,10 +169,13 @@ fun VibraPullToRefresh(
     val bounce: AnimationSpec<Float> =
         if (animationsDisabled) snap() else spring(dampingRatio = BounceDamping, stiffness = Spring.StiffnessMediumLow)
     var following by remember { mutableStateOf(true) }
+    // Keep the drained logo steady while the stock refresh state settles after release.
+    var holdDrain by remember { mutableStateOf(false) }
     // The spring a release started; a new pull takes the content back from it.
     var settling by remember { mutableStateOf<Job?>(null) }
     LaunchedEffect(shown) {
         if (shown) {
+            holdDrain = false
             following = false
             // Interrupts a release spring heading here, keeping its speed.
             travel.animateTo(1f, bounce)
@@ -187,6 +199,7 @@ fun VibraPullToRefresh(
         if (following && !refreshing && travel.value > 0.001f) {
             val fraction = state.distanceFraction
             val armed = fraction > 1f
+            holdDrain = armed
             val pullPerPx = StockDragMultiplier / with(density) { PullToRefreshDefaults.PositionalThreshold.toPx() }
             val speed = (fingerVelocityY * pullPerPx * rubberBandSlope(fraction)).coerceIn(-MaxReleaseSpeed, MaxReleaseSpeed)
             following = false
@@ -194,7 +207,10 @@ fun VibraPullToRefresh(
                 scope.launch {
                     travel.animateTo(if (armed) 1f else 0f, bounce, initialVelocity = speed)
                     // No refresh came of it (one was already running, say): fold back home.
-                    if (armed && !refreshing) travel.animateTo(0f, bounce)
+                    if (armed && !refreshing) {
+                        holdDrain = false
+                        travel.animateTo(0f, bounce)
+                    }
                     snapshotFlow { state.distanceFraction }.first { it <= 0.001f }
                     following = true
                 }
@@ -207,7 +223,7 @@ fun VibraPullToRefresh(
             pull = { state.distanceFraction.coerceIn(0f, 1f) },
             drain = {
                 when {
-                    refreshing -> 1f
+                    refreshing || holdDrain -> 1f
                     // Under the flash the wave is already full again, while the stock state
                     // eases back on its own; a new pull takes over once the finger is followed.
                     !following && (flash.value > 0f || flash.isRunning) -> 0f
@@ -245,6 +261,7 @@ fun VibraPullToRefresh(
                             if (!change.pressed) break
                             if (change.positionChange().y != 0f && settling?.isActive == true && !refreshing) {
                                 settling?.cancel()
+                                holdDrain = false
                                 following = true
                             }
                         }
@@ -275,7 +292,7 @@ private fun rubberBandSlope(fraction: Float): Float = PullStretch * exp(-fractio
  *
  * @property pull the stock pull, 0..1 of the refresh threshold.
  * @property drain how far the plain fill has drained away (0 full, 1 empty).
- * @property liquid strength of the liquid gradient (a spring: may overshoot 1).
+ * @property liquid strength of the liquid gradient, 0..1.
  * @property liquidClockMs the liquid's own clock.
  * @property flash white glow on completion, 0..1.
  */
@@ -393,10 +410,6 @@ private const val MaxReleaseSpeed = 8f
 
 /** A refresh is shown at least this long, so the liquid always surges in and moves. */
 private const val MinLiquidMs = 1_100L
-
-/** The liquid's entrance: a strong, bouncy spring (its overshoot swells the blobs). */
-private const val SurgeDamping = 0.42f
-private const val SurgeStiffness = 420f
 
 /** Completion: quick white flash, liquid fading under it, slow return to the plain colour. */
 private const val FlashInMs = 220
